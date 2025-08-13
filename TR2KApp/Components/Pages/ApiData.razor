@@ -60,11 +60,10 @@
                                             <option value="">Choose...</option>
                                             @if (DropdownData.ContainsKey(param.DropdownSource))
                                             {
-                                                @foreach (var item in DropdownData[param.DropdownSource])
+                                                var items = GetUniqueAndSortedDropdownItems(param);
+                                                @foreach (var item in items)
                                                 {
-                                                    var valueField = GetDropdownValue(item, param.ValueField);
-                                                    var displayField = GetDropdownDisplay(item, param.DisplayField);
-                                                    <option value="@valueField">@displayField</option>
+                                                    <option value="@item.Value">@item.Display</option>
                                                 }
                                             }
                                         </select>
@@ -715,6 +714,73 @@
         }
     }
     
+    private List<(string Value, string Display)> GetUniqueAndSortedDropdownItems(EndpointParameter param)
+    {
+        if (!DropdownData.ContainsKey(param.DropdownSource!))
+            return new List<(string, string)>();
+            
+        var items = new List<(string Value, string Display)>();
+        var seenValues = new HashSet<string>();
+        
+        foreach (var item in DropdownData[param.DropdownSource!])
+        {
+            var value = GetDropdownValue(item, param.ValueField);
+            var display = GetDropdownDisplay(item, param.DisplayField);
+            
+            if (!string.IsNullOrEmpty(value) && !seenValues.Contains(value))
+            {
+                seenValues.Add(value);
+                items.Add((value, display));
+            }
+        }
+        
+        // Special sorting for revision fields
+        if (param.DropdownSource == "issues" && param.ValueField?.Contains("Revision") == true)
+        {
+            return SortRevisions(items);
+        }
+        
+        // Default sorting for other fields
+        return items.OrderBy(i => i.Display).ToList();
+    }
+    
+    private List<(string Value, string Display)> SortRevisions(List<(string Value, string Display)> items)
+    {
+        var numericOnly = new List<(string Value, string Display, int NumValue)>();
+        var alphanumeric = new List<(string Value, string Display)>();
+        
+        foreach (var item in items)
+        {
+            if (int.TryParse(item.Value, out int numValue))
+            {
+                numericOnly.Add((item.Value, item.Display, numValue));
+            }
+            else
+            {
+                alphanumeric.Add(item);
+            }
+        }
+        
+        // Sort numeric revisions numerically
+        var sortedNumeric = numericOnly.OrderBy(i => i.NumValue).Select(i => (i.Value, i.Display));
+        
+        // Sort alphanumeric revisions - if starts with number, extract it for sorting
+        var sortedAlpha = alphanumeric.OrderBy(i => 
+        {
+            // Try to extract leading number for sorting
+            var match = System.Text.RegularExpressions.Regex.Match(i.Value, @"^(\d+)");
+            if (match.Success && int.TryParse(match.Groups[1].Value, out int leadingNum))
+            {
+                // Pad the number for proper string sorting, then add the rest
+                return leadingNum.ToString("D10") + i.Value.Substring(match.Length);
+            }
+            return "Z" + i.Value; // Put non-numeric start after all numeric
+        }).Select(i => (i.Value, i.Display));
+        
+        // Combine: numbers first, then alphanumeric
+        return sortedNumeric.Concat(sortedAlpha).ToList();
+    }
+    
     private string GetDropdownValue(dynamic item, string? valueField)
     {
         if (string.IsNullOrEmpty(valueField)) return "";
@@ -768,6 +834,11 @@
         {
             if (ParameterValues.TryGetValue(param.Name, out var value) && !string.IsNullOrEmpty(value))
             {
+                // URL encode revision parameters to handle special characters
+                if (param.Name.Contains("Revision") || param.Name == "issueRevision")
+                {
+                    value = System.Net.WebUtility.UrlEncode(value);
+                }
                 Console.WriteLine($"GetFinalEndpoint: Replacing {{{param.Name}}} with {value}");
                 endpoint = endpoint.Replace($"{{{param.Name}}}", value);
             }

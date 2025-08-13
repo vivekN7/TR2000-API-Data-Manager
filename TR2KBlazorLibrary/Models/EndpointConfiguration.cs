@@ -200,6 +200,187 @@ public static class EndpointRegistry
             }
         },
         
+        new EndpointConfiguration
+        {
+            Key = "issue",
+            Name = "Get issue revision",
+            Section = "Issues - Collection of datasheets",
+            Endpoint = "plants/{plantId}/issues/{issueRevision}",
+            TableName = "issues",
+            HttpMethod = "GET",
+            Parameters = new()
+            {
+                new EndpointParameter 
+                { 
+                    Name = "plantId", 
+                    DisplayName = "Select Plant", 
+                    IsRequired = true, 
+                    Type = "dropdown",
+                    DropdownSource = "plants",
+                    ValueField = "PlantID",
+                    DisplayField = "ShortDescription"
+                },
+                new EndpointParameter
+                {
+                    Name = "issueRevision",
+                    DisplayName = "Issue Revision",
+                    IsRequired = true,
+                    Type = "string"
+                }
+            },
+            Description = "Retrieve a specific issue revision",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "IssueRevision", Type = "[String]" },
+                new ResponseField { Name = "Status", Type = "[String]" },
+                new ResponseField { Name = "RevDate", Type = "[String]" },
+                new ResponseField { Name = "ProtectStatus", Type = "[String]" },
+                new ResponseField { Name = "GeneralRevision", Type = "[String]" },
+                new ResponseField { Name = "GeneralRevDate", Type = "[String]" },
+                new ResponseField { Name = "PCSRevision", Type = "[String]" },
+                new ResponseField { Name = "PCSRevDate", Type = "[String]" },
+                new ResponseField { Name = "EDSRevision", Type = "[String]" },
+                new ResponseField { Name = "EDSRevDate", Type = "[String]" },
+                new ResponseField { Name = "VDSRevision", Type = "[String]" },
+                new ResponseField { Name = "VDSRevDate", Type = "[String]" },
+                new ResponseField { Name = "VSKRevision", Type = "[String]" },
+                new ResponseField { Name = "VSKRevDate", Type = "[String]" },
+                new ResponseField { Name = "MDSRevision", Type = "[String]" },
+                new ResponseField { Name = "MDSRevDate", Type = "[String]" },
+                new ResponseField { Name = "ESKRevision", Type = "[String]" },
+                new ResponseField { Name = "ESKRevDate", Type = "[String]" },
+                new ResponseField { Name = "SCRevision", Type = "[String]" },
+                new ResponseField { Name = "SCRevDate", Type = "[String]" },
+                new ResponseField { Name = "VSMRevision", Type = "[String]" },
+                new ResponseField { Name = "VSMRevDate", Type = "[String]" }
+            }
+        },
+        
+        new EndpointConfiguration
+        {
+            Key = "general_datasheet",
+            Name = "Get general datasheet",
+            Section = "Issues - Collection of datasheets",
+            Endpoint = "plants/{plantId}/issues/{issueRevision}/general",
+            TableName = "general_datasheet",
+            HttpMethod = "GET",
+            Parameters = new()
+            {
+                new EndpointParameter 
+                { 
+                    Name = "plantId", 
+                    DisplayName = "Select Plant", 
+                    IsRequired = true, 
+                    Type = "dropdown",
+                    DropdownSource = "plants",
+                    ValueField = "PlantID",
+                    DisplayField = "ShortDescription"
+                },
+                new EndpointParameter
+                {
+                    Name = "issueRevision",
+                    DisplayName = "Issue Revision",
+                    IsRequired = true,
+                    Type = "string"
+                }
+            },
+            Description = "Retrieve general datasheet for an issue",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "PlantID", Type = "[Int32]" },
+                new ResponseField { Name = "IssueRevision", Type = "[String]" },
+                new ResponseField { Name = "GeneralRevision", Type = "[String]" },
+                new ResponseField { Name = "RevDate", Type = "[String]" },
+                new ResponseField { Name = "Status", Type = "[String]" },
+                new ResponseField { Name = "ProjectTitle", Type = "[String]" },
+                new ResponseField { Name = "PlantName", Type = "[String]" },
+                new ResponseField { Name = "PlantCode", Type = "[String]" },
+                new ResponseField { Name = "Comments", Type = "[String]" }
+            }
+        },
+        
+        new EndpointConfiguration
+        {
+            Key = "general_datasheet_by_revision",
+            Name = "Get general datasheet by revision",
+            Section = "Issues - Collection of datasheets",
+            Endpoint = "plants/{plantId}/general/{generalRevision}",
+            TableName = "general_datasheet",
+            HttpMethod = "GET",
+            Parameters = new()
+            {
+                new EndpointParameter 
+                { 
+                    Name = "plantId", 
+                    DisplayName = "Select Plant", 
+                    IsRequired = true, 
+                    Type = "dropdown",
+                    DropdownSource = "plants",
+                    ValueField = "PlantID",
+                    DisplayField = "ShortDescription"
+                },
+                new EndpointParameter
+                {
+                    Name = "generalRevision",
+                    DisplayName = "General Revision",
+                    IsRequired = true,
+                    Type = "string"
+                }
+            },
+            Description = "Retrieve general datasheet by specific revision",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "PlantID", Type = "[Int32]" },
+                new ResponseField { Name = "GeneralRevision", Type = "[String]" },
+                new ResponseField { Name = "RevDate", Type = "[String]" },
+                new ResponseField { Name = "Status", Type = "[String]" },
+                new ResponseField { Name = "ProjectTitle", Type = "[String]" },
+                new ResponseField { Name = "PlantName", Type = "[String]" },
+                new ResponseField { Name = "PlantCode", Type = "[String]" },
+                new ResponseField { Name = "Comments", Type = "[String]" }
+            }
+        },
+        
+        new EndpointConfiguration
+        {
+            Key = "pipe_element_references",
+            Name = "Get pipe element references",
+            Section = "Issues - Collection of datasheets",
+            Endpoint = "plants/{plantId}/issues/{issueRevision}/pipe-element-references",
+            TableName = "pipe_element_references",
+            HttpMethod = "GET",
+            Parameters = new()
+            {
+                new EndpointParameter 
+                { 
+                    Name = "plantId", 
+                    DisplayName = "Select Plant", 
+                    IsRequired = true, 
+                    Type = "dropdown",
+                    DropdownSource = "plants",
+                    ValueField = "PlantID",
+                    DisplayField = "ShortDescription"
+                },
+                new EndpointParameter
+                {
+                    Name = "issueRevision",
+                    DisplayName = "Issue Revision",
+                    IsRequired = true,
+                    Type = "string"
+                }
+            },
+            Description = "Retrieve pipe element references for an issue",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "ElementType", Type = "[String]" },
+                new ResponseField { Name = "ElementCode", Type = "[String]" },
+                new ResponseField { Name = "Description", Type = "[String]" },
+                new ResponseField { Name = "Reference", Type = "[String]" },
+                new ResponseField { Name = "Standard", Type = "[String]" },
+                new ResponseField { Name = "Material", Type = "[String]" }
+            }
+        },
+        
         // PCS Section  
         new EndpointConfiguration
         {

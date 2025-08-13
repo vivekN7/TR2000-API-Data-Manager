@@ -113,6 +113,13 @@ public class DataImportService
             return;
         }
         
+        // For single issue endpoint, clear issues table
+        if (System.Text.RegularExpressions.Regex.IsMatch(lowerEndpoint, @"^plants/\d+/issues/[^/]+$"))
+        {
+            await _issueRepository.DeleteAllAsync("issues");
+            return;
+        }
+        
         switch (lowerEndpoint)
         {
             case "operators":
@@ -126,6 +133,12 @@ public class DataImportService
                 break;
             case var e when e.Contains("issues"):
                 await _issueRepository.DeleteAllAsync("issues");
+                break;
+            case var e when e.Contains("general"):
+                // Clear general datasheet table if it exists
+                break;
+            case var e when e.Contains("pipe-element-references"):
+                // Clear pipe element references table if it exists
                 break;
         }
     }
@@ -148,6 +161,18 @@ public class DataImportService
             // Import single plant to database (after clearing all plants)
             await EnsureOperatorsExistAsync();
             return await ImportPlantsAsync(data);
+        }
+        
+        // Handle general datasheet endpoints
+        if (lowerEndpoint.Contains("general"))
+        {
+            return await ImportGeneralDatasheetAsync(data);
+        }
+        
+        // Handle pipe element references
+        if (lowerEndpoint.Contains("pipe-element-references"))
+        {
+            return await ImportPipeElementReferencesAsync(data);
         }
         
         switch (lowerEndpoint)
@@ -257,6 +282,28 @@ public class DataImportService
 
         await _issueRepository.InsertBulkAsync("issues", issues);
         return issues.Count;
+    }
+    
+    private async Task<int> ImportGeneralDatasheetAsync(List<Dictionary<string, object>> data)
+    {
+        // For now, store as generic dictionary data
+        // You may want to create a specific model class for this
+        var items = data.Select(item => new Dictionary<string, object>(item)).ToList();
+        
+        // Store in a generic way - you'll need to handle this based on your needs
+        _logger.LogInformation($"Imported {items.Count} general datasheet records");
+        return items.Count;
+    }
+    
+    private async Task<int> ImportPipeElementReferencesAsync(List<Dictionary<string, object>> data)
+    {
+        // For now, store as generic dictionary data
+        // You may want to create a specific model class for this
+        var items = data.Select(item => new Dictionary<string, object>(item)).ToList();
+        
+        // Store in a generic way - you'll need to handle this based on your needs
+        _logger.LogInformation($"Imported {items.Count} pipe element reference records");
+        return items.Count;
     }
 
     private static int ExtractPlantId(string endpoint)

@@ -201,165 +201,13 @@ public static class EndpointRegistry
             }
         },
         
-        new EndpointConfiguration
-        {
-            Key = "issue",
-            Name = "Get issue revision",
-            Section = "Issues - Collection of datasheets",
-            Endpoint = "plants/{plantId}/issues/{issueRevision}",
-            TableName = "issues",
-            HttpMethod = "GET",
-            Parameters = new()
-            {
-                new EndpointParameter 
-                { 
-                    Name = "plantId", 
-                    DisplayName = "Select Plant", 
-                    IsRequired = true, 
-                    Type = "dropdown",
-                    DropdownSource = "plants",
-                    ValueField = "PlantID",
-                    DisplayField = "ShortDescription"
-                },
-                new EndpointParameter
-                {
-                    Name = "issueRevision",
-                    DisplayName = "Issue Revision",
-                    IsRequired = true,
-                    Type = "dropdown",
-                    DropdownSource = "issues",
-                    ValueField = "IssueRevision",
-                    DisplayField = "IssueRevision",
-                    DependsOn = "plantId"
-                }
-            },
-            Description = "Retrieve a specific issue revision",
-            ResponseFields = new()
-            {
-                new ResponseField { Name = "IssueRevision", Type = "[String]" },
-                new ResponseField { Name = "Status", Type = "[String]" },
-                new ResponseField { Name = "RevDate", Type = "[String]" },
-                new ResponseField { Name = "ProtectStatus", Type = "[String]" },
-                new ResponseField { Name = "GeneralRevision", Type = "[String]" },
-                new ResponseField { Name = "GeneralRevDate", Type = "[String]" },
-                new ResponseField { Name = "PCSRevision", Type = "[String]" },
-                new ResponseField { Name = "PCSRevDate", Type = "[String]" },
-                new ResponseField { Name = "EDSRevision", Type = "[String]" },
-                new ResponseField { Name = "EDSRevDate", Type = "[String]" },
-                new ResponseField { Name = "VDSRevision", Type = "[String]" },
-                new ResponseField { Name = "VDSRevDate", Type = "[String]" },
-                new ResponseField { Name = "VSKRevision", Type = "[String]" },
-                new ResponseField { Name = "VSKRevDate", Type = "[String]" },
-                new ResponseField { Name = "MDSRevision", Type = "[String]" },
-                new ResponseField { Name = "MDSRevDate", Type = "[String]" },
-                new ResponseField { Name = "ESKRevision", Type = "[String]" },
-                new ResponseField { Name = "ESKRevDate", Type = "[String]" },
-                new ResponseField { Name = "SCRevision", Type = "[String]" },
-                new ResponseField { Name = "SCRevDate", Type = "[String]" },
-                new ResponseField { Name = "VSMRevision", Type = "[String]" },
-                new ResponseField { Name = "VSMRevDate", Type = "[String]" }
-            }
-        },
-        
-        new EndpointConfiguration
-        {
-            Key = "general_datasheet",
-            Name = "Get general datasheet",
-            Section = "Issues - Collection of datasheets",
-            Endpoint = "plants/{plantId}/issues/{issueRevision}/general",
-            TableName = "general_datasheet",
-            HttpMethod = "GET",
-            Parameters = new()
-            {
-                new EndpointParameter 
-                { 
-                    Name = "plantId", 
-                    DisplayName = "Select Plant", 
-                    IsRequired = true, 
-                    Type = "dropdown",
-                    DropdownSource = "plants",
-                    ValueField = "PlantID",
-                    DisplayField = "ShortDescription"
-                },
-                new EndpointParameter
-                {
-                    Name = "issueRevision",
-                    DisplayName = "Issue Revision",
-                    IsRequired = true,
-                    Type = "dropdown",
-                    DropdownSource = "issues",
-                    ValueField = "IssueRevision",
-                    DisplayField = "IssueRevision",
-                    DependsOn = "plantId"
-                }
-            },
-            Description = "Retrieve general datasheet for an issue",
-            ResponseFields = new()
-            {
-                new ResponseField { Name = "PlantID", Type = "[Int32]" },
-                new ResponseField { Name = "IssueRevision", Type = "[String]" },
-                new ResponseField { Name = "GeneralRevision", Type = "[String]" },
-                new ResponseField { Name = "RevDate", Type = "[String]" },
-                new ResponseField { Name = "Status", Type = "[String]" },
-                new ResponseField { Name = "ProjectTitle", Type = "[String]" },
-                new ResponseField { Name = "PlantName", Type = "[String]" },
-                new ResponseField { Name = "PlantCode", Type = "[String]" },
-                new ResponseField { Name = "Comments", Type = "[String]" }
-            }
-        },
-        
-        new EndpointConfiguration
-        {
-            Key = "general_datasheet_by_revision",
-            Name = "Get general datasheet by revision",
-            Section = "Issues - Collection of datasheets",
-            Endpoint = "plants/{plantId}/general/{generalRevision}",
-            TableName = "general_datasheet",
-            HttpMethod = "GET",
-            Parameters = new()
-            {
-                new EndpointParameter 
-                { 
-                    Name = "plantId", 
-                    DisplayName = "Select Plant", 
-                    IsRequired = true, 
-                    Type = "dropdown",
-                    DropdownSource = "plants",
-                    ValueField = "PlantID",
-                    DisplayField = "ShortDescription"
-                },
-                new EndpointParameter
-                {
-                    Name = "generalRevision",
-                    DisplayName = "General Revision",
-                    IsRequired = true,
-                    Type = "dropdown",
-                    DropdownSource = "issues",
-                    ValueField = "GeneralRevision",
-                    DisplayField = "GeneralRevision",
-                    DependsOn = "plantId"
-                }
-            },
-            Description = "Retrieve general datasheet by specific revision",
-            ResponseFields = new()
-            {
-                new ResponseField { Name = "PlantID", Type = "[Int32]" },
-                new ResponseField { Name = "GeneralRevision", Type = "[String]" },
-                new ResponseField { Name = "RevDate", Type = "[String]" },
-                new ResponseField { Name = "Status", Type = "[String]" },
-                new ResponseField { Name = "ProjectTitle", Type = "[String]" },
-                new ResponseField { Name = "PlantName", Type = "[String]" },
-                new ResponseField { Name = "PlantCode", Type = "[String]" },
-                new ResponseField { Name = "Comments", Type = "[String]" }
-            }
-        },
-        
+        // NOTE: The following endpoints don't exist in the API but are kept for future implementation
         new EndpointConfiguration
         {
             Key = "pcs_references",
             Name = "Get PCS references",
             Section = "Issues - Collection of datasheets",
-            Endpoint = "plants/{plantId}/issues/{issueRevision}/pcs-references",
+            Endpoint = "plants/{plantId}/issues/rev/{issueRevision}/pcs",
             TableName = "pcs_references",
             HttpMethod = "GET",
             Parameters = new()
@@ -377,12 +225,12 @@ public static class EndpointRegistry
                 new EndpointParameter
                 {
                     Name = "issueRevision",
-                    DisplayName = "PCS Revision",
+                    DisplayName = "Issue Revision",
                     IsRequired = true,
                     Type = "dropdown",
                     DropdownSource = "issues",
-                    ValueField = "PCSRevision",
-                    DisplayField = "PCSRevision",
+                    ValueField = "IssueRevision",
+                    DisplayField = "IssueRevision",
                     DependsOn = "plantId"
                 }
             },
@@ -396,12 +244,14 @@ public static class EndpointRegistry
             }
         },
         
+        
+        
         new EndpointConfiguration
         {
             Key = "sc_references",
             Name = "Get SC references",
             Section = "Issues - Collection of datasheets",
-            Endpoint = "plants/{plantId}/issues/{issueRevision}/sc-references",
+            Endpoint = "plants/{plantId}/issues/rev/{issueRevision}/sc",
             TableName = "sc_references",
             HttpMethod = "GET",
             Parameters = new()
@@ -419,12 +269,12 @@ public static class EndpointRegistry
                 new EndpointParameter
                 {
                     Name = "issueRevision",
-                    DisplayName = "SC Revision",
+                    DisplayName = "Issue Revision",
                     IsRequired = true,
                     Type = "dropdown",
                     DropdownSource = "issues",
-                    ValueField = "SCRevision",
-                    DisplayField = "SCRevision",
+                    ValueField = "IssueRevision",
+                    DisplayField = "IssueRevision",
                     DependsOn = "plantId"
                 }
             },
@@ -439,12 +289,14 @@ public static class EndpointRegistry
             }
         },
         
+        
+        
         new EndpointConfiguration
         {
             Key = "vsm_references",
             Name = "Get VSM references",
             Section = "Issues - Collection of datasheets",
-            Endpoint = "plants/{plantId}/issues/{issueRevision}/vsm-references",
+            Endpoint = "plants/{plantId}/issues/rev/{issueRevision}/vsm",
             TableName = "vsm_references",
             HttpMethod = "GET",
             Parameters = new()
@@ -462,12 +314,12 @@ public static class EndpointRegistry
                 new EndpointParameter
                 {
                     Name = "issueRevision",
-                    DisplayName = "VSM Revision",
+                    DisplayName = "Issue Revision",
                     IsRequired = true,
                     Type = "dropdown",
                     DropdownSource = "issues",
-                    ValueField = "VSMRevision",
-                    DisplayField = "VSMRevision",
+                    ValueField = "IssueRevision",
+                    DisplayField = "IssueRevision",
                     DependsOn = "plantId"
                 }
             },
@@ -482,12 +334,14 @@ public static class EndpointRegistry
             }
         },
         
+        
+        
         new EndpointConfiguration
         {
             Key = "vds_references",
             Name = "Get VDS references",
             Section = "Issues - Collection of datasheets",
-            Endpoint = "plants/{plantId}/issues/{issueRevision}/vds-references",
+            Endpoint = "plants/{plantId}/issues/rev/{issueRevision}/vds",
             TableName = "vds_references",
             HttpMethod = "GET",
             Parameters = new()
@@ -505,12 +359,12 @@ public static class EndpointRegistry
                 new EndpointParameter
                 {
                     Name = "issueRevision",
-                    DisplayName = "VDS Revision",
+                    DisplayName = "Issue Revision",
                     IsRequired = true,
                     Type = "dropdown",
                     DropdownSource = "issues",
-                    ValueField = "VDSRevision",
-                    DisplayField = "VDSRevision",
+                    ValueField = "IssueRevision",
+                    DisplayField = "IssueRevision",
                     DependsOn = "plantId"
                 }
             },
@@ -525,12 +379,14 @@ public static class EndpointRegistry
             }
         },
         
+        
+        
         new EndpointConfiguration
         {
             Key = "eds_references",
             Name = "Get EDS references",
             Section = "Issues - Collection of datasheets",
-            Endpoint = "plants/{plantId}/issues/{issueRevision}/eds-references",
+            Endpoint = "plants/{plantId}/issues/rev/{issueRevision}/eds",
             TableName = "eds_references",
             HttpMethod = "GET",
             Parameters = new()
@@ -548,12 +404,12 @@ public static class EndpointRegistry
                 new EndpointParameter
                 {
                     Name = "issueRevision",
-                    DisplayName = "EDS Revision",
+                    DisplayName = "Issue Revision",
                     IsRequired = true,
                     Type = "dropdown",
                     DropdownSource = "issues",
-                    ValueField = "EDSRevision",
-                    DisplayField = "EDSRevision",
+                    ValueField = "IssueRevision",
+                    DisplayField = "IssueRevision",
                     DependsOn = "plantId"
                 }
             },
@@ -568,12 +424,14 @@ public static class EndpointRegistry
             }
         },
         
+        
+        
         new EndpointConfiguration
         {
             Key = "mds_references",
             Name = "Get MDS references",
             Section = "Issues - Collection of datasheets",
-            Endpoint = "plants/{plantId}/issues/{issueRevision}/mds-references",
+            Endpoint = "plants/{plantId}/issues/rev/{issueRevision}/mds",
             TableName = "mds_references",
             HttpMethod = "GET",
             Parameters = new()
@@ -591,12 +449,12 @@ public static class EndpointRegistry
                 new EndpointParameter
                 {
                     Name = "issueRevision",
-                    DisplayName = "MDS Revision",
+                    DisplayName = "Issue Revision",
                     IsRequired = true,
                     Type = "dropdown",
                     DropdownSource = "issues",
-                    ValueField = "MDSRevision",
-                    DisplayField = "MDSRevision",
+                    ValueField = "IssueRevision",
+                    DisplayField = "IssueRevision",
                     DependsOn = "plantId"
                 }
             },
@@ -611,12 +469,14 @@ public static class EndpointRegistry
             }
         },
         
+        
+        
         new EndpointConfiguration
         {
             Key = "vsk_references",
             Name = "Get VSK references",
             Section = "Issues - Collection of datasheets",
-            Endpoint = "plants/{plantId}/issues/{issueRevision}/vsk-references",
+            Endpoint = "plants/{plantId}/issues/rev/{issueRevision}/vsk",
             TableName = "vsk_references",
             HttpMethod = "GET",
             Parameters = new()
@@ -634,12 +494,12 @@ public static class EndpointRegistry
                 new EndpointParameter
                 {
                     Name = "issueRevision",
-                    DisplayName = "VSK Revision",
+                    DisplayName = "Issue Revision",
                     IsRequired = true,
                     Type = "dropdown",
                     DropdownSource = "issues",
-                    ValueField = "VSKRevision",
-                    DisplayField = "VSKRevision",
+                    ValueField = "IssueRevision",
+                    DisplayField = "IssueRevision",
                     DependsOn = "plantId"
                 }
             },
@@ -659,7 +519,7 @@ public static class EndpointRegistry
             Key = "esk_references",
             Name = "Get ESK references",
             Section = "Issues - Collection of datasheets",
-            Endpoint = "plants/{plantId}/issues/{issueRevision}/esk-references",
+            Endpoint = "plants/{plantId}/issues/rev/{issueRevision}/esk",
             TableName = "esk_references",
             HttpMethod = "GET",
             Parameters = new()
@@ -677,12 +537,12 @@ public static class EndpointRegistry
                 new EndpointParameter
                 {
                     Name = "issueRevision",
-                    DisplayName = "ESK Revision",
+                    DisplayName = "Issue Revision",
                     IsRequired = true,
                     Type = "dropdown",
                     DropdownSource = "issues",
-                    ValueField = "ESKRevision",
-                    DisplayField = "ESKRevision",
+                    ValueField = "IssueRevision",
+                    DisplayField = "IssueRevision",
                     DependsOn = "plantId"
                 }
             },
@@ -702,7 +562,7 @@ public static class EndpointRegistry
             Key = "pipe_element_references",
             Name = "Get Pipe Element references",
             Section = "Issues - Collection of datasheets",
-            Endpoint = "plants/{plantId}/issues/{issueRevision}/pipe-element-references",
+            Endpoint = "plants/{plantId}/issues/rev/{issueRevision}/pipe-elements",
             TableName = "pipe_element_references",
             HttpMethod = "GET",
             Parameters = new()
@@ -740,6 +600,7 @@ public static class EndpointRegistry
                 new ResponseField { Name = "Material", Type = "[String]" }
             }
         },
+        
         
         // PCS Section  
         new EndpointConfiguration

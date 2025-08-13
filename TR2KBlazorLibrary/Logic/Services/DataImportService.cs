@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using TR2KBlazorLibrary.Logic.Repositories;
 using TR2KBlazorLibrary.Models.DatabaseModels;
+using System.Data;
 
 namespace TR2KBlazorLibrary.Logic.Services;
 
@@ -13,6 +14,7 @@ public class DataImportService
     private readonly IGenericRepository<Plant> _plantRepository;
     private readonly IGenericRepository<PCS> _pcsRepository;
     private readonly IGenericRepository<Issue> _issueRepository;
+    private readonly ISqliteConnectionFactory _connectionFactory;
     private readonly ILogger<DataImportService> _logger;
 
     public DataImportService(
@@ -23,6 +25,7 @@ public class DataImportService
         IGenericRepository<Plant> plantRepository,
         IGenericRepository<PCS> pcsRepository,
         IGenericRepository<Issue> issueRepository,
+        ISqliteConnectionFactory connectionFactory,
         ILogger<DataImportService> logger)
     {
         _apiService = apiService;
@@ -32,6 +35,7 @@ public class DataImportService
         _plantRepository = plantRepository;
         _pcsRepository = pcsRepository;
         _issueRepository = issueRepository;
+        _connectionFactory = connectionFactory;
         _logger = logger;
     }
 
@@ -170,8 +174,13 @@ public class DataImportService
             return await ImportGeneralDatasheetAsync(data);
         }
         
-        // Handle all reference endpoints
-        if (lowerEndpoint.Contains("-references"))
+        // Handle all reference endpoints (new URL pattern: /issues/rev/{rev}/pcs, /sc, etc.)
+        if (lowerEndpoint.Contains("/issues/rev/") && 
+            (lowerEndpoint.EndsWith("/pcs") || lowerEndpoint.EndsWith("/sc") || 
+             lowerEndpoint.EndsWith("/vsm") || lowerEndpoint.EndsWith("/vds") ||
+             lowerEndpoint.EndsWith("/eds") || lowerEndpoint.EndsWith("/mds") ||
+             lowerEndpoint.EndsWith("/vsk") || lowerEndpoint.EndsWith("/esk") ||
+             lowerEndpoint.EndsWith("/pipe-elements")))
         {
             return await ImportReferencesAsync(data, lowerEndpoint);
         }
@@ -298,25 +307,73 @@ public class DataImportService
     
     private async Task<int> ImportReferencesAsync(List<Dictionary<string, object>> data, string endpoint)
     {
-        // For now, store as generic dictionary data
-        // You may want to create specific model classes for each reference type
-        var items = data.Select(item => new Dictionary<string, object>(item)).ToList();
+        // Extract plant ID and issue revision from the endpoint
+        var match = System.Text.RegularExpressions.Regex.Match(endpoint, @"plants/(\d+)/issues/rev/([^/]+)/(.+)");
+        if (!match.Success)
+        {
+            throw new ArgumentException($"Invalid reference endpoint format: {endpoint}");
+        }
         
-        // Determine the reference type from the endpoint
-        string referenceType = "unknown";
-        if (endpoint.Contains("pcs-references")) referenceType = "PCS";
-        else if (endpoint.Contains("sc-references")) referenceType = "SC";
-        else if (endpoint.Contains("vsm-references")) referenceType = "VSM";
-        else if (endpoint.Contains("vds-references")) referenceType = "VDS";
-        else if (endpoint.Contains("eds-references")) referenceType = "EDS";
-        else if (endpoint.Contains("mds-references")) referenceType = "MDS";
-        else if (endpoint.Contains("vsk-references")) referenceType = "VSK";
-        else if (endpoint.Contains("esk-references")) referenceType = "ESK";
-        else if (endpoint.Contains("pipe-element-references")) referenceType = "Pipe Element";
+        int plantId = int.Parse(match.Groups[1].Value);
+        string issueRevision = match.Groups[2].Value;
+        string endpointType = match.Groups[3].Value;
         
-        // Store in a generic way - you'll need to handle this based on your needs
-        _logger.LogInformation($"Imported {items.Count} {referenceType} reference records");
-        return items.Count;
+        // Determine the table name and prepare data with PlantID and IssueRevision
+        string tableName = endpointType switch
+        {
+            "pcs" => "pcs_references",
+            "sc" => "sc_references",
+            "vsm" => "vsm_references",
+            "vds" => "vds_references",
+            "eds" => "eds_references",
+            "mds" => "mds_references",
+            "vsk" => "vsk_references",
+            "esk" => "esk_references",
+            "pipe-elements" => "pipe_element_references",
+            _ => throw new ArgumentException($"Unknown reference type: {endpointType}")
+        };
+        
+        // Add PlantID and IssueRevision to each item
+        var itemsToInsert = data.Select(item =>
+        {
+            var newItem = new Dictionary<string, object>(item);
+            newItem["PlantID"] = plantId;
+            newItem["IssueRevision"] = issueRevision;
+            return newItem;
+        }).ToList();
+        
+        // Insert data directly using SQL
+        if (itemsToInsert.Any())
+        {
+            using var connection = await _connectionFactory.GetConnectionAsync();
+            
+            // Get column names from the first item
+            var firstItem = itemsToInsert.First();
+            var columnNames = firstItem.Keys.Where(k => k != "Id" && k != "CreatedDate" && k != "ModifiedDate").ToList();
+            var columns = string.Join(", ", columnNames.Select(c => $"[{c}]"));
+            var parameters = string.Join(", ", columnNames.Select(c => $"@{c}"));
+            
+            var sql = $"INSERT INTO [{tableName}] ({columns}) VALUES ({parameters})";
+            
+            using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            
+            foreach (var item in itemsToInsert)
+            {
+                command.Parameters.Clear();
+                foreach (var column in columnNames)
+                {
+                    var parameter = command.CreateParameter();
+                    parameter.ParameterName = $"@{column}";
+                    parameter.Value = item.ContainsKey(column) ? item[column] ?? DBNull.Value : DBNull.Value;
+                    command.Parameters.Add(parameter);
+                }
+                await command.ExecuteNonQueryAsync();
+            }
+        }
+        
+        _logger.LogInformation($"Imported {itemsToInsert.Count} records into {tableName}");
+        return itemsToInsert.Count;
     }
 
     private static int ExtractPlantId(string endpoint)
@@ -367,6 +424,30 @@ public class DataImportService
         }
     }
 
+    private async Task<IEnumerable<dynamic>> GetReferenceDataAsync(string tableName)
+    {
+        using var connection = await _connectionFactory.GetConnectionAsync();
+        var sql = $"SELECT * FROM [{tableName}]";
+        
+        using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        
+        var results = new List<Dictionary<string, object>>();
+        using var reader = await command.ExecuteReaderAsync();
+        
+        while (await reader.ReadAsync())
+        {
+            var row = new Dictionary<string, object>();
+            for (int i = 0; i < reader.FieldCount; i++)
+            {
+                row[reader.GetName(i)] = reader.GetValue(i);
+            }
+            results.Add(row);
+        }
+        
+        return results.Cast<dynamic>();
+    }
+    
     public async Task<IEnumerable<dynamic>> GetImportedDataAsync(string tableName)
     {
         return tableName.ToLower() switch
@@ -375,6 +456,15 @@ public class DataImportService
             "plants" => await _plantRepository.GetAllAsync("plants"),
             "pcs" => await _pcsRepository.GetAllAsync("pcs"),
             "issues" => await _issueRepository.GetAllAsync("issues"),
+            "pcs_references" => await GetReferenceDataAsync("pcs_references"),
+            "sc_references" => await GetReferenceDataAsync("sc_references"),
+            "vsm_references" => await GetReferenceDataAsync("vsm_references"),
+            "vds_references" => await GetReferenceDataAsync("vds_references"),
+            "eds_references" => await GetReferenceDataAsync("eds_references"),
+            "mds_references" => await GetReferenceDataAsync("mds_references"),
+            "vsk_references" => await GetReferenceDataAsync("vsk_references"),
+            "esk_references" => await GetReferenceDataAsync("esk_references"),
+            "pipe_element_references" => await GetReferenceDataAsync("pipe_element_references"),
             _ => throw new ArgumentException($"Unknown table: {tableName}")
         };
     }

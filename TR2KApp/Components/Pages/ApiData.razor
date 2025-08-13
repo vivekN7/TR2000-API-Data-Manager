@@ -199,7 +199,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach (var row in ImportedData.Take(100))
+                                @foreach (var row in GetPagedData())
                                 {
                                     <tr>
                                         @foreach (var column in GetTableColumns())
@@ -210,9 +210,26 @@
                                 }
                             </tbody>
                         </table>
-                        @if (ImportedData.Count() > 100)
+                        @if (GetTotalPages() > 1)
                         {
-                            <p class="text-muted mt-2">Showing first 100 records of @ImportedData.Count() total</p>
+                            <div class="d-flex justify-content-between align-items-center mt-3">
+                                <div>
+                                    Showing @((CurrentPage - 1) * PageSize + 1) to @Math.Min(CurrentPage * PageSize, ImportedData.Count()) of @ImportedData.Count() records
+                                </div>
+                                <div>
+                                    <button class="btn btn-sm btn-outline-primary me-2" 
+                                            @onclick="PreviousPage" 
+                                            disabled="@(CurrentPage == 1)">
+                                        Previous
+                                    </button>
+                                    <span class="mx-2">Page @CurrentPage of @GetTotalPages()</span>
+                                    <button class="btn btn-sm btn-outline-primary ms-2" 
+                                            @onclick="NextPage" 
+                                            disabled="@(CurrentPage >= GetTotalPages())">
+                                        Next
+                                    </button>
+                                </div>
+                            </div>
                         }
                     </div>
                 </div>
@@ -234,6 +251,8 @@
     private bool IsLoadingDropdowns = false;
     private bool ShowViewData = false;
     private IEnumerable<dynamic>? ImportedData = null;
+    private int CurrentPage = 1;
+    private int PageSize = 100;
     
     private async Task TestConnection()
     {
@@ -267,6 +286,13 @@
     {
         var endpoint = GetFinalEndpoint();
         if (string.IsNullOrEmpty(endpoint)) return;
+        
+        // Debug logging
+        Console.WriteLine($"Importing endpoint: {endpoint}");
+        foreach (var kv in ParameterValues)
+        {
+            Console.WriteLine($"Parameter {kv.Key} = {kv.Value}");
+        }
         
         IsImporting = true;
         LoadingMessage = "Importing data...";
@@ -358,11 +384,42 @@
         try
         {
             ImportedData = await ImportService.GetImportedDataAsync(SelectedEndpoint.TableName);
+            CurrentPage = 1; // Reset to first page when loading new data
             StateHasChanged();
         }
         catch (Exception ex)
         {
             StatusMessage = $"❌ Error loading data: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+    
+    private IEnumerable<dynamic> GetPagedData()
+    {
+        if (ImportedData == null) return Enumerable.Empty<dynamic>();
+        return ImportedData.Skip((CurrentPage - 1) * PageSize).Take(PageSize);
+    }
+    
+    private int GetTotalPages()
+    {
+        if (ImportedData == null || !ImportedData.Any()) return 1;
+        return (int)Math.Ceiling((double)ImportedData.Count() / PageSize);
+    }
+    
+    private void NextPage()
+    {
+        if (CurrentPage < GetTotalPages())
+        {
+            CurrentPage++;
+            StateHasChanged();
+        }
+    }
+    
+    private void PreviousPage()
+    {
+        if (CurrentPage > 1)
+        {
+            CurrentPage--;
             StateHasChanged();
         }
     }
@@ -411,12 +468,16 @@
         ImportedData = null;
         ShowViewData = false;
         StatusMessage = "";
+        CurrentPage = 1; // Reset pagination
         
         // Load dropdown data for parameters
         if (SelectedEndpoint != null)
         {
             StatusMessage = $"Loading parameters for: {SelectedEndpoint.Name}";
             await LoadDropdownData();
+            
+            // Debug: Show what endpoint will be called
+            Console.WriteLine($"Selected endpoint: {SelectedEndpoint.Endpoint}");
         }
         
         await InvokeAsync(StateHasChanged);
@@ -482,6 +543,7 @@
     private void SetParameterValue(string paramName, string value)
     {
         ParameterValues[paramName] = value;
+        Console.WriteLine($"SetParameterValue: {paramName} = {value}");
         StateHasChanged();
     }
     
@@ -538,14 +600,17 @@
         {
             if (ParameterValues.TryGetValue(param.Name, out var value) && !string.IsNullOrEmpty(value))
             {
+                Console.WriteLine($"GetFinalEndpoint: Replacing {{{param.Name}}} with {value}");
                 endpoint = endpoint.Replace($"{{{param.Name}}}", value);
             }
             else if (param.IsRequired)
             {
+                Console.WriteLine($"GetFinalEndpoint: Missing required parameter {param.Name}");
                 return ""; // Required parameter is missing
             }
         }
         
+        Console.WriteLine($"GetFinalEndpoint: Final endpoint = {endpoint}");
         return endpoint;
     }
     

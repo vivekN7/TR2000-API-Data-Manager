@@ -343,8 +343,319 @@ public static class EndpointRegistry
         
         new EndpointConfiguration
         {
+            Key = "pcs_references",
+            Name = "Get PCS references",
+            Section = "Issues - Collection of datasheets",
+            Endpoint = "plants/{plantId}/issues/{issueRevision}/pcs-references",
+            TableName = "pcs_references",
+            HttpMethod = "GET",
+            Parameters = new()
+            {
+                new EndpointParameter 
+                { 
+                    Name = "plantId", 
+                    DisplayName = "Select Plant", 
+                    IsRequired = true, 
+                    Type = "dropdown",
+                    DropdownSource = "plants",
+                    ValueField = "PlantID",
+                    DisplayField = "ShortDescription"
+                },
+                new EndpointParameter
+                {
+                    Name = "issueRevision",
+                    DisplayName = "Issue Revision",
+                    IsRequired = true,
+                    Type = "string"
+                }
+            },
+            Description = "Retrieve PCS references for an issue",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "PCS", Type = "[String]" },
+                new ResponseField { Name = "Revision", Type = "[String]" },
+                new ResponseField { Name = "Status", Type = "[String]" },
+                new ResponseField { Name = "RevDate", Type = "[String]" }
+            }
+        },
+        
+        new EndpointConfiguration
+        {
+            Key = "sc_references",
+            Name = "Get SC references",
+            Section = "Issues - Collection of datasheets",
+            Endpoint = "plants/{plantId}/issues/{issueRevision}/sc-references",
+            TableName = "sc_references",
+            HttpMethod = "GET",
+            Parameters = new()
+            {
+                new EndpointParameter 
+                { 
+                    Name = "plantId", 
+                    DisplayName = "Select Plant", 
+                    IsRequired = true, 
+                    Type = "dropdown",
+                    DropdownSource = "plants",
+                    ValueField = "PlantID",
+                    DisplayField = "ShortDescription"
+                },
+                new EndpointParameter
+                {
+                    Name = "issueRevision",
+                    DisplayName = "Issue Revision",
+                    IsRequired = true,
+                    Type = "string"
+                }
+            },
+            Description = "Retrieve SC (Special Component) references for an issue",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "SC", Type = "[String]" },
+                new ResponseField { Name = "Revision", Type = "[String]" },
+                new ResponseField { Name = "Status", Type = "[String]" },
+                new ResponseField { Name = "RevDate", Type = "[String]" },
+                new ResponseField { Name = "Description", Type = "[String]" }
+            }
+        },
+        
+        new EndpointConfiguration
+        {
+            Key = "vsm_references",
+            Name = "Get VSM references",
+            Section = "Issues - Collection of datasheets",
+            Endpoint = "plants/{plantId}/issues/{issueRevision}/vsm-references",
+            TableName = "vsm_references",
+            HttpMethod = "GET",
+            Parameters = new()
+            {
+                new EndpointParameter 
+                { 
+                    Name = "plantId", 
+                    DisplayName = "Select Plant", 
+                    IsRequired = true, 
+                    Type = "dropdown",
+                    DropdownSource = "plants",
+                    ValueField = "PlantID",
+                    DisplayField = "ShortDescription"
+                },
+                new EndpointParameter
+                {
+                    Name = "issueRevision",
+                    DisplayName = "Issue Revision",
+                    IsRequired = true,
+                    Type = "string"
+                }
+            },
+            Description = "Retrieve VSM (Valve Specification Manual) references for an issue",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "VSM", Type = "[String]" },
+                new ResponseField { Name = "Revision", Type = "[String]" },
+                new ResponseField { Name = "Status", Type = "[String]" },
+                new ResponseField { Name = "RevDate", Type = "[String]" },
+                new ResponseField { Name = "Description", Type = "[String]" }
+            }
+        },
+        
+        new EndpointConfiguration
+        {
+            Key = "vds_references",
+            Name = "Get VDS references",
+            Section = "Issues - Collection of datasheets",
+            Endpoint = "plants/{plantId}/issues/{issueRevision}/vds-references",
+            TableName = "vds_references",
+            HttpMethod = "GET",
+            Parameters = new()
+            {
+                new EndpointParameter 
+                { 
+                    Name = "plantId", 
+                    DisplayName = "Select Plant", 
+                    IsRequired = true, 
+                    Type = "dropdown",
+                    DropdownSource = "plants",
+                    ValueField = "PlantID",
+                    DisplayField = "ShortDescription"
+                },
+                new EndpointParameter
+                {
+                    Name = "issueRevision",
+                    DisplayName = "Issue Revision",
+                    IsRequired = true,
+                    Type = "string"
+                }
+            },
+            Description = "Retrieve VDS (Valve Datasheet) references for an issue",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "VDS", Type = "[String]" },
+                new ResponseField { Name = "Revision", Type = "[String]" },
+                new ResponseField { Name = "Status", Type = "[String]" },
+                new ResponseField { Name = "RevDate", Type = "[String]" },
+                new ResponseField { Name = "Description", Type = "[String]" }
+            }
+        },
+        
+        new EndpointConfiguration
+        {
+            Key = "eds_references",
+            Name = "Get EDS references",
+            Section = "Issues - Collection of datasheets",
+            Endpoint = "plants/{plantId}/issues/{issueRevision}/eds-references",
+            TableName = "eds_references",
+            HttpMethod = "GET",
+            Parameters = new()
+            {
+                new EndpointParameter 
+                { 
+                    Name = "plantId", 
+                    DisplayName = "Select Plant", 
+                    IsRequired = true, 
+                    Type = "dropdown",
+                    DropdownSource = "plants",
+                    ValueField = "PlantID",
+                    DisplayField = "ShortDescription"
+                },
+                new EndpointParameter
+                {
+                    Name = "issueRevision",
+                    DisplayName = "Issue Revision",
+                    IsRequired = true,
+                    Type = "string"
+                }
+            },
+            Description = "Retrieve EDS (Equipment Datasheet) references for an issue",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "EDS", Type = "[String]" },
+                new ResponseField { Name = "Revision", Type = "[String]" },
+                new ResponseField { Name = "Status", Type = "[String]" },
+                new ResponseField { Name = "RevDate", Type = "[String]" },
+                new ResponseField { Name = "Description", Type = "[String]" }
+            }
+        },
+        
+        new EndpointConfiguration
+        {
+            Key = "mds_references",
+            Name = "Get MDS references",
+            Section = "Issues - Collection of datasheets",
+            Endpoint = "plants/{plantId}/issues/{issueRevision}/mds-references",
+            TableName = "mds_references",
+            HttpMethod = "GET",
+            Parameters = new()
+            {
+                new EndpointParameter 
+                { 
+                    Name = "plantId", 
+                    DisplayName = "Select Plant", 
+                    IsRequired = true, 
+                    Type = "dropdown",
+                    DropdownSource = "plants",
+                    ValueField = "PlantID",
+                    DisplayField = "ShortDescription"
+                },
+                new EndpointParameter
+                {
+                    Name = "issueRevision",
+                    DisplayName = "Issue Revision",
+                    IsRequired = true,
+                    Type = "string"
+                }
+            },
+            Description = "Retrieve MDS (Material Datasheet) references for an issue",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "MDS", Type = "[String]" },
+                new ResponseField { Name = "Revision", Type = "[String]" },
+                new ResponseField { Name = "Status", Type = "[String]" },
+                new ResponseField { Name = "RevDate", Type = "[String]" },
+                new ResponseField { Name = "Description", Type = "[String]" }
+            }
+        },
+        
+        new EndpointConfiguration
+        {
+            Key = "vsk_references",
+            Name = "Get VSK references",
+            Section = "Issues - Collection of datasheets",
+            Endpoint = "plants/{plantId}/issues/{issueRevision}/vsk-references",
+            TableName = "vsk_references",
+            HttpMethod = "GET",
+            Parameters = new()
+            {
+                new EndpointParameter 
+                { 
+                    Name = "plantId", 
+                    DisplayName = "Select Plant", 
+                    IsRequired = true, 
+                    Type = "dropdown",
+                    DropdownSource = "plants",
+                    ValueField = "PlantID",
+                    DisplayField = "ShortDescription"
+                },
+                new EndpointParameter
+                {
+                    Name = "issueRevision",
+                    DisplayName = "Issue Revision",
+                    IsRequired = true,
+                    Type = "string"
+                }
+            },
+            Description = "Retrieve VSK (Valve Spares Kit) references for an issue",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "VSK", Type = "[String]" },
+                new ResponseField { Name = "Revision", Type = "[String]" },
+                new ResponseField { Name = "Status", Type = "[String]" },
+                new ResponseField { Name = "RevDate", Type = "[String]" },
+                new ResponseField { Name = "Description", Type = "[String]" }
+            }
+        },
+        
+        new EndpointConfiguration
+        {
+            Key = "esk_references",
+            Name = "Get ESK references",
+            Section = "Issues - Collection of datasheets",
+            Endpoint = "plants/{plantId}/issues/{issueRevision}/esk-references",
+            TableName = "esk_references",
+            HttpMethod = "GET",
+            Parameters = new()
+            {
+                new EndpointParameter 
+                { 
+                    Name = "plantId", 
+                    DisplayName = "Select Plant", 
+                    IsRequired = true, 
+                    Type = "dropdown",
+                    DropdownSource = "plants",
+                    ValueField = "PlantID",
+                    DisplayField = "ShortDescription"
+                },
+                new EndpointParameter
+                {
+                    Name = "issueRevision",
+                    DisplayName = "Issue Revision",
+                    IsRequired = true,
+                    Type = "string"
+                }
+            },
+            Description = "Retrieve ESK (Equipment Spares Kit) references for an issue",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "ESK", Type = "[String]" },
+                new ResponseField { Name = "Revision", Type = "[String]" },
+                new ResponseField { Name = "Status", Type = "[String]" },
+                new ResponseField { Name = "RevDate", Type = "[String]" },
+                new ResponseField { Name = "Description", Type = "[String]" }
+            }
+        },
+        
+        new EndpointConfiguration
+        {
             Key = "pipe_element_references",
-            Name = "Get pipe element references",
+            Name = "Get Pipe Element references",
             Section = "Issues - Collection of datasheets",
             Endpoint = "plants/{plantId}/issues/{issueRevision}/pipe-element-references",
             TableName = "pipe_element_references",

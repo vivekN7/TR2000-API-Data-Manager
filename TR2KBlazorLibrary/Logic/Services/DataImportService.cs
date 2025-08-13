@@ -137,8 +137,9 @@ public class DataImportService
             case var e when e.Contains("general"):
                 // Clear general datasheet table if it exists
                 break;
-            case var e when e.Contains("pipe-element-references"):
-                // Clear pipe element references table if it exists
+            case var e when e.Contains("-references"):
+                // Clear reference tables if they exist
+                // For now, we're not storing these in persistent tables
                 break;
         }
     }
@@ -169,10 +170,10 @@ public class DataImportService
             return await ImportGeneralDatasheetAsync(data);
         }
         
-        // Handle pipe element references
-        if (lowerEndpoint.Contains("pipe-element-references"))
+        // Handle all reference endpoints
+        if (lowerEndpoint.Contains("-references"))
         {
-            return await ImportPipeElementReferencesAsync(data);
+            return await ImportReferencesAsync(data, lowerEndpoint);
         }
         
         switch (lowerEndpoint)
@@ -295,14 +296,26 @@ public class DataImportService
         return items.Count;
     }
     
-    private async Task<int> ImportPipeElementReferencesAsync(List<Dictionary<string, object>> data)
+    private async Task<int> ImportReferencesAsync(List<Dictionary<string, object>> data, string endpoint)
     {
         // For now, store as generic dictionary data
-        // You may want to create a specific model class for this
+        // You may want to create specific model classes for each reference type
         var items = data.Select(item => new Dictionary<string, object>(item)).ToList();
         
+        // Determine the reference type from the endpoint
+        string referenceType = "unknown";
+        if (endpoint.Contains("pcs-references")) referenceType = "PCS";
+        else if (endpoint.Contains("sc-references")) referenceType = "SC";
+        else if (endpoint.Contains("vsm-references")) referenceType = "VSM";
+        else if (endpoint.Contains("vds-references")) referenceType = "VDS";
+        else if (endpoint.Contains("eds-references")) referenceType = "EDS";
+        else if (endpoint.Contains("mds-references")) referenceType = "MDS";
+        else if (endpoint.Contains("vsk-references")) referenceType = "VSK";
+        else if (endpoint.Contains("esk-references")) referenceType = "ESK";
+        else if (endpoint.Contains("pipe-element-references")) referenceType = "Pipe Element";
+        
         // Store in a generic way - you'll need to handle this based on your needs
-        _logger.LogInformation($"Imported {items.Count} pipe element reference records");
+        _logger.LogInformation($"Imported {items.Count} {referenceType} reference records");
         return items.Count;
     }
 

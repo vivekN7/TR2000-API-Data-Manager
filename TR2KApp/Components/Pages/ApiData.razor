@@ -29,7 +29,7 @@
                             <optgroup label="@group.Key">
                                 @foreach (var endpoint in group)
                                 {
-                                    <option value="@endpoint.Key">@endpoint.Name</option>
+                                    <option value="@endpoint.Key">@endpoint.Name - @endpoint.Description</option>
                                 }
                             </optgroup>
                         }
@@ -72,13 +72,15 @@
                                     else if (param.Type == "int")
                                     {
                                         <input type="number" class="form-control form-control-sm" 
-                                               @bind="ParameterValues[param.Name]" 
+                                               value="@GetParameterValue(param.Name)"
+                                               @onchange="@(e => SetParameterValue(param.Name, e.Value?.ToString() ?? ""))"
                                                placeholder="Enter @param.DisplayName" />
                                     }
                                     else
                                     {
                                         <input type="text" class="form-control form-control-sm" 
-                                               @bind="ParameterValues[param.Name]" 
+                                               value="@GetParameterValue(param.Name)"
+                                               @onchange="@(e => SetParameterValue(param.Name, e.Value?.ToString() ?? ""))"
                                                placeholder="Enter @param.DisplayName" />
                                     }
                                 </div>
@@ -122,7 +124,7 @@
         {
             <div class="card">
                 <div class="card-header">
-                    <h6>Endpoint Details</h6>
+                    <h6>Endpoint Details for: '@SelectedEndpoint.Name'</h6>
                 </div>
                 <div class="card-body p-2" style="font-size: 0.8rem;">
                     <div class="mb-1">
@@ -355,7 +357,40 @@
         
         try
         {
-            ImportedData = await ImportService.GetImportedDataAsync(SelectedEndpoint.TableName);
+            // For single plant endpoint, filter to just the requested plant
+            if (SelectedEndpoint.Key == "plant" && ParameterValues.TryGetValue("plantId", out var plantIdStr) && !string.IsNullOrEmpty(plantIdStr))
+            {
+                var allPlants = await ImportService.GetImportedDataAsync(SelectedEndpoint.TableName);
+                if (int.TryParse(plantIdStr, out var plantId))
+                {
+                    ImportedData = allPlants.Where(p => 
+                    {
+                        try
+                        {
+                            if (p is IDictionary<string, object> dict && dict.ContainsKey("PlantID"))
+                            {
+                                return Convert.ToInt32(dict["PlantID"]) == plantId;
+                            }
+                            object obj = p;
+                            var prop = obj.GetType().GetProperty("PlantID");
+                            var value = prop?.GetValue(obj);
+                            return value != null && Convert.ToInt32(value) == plantId;
+                        }
+                        catch
+                        {
+                            return false;
+                        }
+                    });
+                }
+                else
+                {
+                    ImportedData = allPlants;
+                }
+            }
+            else
+            {
+                ImportedData = await ImportService.GetImportedDataAsync(SelectedEndpoint.TableName);
+            }
             StateHasChanged();
         }
         catch (Exception ex)

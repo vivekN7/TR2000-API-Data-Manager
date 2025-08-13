@@ -36,11 +36,11 @@ public static class EndpointRegistry
 {
     public static readonly List<EndpointConfiguration> AllEndpoints = new()
     {
-        // Operators and Plants Section
+        // Operators and Plants Section - In exact order from API documentation
         new EndpointConfiguration
         {
             Key = "operators",
-            Name = "Get all operators",
+            Name = "Get operators",
             Section = "Operators and Plants",
             Endpoint = "operators",
             TableName = "operators",
@@ -56,33 +56,8 @@ public static class EndpointRegistry
         
         new EndpointConfiguration
         {
-            Key = "plants",
-            Name = "Get all plants",
-            Section = "Operators and Plants",
-            Endpoint = "plants",
-            TableName = "plants",
-            HttpMethod = "GET",
-            Parameters = new(),
-            Description = "Retrieve all plants across all operators",
-            ResponseFields = new()
-            {
-                new ResponseField { Name = "OperatorID", Type = "[Int32]" },
-                new ResponseField { Name = "OperatorName", Type = "[String]" },
-                new ResponseField { Name = "PlantID", Type = "[Int32]" },
-                new ResponseField { Name = "ShortDescription", Type = "[String]" },
-                new ResponseField { Name = "Project", Type = "[String]" },
-                new ResponseField { Name = "LongDescription", Type = "[String]" },
-                new ResponseField { Name = "CommonLibPlantCode", Type = "[String]" },
-                new ResponseField { Name = "InitialRevision", Type = "[String]" },
-                new ResponseField { Name = "AreaID", Type = "[Int32]" },
-                new ResponseField { Name = "Area", Type = "[String]" }
-            }
-        },
-        
-        new EndpointConfiguration
-        {
             Key = "operator_plants",
-            Name = "Get plants by operator",
+            Name = "Get operator plants",
             Section = "Operators and Plants",
             Endpoint = "operators/{operatorId}/plants",
             TableName = "plants",
@@ -118,51 +93,69 @@ public static class EndpointRegistry
         
         new EndpointConfiguration
         {
-            Key = "plant_pcs",
-            Name = "Get PCS by plant",
+            Key = "plants",
+            Name = "Get plants",
             Section = "Operators and Plants",
-            Endpoint = "plants/{plantId}/pcs",
-            TableName = "pcs",
+            Endpoint = "plants",
+            TableName = "plants",
+            HttpMethod = "GET",
+            Parameters = new(),
+            Description = "Retrieve all plants across all operators",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "OperatorID", Type = "[Int32]" },
+                new ResponseField { Name = "OperatorName", Type = "[String]" },
+                new ResponseField { Name = "PlantID", Type = "[Int32]" },
+                new ResponseField { Name = "ShortDescription", Type = "[String]" },
+                new ResponseField { Name = "Project", Type = "[String]" },
+                new ResponseField { Name = "LongDescription", Type = "[String]" },
+                new ResponseField { Name = "CommonLibPlantCode", Type = "[String]" },
+                new ResponseField { Name = "InitialRevision", Type = "[String]" },
+                new ResponseField { Name = "AreaID", Type = "[Int32]" },
+                new ResponseField { Name = "Area", Type = "[String]" }
+            }
+        },
+        
+        new EndpointConfiguration
+        {
+            Key = "plant",
+            Name = "Get plant",
+            Section = "Operators and Plants",
+            Endpoint = "plants/{plantId}",
+            TableName = "plants",
             HttpMethod = "GET",
             Parameters = new()
             {
                 new EndpointParameter 
                 { 
                     Name = "plantId", 
-                    DisplayName = "Select Plant", 
+                    DisplayName = "Plant ID", 
                     IsRequired = true, 
-                    Type = "dropdown",
-                    DropdownSource = "plants",
-                    ValueField = "PlantID",
-                    DisplayField = "ShortDescription"
+                    Type = "int"
                 }
             },
-            Description = "Retrieve Pipe Class Sheets for a specific plant",
+            Description = "Retrieve a specific plant by ID",
             ResponseFields = new()
             {
-                new ResponseField { Name = "PCS", Type = "[String]" },
-                new ResponseField { Name = "Revision", Type = "[String]" },
-                new ResponseField { Name = "Status", Type = "[String]" },
-                new ResponseField { Name = "RevDate", Type = "[String]" },
-                new ResponseField { Name = "RatingClass", Type = "[String]" },
-                new ResponseField { Name = "TestPressure", Type = "[String]" },
-                new ResponseField { Name = "MaterialGroup", Type = "[String]" },
-                new ResponseField { Name = "DesignCode", Type = "[String]" },
-                new ResponseField { Name = "LastUpdate", Type = "[String]" },
-                new ResponseField { Name = "LastUpdateBy", Type = "[String]" },
-                new ResponseField { Name = "Approver", Type = "[String]" },
-                new ResponseField { Name = "Notepad", Type = "[String]" },
-                new ResponseField { Name = "SpecialReqID", Type = "[Int32]" },
-                new ResponseField { Name = "TubePCS", Type = "[String]" },
-                new ResponseField { Name = "NewVDSSection", Type = "[String]" }
+                new ResponseField { Name = "OperatorID", Type = "[Int32]" },
+                new ResponseField { Name = "OperatorName", Type = "[String]" },
+                new ResponseField { Name = "PlantID", Type = "[Int32]" },
+                new ResponseField { Name = "ShortDescription", Type = "[String]" },
+                new ResponseField { Name = "Project", Type = "[String]" },
+                new ResponseField { Name = "LongDescription", Type = "[String]" },
+                new ResponseField { Name = "CommonLibPlantCode", Type = "[String]" },
+                new ResponseField { Name = "InitialRevision", Type = "[String]" },
+                new ResponseField { Name = "AreaID", Type = "[Int32]" },
+                new ResponseField { Name = "Area", Type = "[String]" }
             }
         },
         
+        // Issues - Collection of datasheets Section
         new EndpointConfiguration
         {
             Key = "plant_issues",
-            Name = "Get issues by plant",
-            Section = "Operators and Plants",
+            Name = "Get issue revisions",
+            Section = "Issues - Collection of datasheets",
             Endpoint = "plants/{plantId}/issues",
             TableName = "issues",
             HttpMethod = "GET",
@@ -179,7 +172,7 @@ public static class EndpointRegistry
                     DisplayField = "ShortDescription"
                 }
             },
-            Description = "Retrieve issues/revisions for a specific plant",
+            Description = "Retrieve issue revisions for a specific plant",
             ResponseFields = new()
             {
                 new ResponseField { Name = "IssueRevision", Type = "[String]" },
@@ -204,6 +197,49 @@ public static class EndpointRegistry
                 new ResponseField { Name = "SCRevDate", Type = "[String]" },
                 new ResponseField { Name = "VSMRevision", Type = "[String]" },
                 new ResponseField { Name = "VSMRevDate", Type = "[String]" }
+            }
+        },
+        
+        // PCS Section  
+        new EndpointConfiguration
+        {
+            Key = "plant_pcs",
+            Name = "Get PCS list",
+            Section = "PCS",
+            Endpoint = "plants/{plantId}/pcs",
+            TableName = "pcs",
+            HttpMethod = "GET",
+            Parameters = new()
+            {
+                new EndpointParameter 
+                { 
+                    Name = "plantId", 
+                    DisplayName = "Select Plant", 
+                    IsRequired = true, 
+                    Type = "dropdown",
+                    DropdownSource = "plants",
+                    ValueField = "PlantID",
+                    DisplayField = "ShortDescription"
+                }
+            },
+            Description = "Retrieve PCS list for a specific plant",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "PCS", Type = "[String]" },
+                new ResponseField { Name = "Revision", Type = "[String]" },
+                new ResponseField { Name = "Status", Type = "[String]" },
+                new ResponseField { Name = "RevDate", Type = "[String]" },
+                new ResponseField { Name = "RatingClass", Type = "[String]" },
+                new ResponseField { Name = "TestPressure", Type = "[String]" },
+                new ResponseField { Name = "MaterialGroup", Type = "[String]" },
+                new ResponseField { Name = "DesignCode", Type = "[String]" },
+                new ResponseField { Name = "LastUpdate", Type = "[String]" },
+                new ResponseField { Name = "LastUpdateBy", Type = "[String]" },
+                new ResponseField { Name = "Approver", Type = "[String]" },
+                new ResponseField { Name = "Notepad", Type = "[String]" },
+                new ResponseField { Name = "SpecialReqID", Type = "[Int32]" },
+                new ResponseField { Name = "TubePCS", Type = "[String]" },
+                new ResponseField { Name = "NewVDSSection", Type = "[String]" }
             }
         }
     };

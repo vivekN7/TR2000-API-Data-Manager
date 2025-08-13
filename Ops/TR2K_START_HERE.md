@@ -1,7 +1,7 @@
 # TR2000 API Data Manager - Project Status
 
-## Current State (2025-08-13)
-The TR2000 API Data Manager is a Blazor Server application (.NET 9.0) that interfaces with the TR2000 API to manage piping specification data. The project is approximately 95% complete with all major functionality working.
+## Current State (2025-08-13 - End of Day)
+The TR2000 API Data Manager is a Blazor Server application (.NET 9.0) that interfaces with the TR2000 API to manage piping specification data. The project is approximately 90% complete with most functionality working.
 
 ## Project Structure
 ```
@@ -70,23 +70,46 @@ cd /workspace/TR2000/TR2K/TR2KApp
 - **Duplicate Removal**: Each revision appears only once
 - **URL Encoding**: Handles special characters in revisions
 
-## Known Issues & Solutions
+## Today's Work (2025-08-13)
 
-### 1. Hot Reload Not Working
+### Completed
+1. **Fixed Issues Section Endpoints**:
+   - Corrected URL format from `/issues/{issueRevision}/pcs-references` to `/issues/rev/{issueRevision}/pcs`
+   - Fixed all 9 reference endpoints (PCS, SC, VSM, VDS, EDS, MDS, VSK, ESK, Pipe Elements)
+
+2. **Database Updates**:
+   - Added 9 new tables for reference endpoints
+   - Fixed database permissions (chmod 666)
+   - Updated connection string with proper settings
+
+3. **UI Improvements**:
+   - Added clickable hyperlink showing full API URL in endpoint details
+   - All endpoints now visible and accessible
+
+4. **Repository Updates**:
+   - Updated DataImportService to handle reference tables
+   - Added dynamic data import/export functionality
+
+### Known Issues & Solutions
+
+### CURRENT ISSUES (Need fixing next session)
+
+### 1. Reference Table Column Mismatch
+- **Issue**: All reference tables except PCS have column mismatch errors
+- **Example Error**: `SQLite Error 1: 'table vsm_references has no column named OfficialRevision'`
+- **Root Cause**: Each reference endpoint returns different fields, but database tables have wrong column definitions
+- **Solution Needed**: 
+  - Test each reference endpoint to see actual response structure
+  - Update database tables with correct columns for each type
+  - PCS works because it has correct columns (OfficialRevision, RevisionSuffix, etc.)
+
+### 2. Hot Reload Not Working
 - **Issue**: Changes don't reflect without restart
 - **Solution**: Kill process and restart after code changes
 
-### 2. Server Binding in WSL/Docker
+### 3. Server Binding in WSL/Docker
 - **Issue**: Site stuck on loading
 - **Solution**: Always use `--host 0.0.0.0` when starting server
-
-### 3. Single Plant Endpoint
-- **Issue**: Returns all plants instead of one
-- **Solution**: Implemented - clears table and inserts only requested plant
-
-### 4. Operator Plants Selection
-- **Issue**: Always showed Equinor Europe plants
-- **Solution**: Fixed parameter binding in dropdowns
 
 ## Database Structure
 - **Pre-defined schema** in `CreateDatabase.sql`
@@ -116,12 +139,15 @@ cd /workspace/TR2000/TR2K/TR2KApp
 
 ## Next Steps / Remaining Work
 
-1. **Add Remaining API Sections**:
-   - PCS detailed endpoints
-   - VDS (Valve Datasheets) section
-   - EDS (Equipment Datasheets) section
-   - MDS (Material Datasheets) section
-   - Any other sections from API documentation
+1. **Fix Reference Table Columns** (PRIORITY):
+   - Test each reference endpoint (SC, VSM, VDS, EDS, MDS, VSK, ESK)
+   - Get actual response structure from API
+   - Update database table columns to match
+   - Currently only PCS references work correctly
+
+2. **Add Remaining API Sections**:
+   - PCS detailed endpoints (if any)
+   - Other sections from API documentation
 
 2. **Oracle Database Migration**:
    - Current SQLite is for testing
@@ -180,14 +206,28 @@ git log --oneline -10
 - **GitHub Repo**: https://github.com/vivekN7/TR2000-API-Data-Manager
 - **Current Port**: 5003 (can be changed if needed)
 
-## Session Recovery
-If starting fresh Claude Code session:
-1. Open this START_HERE.md file first
-2. Check git status for any uncommitted changes
-3. Start the application with proper host binding
-4. Continue from "Next Steps" section above
+## Session Recovery for Next Time
+When starting fresh Claude Code session:
+1. Open this `/workspace/TR2000/TR2K/Ops/TR2K_START_HERE.md` file first
+2. Check git status: `cd /workspace/TR2000/TR2K && git status`
+3. Pull latest changes: `git pull origin master`
+4. Start the application: `cd /workspace/TR2000/TR2K/TR2KApp && /home/node/.dotnet/dotnet run --urls "http://0.0.0.0:5003"`
+5. Focus on fixing reference table columns (see CURRENT ISSUES above)
+
+## Quick Test Commands
+```bash
+# Test SC references (should fail with column error)
+curl -s "https://equinor.pipespec-api.presight.com/plants/34/issues/rev/1/sc" | python3 -m json.tool | head -20
+
+# Test VSM references (should fail with column error)  
+curl -s "https://equinor.pipespec-api.presight.com/plants/34/issues/rev/1/vsm" | python3 -m json.tool | head -20
+
+# Compare with PCS which works
+curl -s "https://equinor.pipespec-api.presight.com/plants/34/issues/rev/1/pcs" | python3 -m json.tool | head -20
+```
 
 ---
-Last Updated: 2025-08-13
-Session ended due to context limit approaching
-All changes pushed to GitHub
+Last Updated: 2025-08-13 (End of Day)
+- Fixed endpoint URLs and added database tables
+- PCS references working, others need column fixes
+- All changes committed and pushed to GitHub

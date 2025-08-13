@@ -8,7 +8,7 @@ public class TR2000ApiService
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<TR2000ApiService> _logger;
-    private const string BaseUrl = "https://tr2000api.equinor.com";
+    private const string BaseUrl = "https://equinor.pipespec-api.presight.com";
 
     public TR2000ApiService(HttpClient httpClient, ILogger<TR2000ApiService> logger)
     {

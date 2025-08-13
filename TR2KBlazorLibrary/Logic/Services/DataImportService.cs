@@ -121,9 +121,19 @@ public class DataImportService
         }
     }
 
-    private async Task<int> ImportDataByEndpointAsync(string endpoint, List<Dictionary<string, object>> data)
+    public async Task<int> ImportDataByEndpointAsync(string endpoint, List<Dictionary<string, object>> data)
     {
-        switch (endpoint.ToLower())
+        var lowerEndpoint = endpoint.ToLower();
+        
+        // Handle operators/{id}/plants endpoint
+        if (lowerEndpoint.Contains("operators") && lowerEndpoint.Contains("plants"))
+        {
+            // Import as plants data
+            await EnsureOperatorsExistAsync();
+            return await ImportPlantsAsync(data);
+        }
+        
+        switch (lowerEndpoint)
         {
             case "operators":
                 return await ImportOperatorsAsync(data);

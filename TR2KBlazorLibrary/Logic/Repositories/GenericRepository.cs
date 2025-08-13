@@ -19,39 +19,6 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class
         _logger = logger;
     }
 
-    public async Task CreateTableFromObjectAsync(string tableName, T sampleObject)
-    {
-        try
-        {
-            var properties = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance);
-            var columnDefinitions = new List<string>();
-
-            foreach (var property in properties)
-            {
-                var columnName = property.Name;
-                var sqlType = GetSqliteType(property.PropertyType);
-                columnDefinitions.Add($"[{columnName}] {sqlType}");
-            }
-
-            var createTableSql = $@"
-                CREATE TABLE IF NOT EXISTS [{tableName}] (
-                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    {string.Join(",\n                    ", columnDefinitions)},
-                    CreatedDate DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    ModifiedDate DATETIME DEFAULT CURRENT_TIMESTAMP
-                )";
-
-            using var connection = await _connectionFactory.GetConnectionAsync();
-            await connection.ExecuteAsync(createTableSql);
-
-            _logger.LogInformation("Created table {TableName} with {ColumnCount} columns", tableName, columnDefinitions.Count);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to create table {TableName}", tableName);
-            throw;
-        }
-    }
 
     public async Task<bool> TableExistsAsync(string tableName)
     {
@@ -61,21 +28,6 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class
         return !string.IsNullOrEmpty(result);
     }
 
-    public async Task DropTableAsync(string tableName)
-    {
-        try
-        {
-            var sql = $"DROP TABLE IF EXISTS [{tableName}]";
-            using var connection = await _connectionFactory.GetConnectionAsync();
-            await connection.ExecuteAsync(sql);
-            _logger.LogInformation("Dropped table {TableName}", tableName);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to drop table {TableName}", tableName);
-            throw;
-        }
-    }
 
     public async Task<IEnumerable<T>> GetAllAsync(string tableName)
     {
@@ -262,25 +214,5 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class
         return columnInfo.Select(c => (string)c.name);
     }
 
-    private static string GetSqliteType(Type propertyType)
-    {
-        // Handle nullable types
-        var underlyingType = Nullable.GetUnderlyingType(propertyType) ?? propertyType;
-
-        return underlyingType.Name switch
-        {
-            nameof(String) => "TEXT",
-            nameof(Int32) => "INTEGER",
-            nameof(Int64) => "INTEGER",
-            nameof(Boolean) => "INTEGER",
-            nameof(DateTime) => "DATETIME",
-            nameof(DateTimeOffset) => "DATETIME",
-            nameof(Decimal) => "REAL",
-            nameof(Double) => "REAL",
-            nameof(Single) => "REAL",
-            nameof(Guid) => "TEXT",
-            _ => "TEXT" // Default to TEXT for unknown types
-        };
-    }
 }
 

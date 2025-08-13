@@ -2,10 +2,8 @@ namespace TR2KBlazorLibrary.Logic.Repositories;
 
 public interface IGenericRepository<T> where T : class
 {
-    // Strongly-typed table operations for predefined entities
-    Task CreateTableFromObjectAsync(string tableName, T sampleObject);
+    // Table verification operations (no dynamic creation)
     Task<bool> TableExistsAsync(string tableName);
-    Task DropTableAsync(string tableName);
     
     // Data operations
     Task<IEnumerable<T>> GetAllAsync(string tableName);

@@ -1,10 +1,13 @@
 @page "/api-data"
 @rendermode InteractiveServer
 @using TR2KBlazorLibrary.Logic.Services
+@using TR2KBlazorLibrary.Models
 @using TR2KBlazorLibrary.Models.DatabaseModels
+@using System.Text
 @inject TR2000ApiService ApiService
 @inject DataImportService ImportService
 @inject ApiResponseDeserializer Deserializer
+@inject IJSRuntime JS
 
 <PageTitle>TR2000 API Data</PageTitle>
 
@@ -17,48 +20,127 @@
                 <h5>Import TR2000 Data</h5>
             </div>
             <div class="card-body">
-                <div class="row">
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label">1. Select Data Type:</label>
-                        <select class="form-select" @bind="SelectedDataType" @bind:after="OnDataTypeChanged">
-                            <option value="">Choose data type...</option>
-                            <option value="operators">Operators</option>
-                            <option value="plants">Plants</option>
-                            <option value="pcs">Pipe Class Sheets (PCS)</option>
-                            <option value="issues">Issues</option>
-                        </select>
-                    </div>
-                    
-                    @if (SelectedDataType == "pcs" || SelectedDataType == "issues")
-                    {
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">2. Select Plant:</label>
-                            <select class="form-select" @bind="SelectedPlantId" @bind:after="OnPlantChanged">
-                                <option value="">Loading plants...</option>
-                                @if (AvailablePlants != null)
+                <div class="mb-2">
+                    <label class="form-label">1. Select Endpoint:</label>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <select class="form-select" @bind="SelectedEndpointKey" @bind:after="OnEndpointChanged">
+                                <option value="">Choose endpoint...</option>
+                                @foreach (var group in EndpointRegistry.AllEndpoints.GroupBy(e => e.Section))
                                 {
-                                    <option value="">Choose a plant...</option>
-                                    @foreach (var plant in AvailablePlants)
-                                    {
-                                        <option value="@plant.PlantID">@plant.ShortDescription (@plant.OperatorName)</option>
-                                    }
+                                    <optgroup label="@group.Key">
+                                        @foreach (var endpoint in group)
+                                        {
+                                            <option value="@endpoint.Key">@endpoint.Name</option>
+                                        }
+                                    </optgroup>
                                 }
                             </select>
                         </div>
                         
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">Final Endpoint:</label>
-                            <input type="text" class="form-control" value="@GetFinalEndpoint()" readonly />
-                        </div>
-                    }
-                    else if (!string.IsNullOrEmpty(SelectedDataType))
-                    {
-                        <div class="col-md-8 mb-3">
-                            <label class="form-label">Final Endpoint:</label>
-                            <input type="text" class="form-control" value="@GetFinalEndpoint()" readonly />
-                        </div>
-                    }
+                        @if (SelectedEndpoint != null)
+                        {
+                            <div class="col-md-6">
+                                <small class="d-block text-muted mb-1">Endpoint Details:</small>
+                                <div class="card">
+                                    <div class="card-body p-2" style="font-size: 0.85rem;">
+                                        <div class="mb-1">
+                                            <strong>Template:</strong> <code class="text-info">/@SelectedEndpoint.Endpoint | @SelectedEndpoint.HttpMethod</code>
+                                        </div>
+                                        @if (SelectedEndpoint.Parameters.Any())
+                                        {
+                                            <div class="mb-1">
+                                                <strong>Generated:</strong> <code class="text-primary">/@GetFinalEndpoint()</code>
+                                            </div>
+                                        }
+                                        <div class="mb-1">
+                                            <strong>Table:</strong> <code>@SelectedEndpoint.TableName</code>
+                                        </div>
+                                        @if (!string.IsNullOrEmpty(SelectedEndpoint.Description))
+                                        {
+                                            <div class="mb-1">
+                                                <small>@SelectedEndpoint.Description</small>
+                                            </div>
+                                        }
+                                        @if (SelectedEndpoint.Parameters.Any())
+                                        {
+                                            <div class="mb-1">
+                                                <strong>Params:</strong>
+                                                @foreach (var param in SelectedEndpoint.Parameters)
+                                                {
+                                                    <span class="ms-2">@param.Name.ToUpper() [Int32]</span>
+                                                }
+                                            </div>
+                                        }
+                                        @if (SelectedEndpoint.ResponseFields.Any())
+                                        {
+                                            <div>
+                                                <strong>Returns:</strong>
+                                                <div class="font-monospace" style="max-height: 100px; overflow-y: auto; background: #f8f9fa; padding: 4px; border-radius: 3px; margin-top: 2px; font-size: 0.8rem;">
+                                                    @foreach (var field in SelectedEndpoint.ResponseFields)
+                                                    {
+                                                        <div>@field.Name = @field.Type</div>
+                                                    }
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
                 </div>
+                
+                @if (SelectedEndpoint != null && SelectedEndpoint.Parameters.Any())
+                {
+                    <div class="mt-2 mb-3">
+                        <label class="form-label">2. Enter Parameters:</label>
+                        <div class="row">
+                            @foreach (var param in SelectedEndpoint.Parameters)
+                            {
+                                <div class="col-md-4">
+                                    <label class="form-label small">
+                                        @param.DisplayName
+                                        @if (param.IsRequired)
+                                        {
+                                            <span class="text-danger">*</span>
+                                        }
+                                    </label>
+                                    @if (param.Type == "dropdown" && param.DropdownSource != null)
+                                    {
+                                        <select class="form-select form-select-sm" 
+                                                value="@GetParameterValue(param.Name)"
+                                                @onchange="@(e => SetParameterValue(param.Name, e.Value?.ToString() ?? ""))"
+                                                disabled="@(!DropdownData.ContainsKey(param.DropdownSource))">
+                                            <option value="">Choose...</option>
+                                            @if (DropdownData.ContainsKey(param.DropdownSource))
+                                            {
+                                                @foreach (var item in DropdownData[param.DropdownSource])
+                                                {
+                                                    var valueField = GetDropdownValue(item, param.ValueField);
+                                                    var displayField = GetDropdownDisplay(item, param.DisplayField);
+                                                    <option value="@valueField">@displayField</option>
+                                                }
+                                            }
+                                        </select>
+                                    }
+                                    else if (param.Type == "int")
+                                    {
+                                        <input type="number" class="form-control form-control-sm" 
+                                               @bind="ParameterValues[param.Name]" 
+                                               placeholder="Enter @param.DisplayName" />
+                                    }
+                                    else
+                                    {
+                                        <input type="text" class="form-control form-control-sm" 
+                                               @bind="ParameterValues[param.Name]" 
+                                               placeholder="Enter @param.DisplayName" />
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
                 
                 <div class="mb-3">
                     <button class="btn btn-primary me-2" 
@@ -74,11 +156,8 @@
                     
                     @if (ShowViewData)
                     {
-                        <button class="btn btn-info ms-2" @onclick="ViewData">
-                            View Imported Data
-                        </button>
-                        <button class="btn btn-secondary ms-1" @onclick="RefreshData">
-                            Refresh
+                        <button class="btn btn-warning ms-2" @onclick="ExportToCsv">
+                            Export to CSV
                         </button>
                     }
                 </div>
@@ -111,6 +190,10 @@
                 else
                 {
                     <p class="text-muted">Ready to import TR2000 data.</p>
+                    <small class="text-info">
+                        <strong>Available Endpoints:</strong> @EndpointRegistry.AllEndpoints.Count<br>
+                        <strong>Sections:</strong> @EndpointRegistry.AllEndpoints.Select(e => e.Section).Distinct().Count()
+                    </small>
                 }
             </div>
         </div>
@@ -123,7 +206,7 @@
         <div class="col-12">
             <div class="card">
                 <div class="card-header">
-                    <h5>Imported Data (@ImportedData.Count() records)</h5>
+                    <h5>Imported Data from '@(SelectedEndpoint?.TableName)' (@ImportedData.Count() records)</h5>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -160,16 +243,18 @@
 }
 
 @code {
-    private string SelectedDataType = "";
-    private string SelectedPlantId = "";
+    private string SelectedEndpointKey = "";
+    private EndpointConfiguration? SelectedEndpoint = null;
+    private Dictionary<string, string> ParameterValues = new();
+    private Dictionary<string, IEnumerable<dynamic>> DropdownData = new();
     private string StatusMessage = "";
     private string LoadingMessage = "";
-    private bool IsLoading => IsTesting || IsImporting;
+    private bool IsLoading => IsTesting || IsImporting || IsLoadingDropdowns;
     private bool IsTesting = false;
     private bool IsImporting = false;
+    private bool IsLoadingDropdowns = false;
     private bool ShowViewData = false;
     private IEnumerable<dynamic>? ImportedData = null;
-    private List<Plant>? AvailablePlants = null;
     
     private async Task TestConnection()
     {
@@ -214,7 +299,7 @@
             var result = await ImportService.ImportDataAsync(endpoint, overwriteExisting: true);
             if (result.Success)
             {
-                StatusMessage = $"✅ Imported {result.RecordsImported} records successfully!";
+                StatusMessage = $"✅ Imported {result.RecordsImported} records successfully into '{SelectedEndpoint?.TableName}' table!";
                 ShowViewData = true;
                 await LoadImportedData();
             }
@@ -241,25 +326,59 @@
         return "alert-info";
     }
     
-    private async Task ViewData()
+    private async Task ExportToCsv()
     {
-        await LoadImportedData();
-    }
-    
-    private async Task RefreshData()
-    {
-        await LoadImportedData();
+        if (ImportedData == null || !ImportedData.Any())
+        {
+            StatusMessage = "⚠️ No data to export!";
+            return;
+        }
+        
+        try
+        {
+            var csv = new StringBuilder();
+            var columns = GetTableColumns().ToList();
+            
+            // Add headers
+            csv.AppendLine(string.Join(",", columns.Select(c => $"\"{c}\"")));
+            
+            // Add data rows
+            foreach (var row in ImportedData)
+            {
+                var values = columns.Select(col => 
+                {
+                    var value = GetCellValue(row, col)?.ToString() ?? "";
+                    // Escape quotes and wrap in quotes if contains comma or quotes
+                    if (value.Contains(",") || value.Contains("\"") || value.Contains("\n"))
+                    {
+                        value = "\"" + value.Replace("\"", "\"\"") + "\"";
+                    }
+                    return value;
+                });
+                csv.AppendLine(string.Join(",", values));
+            }
+            
+            // Download the CSV file
+            var fileName = $"{SelectedEndpoint?.TableName}_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+            var bytes = Encoding.UTF8.GetBytes(csv.ToString());
+            var base64 = Convert.ToBase64String(bytes);
+            
+            await JS.InvokeVoidAsync("downloadFile", fileName, base64, "text/csv");
+            StatusMessage = $"✅ Exported {ImportedData.Count()} records to {fileName}";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"❌ Export failed: {ex.Message}";
+        }
     }
     
     private async Task LoadImportedData()
     {
-        var endpoint = GetFinalEndpoint();
-        if (string.IsNullOrEmpty(endpoint)) return;
+        if (SelectedEndpoint == null) return;
         
         try
         {
-            var tableName = GetTableNameFromEndpoint(endpoint);
-            ImportedData = await ImportService.GetImportedDataAsync(tableName);
+            ImportedData = await ImportService.GetImportedDataAsync(SelectedEndpoint.TableName);
             StateHasChanged();
         }
         catch (Exception ex)
@@ -269,18 +388,6 @@
         }
     }
     
-    private string GetTableNameFromEndpoint(string endpoint)
-    {
-        return endpoint switch
-        {
-            "operators" => "operators",
-            "plants" => "plants",
-            var e when e.Contains("/pcs") => "pcs",
-            var e when e.Contains("/issues") => "issues",
-            _ => "operators"
-        };
-    }
-    
     private IEnumerable<string> GetTableColumns()
     {
         if (ImportedData == null || !ImportedData.Any()) return Enumerable.Empty<string>();
@@ -288,16 +395,15 @@
         var firstItem = ImportedData.First();
         if (firstItem is IDictionary<string, object> dict)
         {
-            return dict.Keys;
+            return dict.Keys.Where(k => k != "Id" && k != "CreatedDate" && k != "ModifiedDate");
         }
         
-        var properties = firstItem.GetType().GetProperties();
-        var columnNames = new List<string>();
-        foreach (var prop in properties)
-        {
-            columnNames.Add(prop.Name);
-        }
-        return columnNames;
+        // Cast to object first to avoid dynamic issues
+        object obj = firstItem;
+        var properties = obj.GetType().GetProperties();
+        return properties
+            .Where(p => p.Name != "Id" && p.Name != "CreatedDate" && p.Name != "ModifiedDate")
+            .Select(p => p.Name);
     }
     
     private object GetCellValue(dynamic row, string columnName)
@@ -318,72 +424,166 @@
         }
     }
     
-    private async Task OnDataTypeChanged()
+    private async Task OnEndpointChanged()
     {
-        SelectedPlantId = "";
+        SelectedEndpoint = EndpointRegistry.AllEndpoints.FirstOrDefault(e => e.Key == SelectedEndpointKey);
+        ParameterValues.Clear();
+        DropdownData.Clear();
         ImportedData = null;
         ShowViewData = false;
         StatusMessage = "";
         
-        if (SelectedDataType == "pcs" || SelectedDataType == "issues")
+        // Load dropdown data for parameters
+        if (SelectedEndpoint != null)
         {
-            await LoadAvailablePlants();
+            StatusMessage = $"Loading parameters for: {SelectedEndpoint.Name}";
+            await LoadDropdownData();
         }
         
         await InvokeAsync(StateHasChanged);
     }
     
-    private async Task OnPlantChanged()
+    private async Task LoadDropdownData()
     {
-        await InvokeAsync(StateHasChanged);
+        if (SelectedEndpoint == null) return;
+        
+        foreach (var param in SelectedEndpoint.Parameters.Where(p => p.Type == "dropdown" && !string.IsNullOrEmpty(p.DropdownSource)))
+        {
+            if (!DropdownData.ContainsKey(param.DropdownSource!))
+            {
+                IsLoadingDropdowns = true;
+                LoadingMessage = $"Loading {param.DropdownSource} data...";
+                StateHasChanged();
+                
+                try
+                {
+                    // Load from database if already imported, otherwise fetch from API
+                    var data = await ImportService.GetImportedDataAsync(param.DropdownSource!);
+                    if (data == null || !data.Any())
+                    {
+                        // If no data in database, fetch from API
+                        StatusMessage = $"📥 Fetching {param.DropdownSource} from API...";
+                        StateHasChanged();
+                        
+                        var apiData = await ApiService.FetchDataAsync(param.DropdownSource!);
+                        var deserializedData = Deserializer.DeserializeApiResponse(apiData, param.DropdownSource!);
+                        
+                        // Import to database for future use
+                        await ImportService.ImportDataByEndpointAsync(param.DropdownSource!, deserializedData);
+                        data = await ImportService.GetImportedDataAsync(param.DropdownSource!);
+                        
+                        StatusMessage = $"✅ Loaded {data?.Count() ?? 0} {param.DropdownSource}";
+                    }
+                    else
+                    {
+                        StatusMessage = $"✅ Loaded {data.Count()} {param.DropdownSource} from cache";
+                    }
+                    
+                    DropdownData[param.DropdownSource!] = data ?? new List<dynamic>();
+                }
+                catch (Exception ex)
+                {
+                    StatusMessage = $"⚠️ Warning: Could not load {param.DropdownSource} data: {ex.Message}";
+                    DropdownData[param.DropdownSource!] = new List<dynamic>(); // Empty list on error
+                }
+                finally
+                {
+                    IsLoadingDropdowns = false;
+                    StateHasChanged();
+                }
+            }
+        }
     }
     
-    private async Task LoadAvailablePlants()
+    private string GetParameterValue(string paramName)
     {
+        return ParameterValues.TryGetValue(paramName, out var value) ? value : "";
+    }
+    
+    private void SetParameterValue(string paramName, string value)
+    {
+        ParameterValues[paramName] = value;
+        StateHasChanged();
+    }
+    
+    private string GetDropdownValue(dynamic item, string? valueField)
+    {
+        if (string.IsNullOrEmpty(valueField)) return "";
+        
         try
         {
-            StatusMessage = "Loading available plants...";
-            StateHasChanged();
-            
-            // Just fetch from API to show options, don't import yet
-            var plantsApiData = await ApiService.FetchDataAsync("plants");
-            var plantsDeserializedData = Deserializer.DeserializeApiResponse(plantsApiData, "plants");
-            
-            AvailablePlants = plantsDeserializedData.Select(item => new Plant
+            if (item is IDictionary<string, object> dict && dict.ContainsKey(valueField))
             {
-                PlantID = Convert.ToInt32(item.GetValueOrDefault("PlantID", 0)),
-                ShortDescription = item.GetValueOrDefault("ShortDescription", "")?.ToString(),
-                OperatorName = item.GetValueOrDefault("OperatorName", "")?.ToString()
-            }).ToList();
+                return dict[valueField]?.ToString() ?? "";
+            }
             
-            StatusMessage = $"Loaded {AvailablePlants.Count} plants available for selection.";
+            object obj = item;
+            var prop = obj.GetType().GetProperty(valueField);
+            return prop?.GetValue(obj)?.ToString() ?? "";
         }
-        catch (Exception ex)
+        catch
         {
-            StatusMessage = $"❌ Error loading plants: {ex.Message}";
-            AvailablePlants = new List<Plant>();
+            return "";
         }
+    }
+    
+    private string GetDropdownDisplay(dynamic item, string? displayField)
+    {
+        if (string.IsNullOrEmpty(displayField)) return "";
         
-        StateHasChanged();
+        try
+        {
+            if (item is IDictionary<string, object> dict && dict.ContainsKey(displayField))
+            {
+                return dict[displayField]?.ToString() ?? "";
+            }
+            
+            object obj = item;
+            var prop = obj.GetType().GetProperty(displayField);
+            return prop?.GetValue(obj)?.ToString() ?? "";
+        }
+        catch
+        {
+            return "";
+        }
     }
     
     private string GetFinalEndpoint()
     {
-        return SelectedDataType switch
+        if (SelectedEndpoint == null) return "";
+        
+        var endpoint = SelectedEndpoint.Endpoint;
+        
+        // Replace parameters in the endpoint
+        foreach (var param in SelectedEndpoint.Parameters)
         {
-            "operators" => "operators",
-            "plants" => "plants",
-            "pcs" when !string.IsNullOrEmpty(SelectedPlantId) => $"plants/{SelectedPlantId}/pcs",
-            "issues" when !string.IsNullOrEmpty(SelectedPlantId) => $"plants/{SelectedPlantId}/issues",
-            _ => ""
-        };
+            if (ParameterValues.TryGetValue(param.Name, out var value) && !string.IsNullOrEmpty(value))
+            {
+                endpoint = endpoint.Replace($"{{{param.Name}}}", value);
+            }
+            else if (param.IsRequired)
+            {
+                return ""; // Required parameter is missing
+            }
+        }
+        
+        return endpoint;
     }
     
     private bool CanImport()
     {
         if (IsLoading) return false;
+        if (SelectedEndpoint == null) return false;
         
-        var endpoint = GetFinalEndpoint();
-        return !string.IsNullOrEmpty(endpoint);
+        // Check all required parameters are filled
+        foreach (var param in SelectedEndpoint.Parameters.Where(p => p.IsRequired))
+        {
+            if (!ParameterValues.TryGetValue(param.Name, out var value) || string.IsNullOrEmpty(value))
+            {
+                return false;
+            }
+        }
+        
+        return !string.IsNullOrEmpty(GetFinalEndpoint());
     }
 }

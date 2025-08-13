@@ -37,6 +37,7 @@ CREATE TABLE ImportLog (
 );
 
 -- Create operators table (TR2000 API: /operators)
+-- Matches exact JSON response: getOperator array with OperatorID and OperatorName
 CREATE TABLE operators (
     Id INTEGER PRIMARY KEY AUTOINCREMENT,
     OperatorID INTEGER NOT NULL,

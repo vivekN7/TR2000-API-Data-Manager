@@ -145,9 +145,9 @@ public class DataImportService
         // Handle plants/{id} endpoint (single plant)
         if (System.Text.RegularExpressions.Regex.IsMatch(lowerEndpoint, @"^plants/\d+$"))
         {
-            // Single plant, still import as plants data
-            await EnsureOperatorsExistAsync();
-            return await ImportPlantsAsync(data);
+            // For single plant, don't import to database at all
+            // The data is just for display purposes
+            return data.Count;
         }
         
         switch (lowerEndpoint)
@@ -195,16 +195,6 @@ public class DataImportService
             Project = item.GetValueOrDefault("Project", "")?.ToString(),
             InitialRevision = item.GetValueOrDefault("InitialRevision", "")?.ToString()
         }).ToList();
-
-        // For single plant endpoint, only insert/update that specific plant
-        if (plants.Count == 1)
-        {
-            var plant = plants.First();
-            // Delete existing plant with same ID if it exists
-            await _plantRepository.ExecuteAsync(
-                "DELETE FROM plants WHERE PlantID = @PlantID", 
-                new { PlantID = plant.PlantID });
-        }
 
         await _plantRepository.InsertBulkAsync("plants", plants);
         return plants.Count;

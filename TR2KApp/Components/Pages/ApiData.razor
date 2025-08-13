@@ -55,8 +55,8 @@
                                     {
                                         <select class="form-select form-select-sm" 
                                                 value="@GetParameterValue(param.Name)"
-                                                @onchange="@(e => SetParameterValue(param.Name, e.Value?.ToString() ?? ""))"
-                                                disabled="@(!DropdownData.ContainsKey(param.DropdownSource))">
+                                                @onchange="@(async e => await SetParameterValue(param.Name, e.Value?.ToString() ?? ""))"
+                                                disabled="@(!DropdownData.ContainsKey(param.DropdownSource) || (param.DependsOn != null && string.IsNullOrEmpty(GetParameterValue(param.DependsOn))))">
                                             <option value="">Choose...</option>
                                             @if (DropdownData.ContainsKey(param.DropdownSource))
                                             {
@@ -73,14 +73,14 @@
                                     {
                                         <input type="number" class="form-control form-control-sm" 
                                                value="@GetParameterValue(param.Name)"
-                                               @onchange="@(e => SetParameterValue(param.Name, e.Value?.ToString() ?? ""))"
+                                               @onchange="@(async e => await SetParameterValue(param.Name, e.Value?.ToString() ?? ""))"
                                                placeholder="Enter @param.DisplayName" />
                                     }
                                     else
                                     {
                                         <input type="text" class="form-control form-control-sm" 
                                                value="@GetParameterValue(param.Name)"
-                                               @onchange="@(e => SetParameterValue(param.Name, e.Value?.ToString() ?? ""))"
+                                               @onchange="@(async e => await SetParameterValue(param.Name, e.Value?.ToString() ?? ""))"
                                                placeholder="Enter @param.DisplayName" />
                                     }
                                 </div>
@@ -602,6 +602,10 @@
         
         foreach (var param in SelectedEndpoint.Parameters.Where(p => p.Type == "dropdown" && !string.IsNullOrEmpty(p.DropdownSource)))
         {
+            // Skip dependent dropdowns - they'll be loaded when their dependency changes
+            if (!string.IsNullOrEmpty(param.DependsOn))
+                continue;
+                
             if (!DropdownData.ContainsKey(param.DropdownSource!))
             {
                 IsLoadingDropdowns = true;
@@ -653,11 +657,62 @@
         return ParameterValues.TryGetValue(paramName, out var value) ? value : "";
     }
     
-    private void SetParameterValue(string paramName, string value)
+    private async Task SetParameterValue(string paramName, string value)
     {
         ParameterValues[paramName] = value;
         Console.WriteLine($"SetParameterValue: {paramName} = {value}");
+        
+        // Check if any other parameters depend on this one
+        if (SelectedEndpoint != null)
+        {
+            var dependentParams = SelectedEndpoint.Parameters
+                .Where(p => p.DependsOn == paramName && p.Type == "dropdown")
+                .ToList();
+                
+            foreach (var depParam in dependentParams)
+            {
+                // Load issues for the selected plant
+                if (depParam.DropdownSource == "issues" && paramName == "plantId" && !string.IsNullOrEmpty(value))
+                {
+                    await LoadIssuesForPlant(value);
+                }
+            }
+        }
+        
         StateHasChanged();
+    }
+    
+    private async Task LoadIssuesForPlant(string plantId)
+    {
+        try
+        {
+            IsLoadingDropdowns = true;
+            LoadingMessage = $"Loading issues for plant {plantId}...";
+            StateHasChanged();
+            
+            // Fetch issues for this plant
+            var endpoint = $"plants/{plantId}/issues";
+            var apiData = await ApiService.FetchDataAsync(endpoint);
+            var deserializedData = Deserializer.DeserializeApiResponse(apiData, endpoint);
+            
+            // Import to database
+            await ImportService.ImportDataByEndpointAsync(endpoint, deserializedData);
+            var data = await ImportService.GetImportedDataAsync("issues");
+            
+            // Store issues data - we'll use it for all revision dropdowns
+            DropdownData["issues"] = data ?? new List<dynamic>();
+            StatusMessage = $"✅ Loaded {data?.Count() ?? 0} issues for selected plant";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"⚠️ Warning: Could not load issues: {ex.Message}";
+            DropdownData["issues"] = new List<dynamic>();
+        }
+        finally
+        {
+            IsLoadingDropdowns = false;
+            StateHasChanged();
+        }
     }
     
     private string GetDropdownValue(dynamic item, string? valueField)

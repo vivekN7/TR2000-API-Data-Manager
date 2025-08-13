@@ -27,9 +27,10 @@ public class EndpointParameter
     public bool IsRequired { get; set; }
     public string Type { get; set; } = "string"; // string, int, dropdown, etc.
     public string? DefaultValue { get; set; }
-    public string? DropdownSource { get; set; } // e.g., "operators", "plants"
-    public string? ValueField { get; set; } // e.g., "OperatorID", "PlantID"
+    public string? DropdownSource { get; set; } // e.g., "operators", "plants", "issues"
+    public string? ValueField { get; set; } // e.g., "OperatorID", "PlantID", "IssueRevision"
     public string? DisplayField { get; set; } // e.g., "OperatorName", "LongDescription"
+    public string? DependsOn { get; set; } // e.g., "plantId" - another parameter this depends on
 }
 
 public static class EndpointRegistry
@@ -225,7 +226,11 @@ public static class EndpointRegistry
                     Name = "issueRevision",
                     DisplayName = "Issue Revision",
                     IsRequired = true,
-                    Type = "string"
+                    Type = "dropdown",
+                    DropdownSource = "issues",
+                    ValueField = "IssueRevision",
+                    DisplayField = "IssueRevision",
+                    DependsOn = "plantId"
                 }
             },
             Description = "Retrieve a specific issue revision",
@@ -281,7 +286,11 @@ public static class EndpointRegistry
                     Name = "issueRevision",
                     DisplayName = "Issue Revision",
                     IsRequired = true,
-                    Type = "string"
+                    Type = "dropdown",
+                    DropdownSource = "issues",
+                    ValueField = "IssueRevision",
+                    DisplayField = "IssueRevision",
+                    DependsOn = "plantId"
                 }
             },
             Description = "Retrieve general datasheet for an issue",
@@ -324,7 +333,11 @@ public static class EndpointRegistry
                     Name = "generalRevision",
                     DisplayName = "General Revision",
                     IsRequired = true,
-                    Type = "string"
+                    Type = "dropdown",
+                    DropdownSource = "issues",
+                    ValueField = "GeneralRevision",
+                    DisplayField = "GeneralRevision",
+                    DependsOn = "plantId"
                 }
             },
             Description = "Retrieve general datasheet by specific revision",
@@ -364,9 +377,13 @@ public static class EndpointRegistry
                 new EndpointParameter
                 {
                     Name = "issueRevision",
-                    DisplayName = "Issue Revision",
+                    DisplayName = "PCS Revision",
                     IsRequired = true,
-                    Type = "string"
+                    Type = "dropdown",
+                    DropdownSource = "issues",
+                    ValueField = "PCSRevision",
+                    DisplayField = "PCSRevision",
+                    DependsOn = "plantId"
                 }
             },
             Description = "Retrieve PCS references for an issue",
@@ -402,9 +419,13 @@ public static class EndpointRegistry
                 new EndpointParameter
                 {
                     Name = "issueRevision",
-                    DisplayName = "Issue Revision",
+                    DisplayName = "SC Revision",
                     IsRequired = true,
-                    Type = "string"
+                    Type = "dropdown",
+                    DropdownSource = "issues",
+                    ValueField = "SCRevision",
+                    DisplayField = "SCRevision",
+                    DependsOn = "plantId"
                 }
             },
             Description = "Retrieve SC (Special Component) references for an issue",
@@ -441,9 +462,13 @@ public static class EndpointRegistry
                 new EndpointParameter
                 {
                     Name = "issueRevision",
-                    DisplayName = "Issue Revision",
+                    DisplayName = "VSM Revision",
                     IsRequired = true,
-                    Type = "string"
+                    Type = "dropdown",
+                    DropdownSource = "issues",
+                    ValueField = "VSMRevision",
+                    DisplayField = "VSMRevision",
+                    DependsOn = "plantId"
                 }
             },
             Description = "Retrieve VSM (Valve Specification Manual) references for an issue",
@@ -480,9 +505,13 @@ public static class EndpointRegistry
                 new EndpointParameter
                 {
                     Name = "issueRevision",
-                    DisplayName = "Issue Revision",
+                    DisplayName = "VDS Revision",
                     IsRequired = true,
-                    Type = "string"
+                    Type = "dropdown",
+                    DropdownSource = "issues",
+                    ValueField = "VDSRevision",
+                    DisplayField = "VDSRevision",
+                    DependsOn = "plantId"
                 }
             },
             Description = "Retrieve VDS (Valve Datasheet) references for an issue",
@@ -519,9 +548,13 @@ public static class EndpointRegistry
                 new EndpointParameter
                 {
                     Name = "issueRevision",
-                    DisplayName = "Issue Revision",
+                    DisplayName = "EDS Revision",
                     IsRequired = true,
-                    Type = "string"
+                    Type = "dropdown",
+                    DropdownSource = "issues",
+                    ValueField = "EDSRevision",
+                    DisplayField = "EDSRevision",
+                    DependsOn = "plantId"
                 }
             },
             Description = "Retrieve EDS (Equipment Datasheet) references for an issue",
@@ -558,9 +591,13 @@ public static class EndpointRegistry
                 new EndpointParameter
                 {
                     Name = "issueRevision",
-                    DisplayName = "Issue Revision",
+                    DisplayName = "MDS Revision",
                     IsRequired = true,
-                    Type = "string"
+                    Type = "dropdown",
+                    DropdownSource = "issues",
+                    ValueField = "MDSRevision",
+                    DisplayField = "MDSRevision",
+                    DependsOn = "plantId"
                 }
             },
             Description = "Retrieve MDS (Material Datasheet) references for an issue",
@@ -597,9 +634,13 @@ public static class EndpointRegistry
                 new EndpointParameter
                 {
                     Name = "issueRevision",
-                    DisplayName = "Issue Revision",
+                    DisplayName = "VSK Revision",
                     IsRequired = true,
-                    Type = "string"
+                    Type = "dropdown",
+                    DropdownSource = "issues",
+                    ValueField = "VSKRevision",
+                    DisplayField = "VSKRevision",
+                    DependsOn = "plantId"
                 }
             },
             Description = "Retrieve VSK (Valve Spares Kit) references for an issue",
@@ -636,9 +677,13 @@ public static class EndpointRegistry
                 new EndpointParameter
                 {
                     Name = "issueRevision",
-                    DisplayName = "Issue Revision",
+                    DisplayName = "ESK Revision",
                     IsRequired = true,
-                    Type = "string"
+                    Type = "dropdown",
+                    DropdownSource = "issues",
+                    ValueField = "ESKRevision",
+                    DisplayField = "ESKRevision",
+                    DependsOn = "plantId"
                 }
             },
             Description = "Retrieve ESK (Equipment Spares Kit) references for an issue",
@@ -677,7 +722,11 @@ public static class EndpointRegistry
                     Name = "issueRevision",
                     DisplayName = "Issue Revision",
                     IsRequired = true,
-                    Type = "string"
+                    Type = "dropdown",
+                    DropdownSource = "issues",
+                    ValueField = "IssueRevision",
+                    DisplayField = "IssueRevision",
+                    DependsOn = "plantId"
                 }
             },
             Description = "Retrieve pipe element references for an issue",

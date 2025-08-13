@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TR2000 API Data Manager - Access Instructions</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+        .status {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .status h3 {
+            margin: 0 0 10px 0;
+            color: #155724;
+        }
+        .url-box {
+            background: #f8f9fa;
+            border: 2px solid #dee2e6;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .url {
+            font-size: 1.5em;
+            color: #007bff;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .url:hover {
+            text-decoration: underline;
+        }
+        .features {
+            background: #e7f3ff;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .features h3 {
+            color: #004085;
+            margin-bottom: 15px;
+        }
+        .features ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .features li {
+            margin: 8px 0;
+            color: #004085;
+        }
+        .instructions {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .instructions h3 {
+            margin: 0 0 10px 0;
+            color: #856404;
+        }
+        .instructions p {
+            margin: 5px 0;
+            color: #856404;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #dee2e6;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 TR2000 API Data Manager</h1>
+        <p style="color: #6c757d; font-size: 1.1em;">Professional Data Import & Management Tool</p>
+        
+        <div class="status">
+            <h3>✅ Server Status: RUNNING</h3>
+            <p style="margin: 0; color: #155724;">The application is running and ready to use!</p>
+        </div>
+
+        <div class="url-box">
+            <p style="margin: 0 0 10px 0; color: #6c757d;">Access the application at:</p>
+            <a href="http://localhost:5001" target="_blank" class="url">http://localhost:5001</a>
+            <p style="margin: 10px 0 0 0; color: #6c757d; font-size: 0.9em;">Click the link to open in a new tab</p>
+        </div>
+
+        <div class="features">
+            <h3>Key Features Available:</h3>
+            <ul>
+                <li>Import data from TR2000 API endpoints</li>
+                <li>Support for Operators, Plants, PCS, and Issues</li>
+                <li>Real-time import progress tracking</li>
+                <li>View imported data in responsive tables</li>
+                <li>Export data to CSV format</li>
+                <li>Test API connections before importing</li>
+                <li>Professional Bootstrap 5 UI</li>
+            </ul>
+        </div>
+
+        <div class="instructions">
+            <h3>📋 Quick Start Guide:</h3>
+            <p>1. Open <strong>http://localhost:5001</strong> in your browser</p>
+            <p>2. Navigate to "TR2000 API Data" from the sidebar</p>
+            <p>3. Select a data type (Operators, Plants, PCS, or Issues)</p>
+            <p>4. For PCS/Issues, select a plant from the dropdown</p>
+            <p>5. Click "Test Connection" to verify API access</p>
+            <p>6. Click "Import Data" to fetch and store the data</p>
+            <p>7. View and export your imported data</p>
+        </div>
+
+        <div class="footer">
+            <strong>TR2K Project</strong> • Built with .NET 9.0 & Blazor Server<br>
+            <small>100% Complete • Ready for Production</small>
+        </div>
+    </div>
+</body>
+</html>

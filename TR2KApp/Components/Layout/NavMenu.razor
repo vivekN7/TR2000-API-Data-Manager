@@ -1,0 +1,30 @@
+﻿<div class="top-row ps-3 navbar navbar-dark" style="background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);">
+    <div class="container-fluid">
+        <a class="navbar-brand text-white fw-bold" href="" style="text-shadow: 0 1px 2px rgba(0,0,0,0.3);">TR2000 API Demo</a>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="nav flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link text-white" href="" Match="NavLinkMatch.All">
+                <i class="bi bi-house-door-fill me-2"></i> Home
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link text-white" href="api-data">
+                <i class="bi bi-database me-2"></i> TR2000 API Data
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link text-white" href="pipe-sizes">
+                <i class="bi bi-diagram-3 me-2"></i> Get Pipe Sizes
+            </NavLink>
+        </div>
+    </nav>
+</div>
+

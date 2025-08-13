@@ -1,0 +1,389 @@
+@page "/api-data"
+@rendermode InteractiveServer
+@using TR2KBlazorLibrary.Logic.Services
+@using TR2KBlazorLibrary.Models.DatabaseModels
+@inject TR2000ApiService ApiService
+@inject DataImportService ImportService
+@inject ApiResponseDeserializer Deserializer
+
+<PageTitle>TR2000 API Data</PageTitle>
+
+<h1>TR2000 API Data Manager</h1>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5>Import TR2000 Data</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">1. Select Data Type:</label>
+                        <select class="form-select" @bind="SelectedDataType" @bind:after="OnDataTypeChanged">
+                            <option value="">Choose data type...</option>
+                            <option value="operators">Operators</option>
+                            <option value="plants">Plants</option>
+                            <option value="pcs">Pipe Class Sheets (PCS)</option>
+                            <option value="issues">Issues</option>
+                        </select>
+                    </div>
+                    
+                    @if (SelectedDataType == "pcs" || SelectedDataType == "issues")
+                    {
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">2. Select Plant:</label>
+                            <select class="form-select" @bind="SelectedPlantId" @bind:after="OnPlantChanged">
+                                <option value="">Loading plants...</option>
+                                @if (AvailablePlants != null)
+                                {
+                                    <option value="">Choose a plant...</option>
+                                    @foreach (var plant in AvailablePlants)
+                                    {
+                                        <option value="@plant.PlantID">@plant.ShortDescription (@plant.OperatorName)</option>
+                                    }
+                                }
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Final Endpoint:</label>
+                            <input type="text" class="form-control" value="@GetFinalEndpoint()" readonly />
+                        </div>
+                    }
+                    else if (!string.IsNullOrEmpty(SelectedDataType))
+                    {
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label">Final Endpoint:</label>
+                            <input type="text" class="form-control" value="@GetFinalEndpoint()" readonly />
+                        </div>
+                    }
+                </div>
+                
+                <div class="mb-3">
+                    <button class="btn btn-primary me-2" 
+                            @onclick="TestConnection" 
+                            disabled="@(!CanImport())">
+                        @(IsTesting ? "Testing..." : "Test Connection")
+                    </button>
+                    <button class="btn btn-success" 
+                            @onclick="ImportData" 
+                            disabled="@(!CanImport())">
+                        @(IsImporting ? "Importing..." : "Import Data")
+                    </button>
+                    
+                    @if (ShowViewData)
+                    {
+                        <button class="btn btn-info ms-2" @onclick="ViewData">
+                            View Imported Data
+                        </button>
+                        <button class="btn btn-secondary ms-1" @onclick="RefreshData">
+                            Refresh
+                        </button>
+                    }
+                </div>
+                
+                @if (!string.IsNullOrEmpty(StatusMessage))
+                {
+                    <div class="alert @GetAlertClass()" role="alert">
+                        @StatusMessage
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h6>Status</h6>
+            </div>
+            <div class="card-body">
+                @if (IsLoading)
+                {
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <div class="mt-2">@LoadingMessage</div>
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted">Ready to import TR2000 data.</p>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (ImportedData != null && ImportedData.Any())
+{
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Imported Data (@ImportedData.Count() records)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    @foreach (var column in GetTableColumns())
+                                    {
+                                        <th>@column</th>
+                                    }
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in ImportedData.Take(100))
+                                {
+                                    <tr>
+                                        @foreach (var column in GetTableColumns())
+                                        {
+                                            <td>@GetCellValue(row, column)</td>
+                                        }
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                        @if (ImportedData.Count() > 100)
+                        {
+                            <p class="text-muted mt-2">Showing first 100 records of @ImportedData.Count() total</p>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private string SelectedDataType = "";
+    private string SelectedPlantId = "";
+    private string StatusMessage = "";
+    private string LoadingMessage = "";
+    private bool IsLoading => IsTesting || IsImporting;
+    private bool IsTesting = false;
+    private bool IsImporting = false;
+    private bool ShowViewData = false;
+    private IEnumerable<dynamic>? ImportedData = null;
+    private List<Plant>? AvailablePlants = null;
+    
+    private async Task TestConnection()
+    {
+        var endpoint = GetFinalEndpoint();
+        if (string.IsNullOrEmpty(endpoint)) return;
+        
+        IsTesting = true;
+        LoadingMessage = "Testing connection...";
+        StatusMessage = "";
+        StateHasChanged();
+        
+        try
+        {
+            var result = await ApiService.TestConnectionAsync(endpoint);
+            StatusMessage = result.Success 
+                ? $"✅ Connected! Found {result.RecordCount} records."
+                : $"❌ Failed: {result.ErrorMessage}";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"❌ Error: {ex.Message}";
+        }
+        finally
+        {
+            IsTesting = false;
+            StateHasChanged();
+        }
+    }
+    
+    private async Task ImportData()
+    {
+        var endpoint = GetFinalEndpoint();
+        if (string.IsNullOrEmpty(endpoint)) return;
+        
+        IsImporting = true;
+        LoadingMessage = "Importing data...";
+        StatusMessage = "";
+        StateHasChanged();
+        
+        try
+        {
+            var result = await ImportService.ImportDataAsync(endpoint, overwriteExisting: true);
+            if (result.Success)
+            {
+                StatusMessage = $"✅ Imported {result.RecordsImported} records successfully!";
+                ShowViewData = true;
+                await LoadImportedData();
+            }
+            else
+            {
+                StatusMessage = $"❌ Import failed: {result.ErrorMessage}";
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"❌ Error: {ex.Message}";
+        }
+        finally
+        {
+            IsImporting = false;
+            StateHasChanged();
+        }
+    }
+    
+    private string GetAlertClass()
+    {
+        if (StatusMessage.StartsWith("✅")) return "alert-success";
+        if (StatusMessage.StartsWith("❌")) return "alert-danger";
+        return "alert-info";
+    }
+    
+    private async Task ViewData()
+    {
+        await LoadImportedData();
+    }
+    
+    private async Task RefreshData()
+    {
+        await LoadImportedData();
+    }
+    
+    private async Task LoadImportedData()
+    {
+        var endpoint = GetFinalEndpoint();
+        if (string.IsNullOrEmpty(endpoint)) return;
+        
+        try
+        {
+            var tableName = GetTableNameFromEndpoint(endpoint);
+            ImportedData = await ImportService.GetImportedDataAsync(tableName);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"❌ Error loading data: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+    
+    private string GetTableNameFromEndpoint(string endpoint)
+    {
+        return endpoint switch
+        {
+            "operators" => "operators",
+            "plants" => "plants",
+            var e when e.Contains("/pcs") => "pcs",
+            var e when e.Contains("/issues") => "issues",
+            _ => "operators"
+        };
+    }
+    
+    private IEnumerable<string> GetTableColumns()
+    {
+        if (ImportedData == null || !ImportedData.Any()) return Enumerable.Empty<string>();
+        
+        var firstItem = ImportedData.First();
+        if (firstItem is IDictionary<string, object> dict)
+        {
+            return dict.Keys;
+        }
+        
+        var properties = firstItem.GetType().GetProperties();
+        var columnNames = new List<string>();
+        foreach (var prop in properties)
+        {
+            columnNames.Add(prop.Name);
+        }
+        return columnNames;
+    }
+    
+    private object GetCellValue(dynamic row, string columnName)
+    {
+        try
+        {
+            if (row is IDictionary<string, object> dict)
+            {
+                return dict.ContainsKey(columnName) ? dict[columnName]?.ToString() ?? "" : "";
+            }
+            
+            var prop = row.GetType().GetProperty(columnName);
+            return prop?.GetValue(row)?.ToString() ?? "";
+        }
+        catch
+        {
+            return "";
+        }
+    }
+    
+    private async Task OnDataTypeChanged()
+    {
+        SelectedPlantId = "";
+        ImportedData = null;
+        ShowViewData = false;
+        StatusMessage = "";
+        
+        if (SelectedDataType == "pcs" || SelectedDataType == "issues")
+        {
+            await LoadAvailablePlants();
+        }
+        
+        await InvokeAsync(StateHasChanged);
+    }
+    
+    private async Task OnPlantChanged()
+    {
+        await InvokeAsync(StateHasChanged);
+    }
+    
+    private async Task LoadAvailablePlants()
+    {
+        try
+        {
+            StatusMessage = "Loading available plants...";
+            StateHasChanged();
+            
+            // Just fetch from API to show options, don't import yet
+            var plantsApiData = await ApiService.FetchDataAsync("plants");
+            var plantsDeserializedData = Deserializer.DeserializeApiResponse(plantsApiData, "plants");
+            
+            AvailablePlants = plantsDeserializedData.Select(item => new Plant
+            {
+                PlantID = Convert.ToInt32(item.GetValueOrDefault("PlantID", 0)),
+                ShortDescription = item.GetValueOrDefault("ShortDescription", "")?.ToString(),
+                OperatorName = item.GetValueOrDefault("OperatorName", "")?.ToString()
+            }).ToList();
+            
+            StatusMessage = $"Loaded {AvailablePlants.Count} plants available for selection.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"❌ Error loading plants: {ex.Message}";
+            AvailablePlants = new List<Plant>();
+        }
+        
+        StateHasChanged();
+    }
+    
+    private string GetFinalEndpoint()
+    {
+        return SelectedDataType switch
+        {
+            "operators" => "operators",
+            "plants" => "plants",
+            "pcs" when !string.IsNullOrEmpty(SelectedPlantId) => $"plants/{SelectedPlantId}/pcs",
+            "issues" when !string.IsNullOrEmpty(SelectedPlantId) => $"plants/{SelectedPlantId}/issues",
+            _ => ""
+        };
+    }
+    
+    private bool CanImport()
+    {
+        if (IsLoading) return false;
+        
+        var endpoint = GetFinalEndpoint();
+        return !string.IsNullOrEmpty(endpoint);
+    }
+}

@@ -1,0 +1,109 @@
+using System.Net.Http;
+using System.Text.Json;
+using Microsoft.Extensions.Logging;
+
+namespace TR2KBlazorLibrary.Logic.Services;
+
+public class TR2000ApiService
+{
+    private readonly HttpClient _httpClient;
+    private readonly ILogger<TR2000ApiService> _logger;
+    private const string BaseUrl = "https://tr2000api.equinor.com";
+
+    public TR2000ApiService(HttpClient httpClient, ILogger<TR2000ApiService> logger)
+    {
+        _httpClient = httpClient;
+        _logger = logger;
+        _httpClient.Timeout = TimeSpan.FromSeconds(30);
+    }
+
+    public async Task<TestConnectionResult> TestConnectionAsync(string endpoint)
+    {
+        try
+        {
+            var url = $"{BaseUrl}/{endpoint.TrimStart('/')}";
+            _logger.LogInformation("Testing connection to: {Url}", url);
+
+            var response = await _httpClient.GetAsync(url);
+            response.EnsureSuccessStatusCode();
+
+            var content = await response.Content.ReadAsStringAsync();
+            _logger.LogInformation("API Response (first 500 chars): {Content}", 
+                content.Length > 500 ? content.Substring(0, 500) + "..." : content);
+                
+            var recordCount = CountRecords(content);
+            _logger.LogInformation("Parsed record count: {Count}", recordCount);
+
+            return new TestConnectionResult
+            {
+                Success = true,
+                RecordCount = recordCount,
+                ResponseTime = TimeSpan.FromMilliseconds(100), // Approximate
+                ErrorMessage = null
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Connection test failed for endpoint: {Endpoint}", endpoint);
+            return new TestConnectionResult
+            {
+                Success = false,
+                RecordCount = 0,
+                ResponseTime = TimeSpan.Zero,
+                ErrorMessage = ex.Message
+            };
+        }
+    }
+
+    public async Task<string> FetchDataAsync(string endpoint)
+    {
+        var url = $"{BaseUrl}/{endpoint.TrimStart('/')}";
+        _logger.LogInformation("Fetching data from: {Url}", url);
+
+        var response = await _httpClient.GetAsync(url);
+        response.EnsureSuccessStatusCode();
+
+        return await response.Content.ReadAsStringAsync();
+    }
+
+    private static int CountRecords(string jsonContent)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(jsonContent);
+            var root = document.RootElement;
+
+            // Handle array responses
+            if (root.ValueKind == JsonValueKind.Array)
+            {
+                return root.GetArrayLength();
+            }
+
+            // Handle wrapper objects with arrays
+            if (root.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var property in root.EnumerateObject())
+                {
+                    if (property.Value.ValueKind == JsonValueKind.Array)
+                    {
+                        return property.Value.GetArrayLength();
+                    }
+                }
+            }
+
+            return 1; // Single object
+        }
+        catch (Exception)
+        {
+            return 0;
+        }
+    }
+}
+
+public class TestConnectionResult
+{
+    public bool Success { get; set; }
+    public int RecordCount { get; set; }
+    public TimeSpan ResponseTime { get; set; }
+    public string? ErrorMessage { get; set; }
+}

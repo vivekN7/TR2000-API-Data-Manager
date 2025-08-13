@@ -1,0 +1,825 @@
+@page "/pipe-sizes"
+@using System.Net.Http.Json
+@using System.Text.Json
+@using System.Text
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+@rendermode InteractiveServer
+
+<PageTitle>Get Pipe Sizes - TR2000 Data Manager</PageTitle>
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h2 mb-2">
+                <i class="bi bi-diagram-3 text-primary me-2"></i>Pipe Size Specifications
+            </h1>
+            <p class="text-muted mb-0">Get pipe size info from a PCS</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-funnel me-2"></i>Selection Filters
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Plant Selection -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-primary">
+                            <i class="bi bi-building me-1"></i>1. Select Plant
+                        </label>
+                        <select class="form-select form-select-lg border-primary" @bind="SelectedPlantId" @bind:after="OnPlantChanged">
+                            <option value="">Choose a plant...</option>
+                            @foreach (var plant in Plants)
+                            {
+                                <option value="@plant.PlantID">@plant.LongDescription</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- PCS Selection -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold @(string.IsNullOrEmpty(SelectedPlantId) ? "text-muted" : "text-success")">
+                            <i class="bi bi-gear me-1"></i>2. Select Pipe Class (PCS)
+                        </label>
+                        <select class="form-select form-select-lg @(string.IsNullOrEmpty(SelectedPlantId) ? "border-secondary" : "border-success")" @bind="SelectedPCS" @bind:after="OnPCSChanged" disabled="@(string.IsNullOrEmpty(SelectedPlantId))">
+                            <option value="">@(string.IsNullOrEmpty(SelectedPlantId) ? "Select plant first..." : "Choose pipe class...")</option>
+                            @foreach (var pcs in PCSList)
+                            {
+                                <option value="@pcs.PCS">@pcs.PCS</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Revision Selection -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold @(string.IsNullOrEmpty(SelectedPCS) ? "text-muted" : "text-warning")">
+                            <i class="bi bi-journals me-1"></i>3. Select Revision
+                        </label>
+                        <select class="form-select form-select-lg @(string.IsNullOrEmpty(SelectedPCS) ? "border-secondary" : "border-warning")" @bind="SelectedRevision" @bind:after="OnRevisionChanged" disabled="@(string.IsNullOrEmpty(SelectedPCS))">
+                            <option value="">@(string.IsNullOrEmpty(SelectedPCS) ? "Select PCS first..." : "Choose revision...")</option>
+                            @foreach (var revision in Revisions)
+                            {
+                                <option value="@revision">@revision</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Load Button -->
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-success btn-lg fw-bold" @onclick="LoadPipeSizes" disabled="@(string.IsNullOrEmpty(SelectedRevision) || IsLoading)">
+                            @if (IsLoading)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                                <text>Loading Specifications...</text>
+                            }
+                            else
+                            {
+                                <i class="bi bi-search me-2"></i><text>Get Pipe Sizes</text>
+                            }
+                        </button>
+                    </div>
+                    
+                    @if (!string.IsNullOrEmpty(SelectedPlantId) && !string.IsNullOrEmpty(SelectedPCS) && !string.IsNullOrEmpty(SelectedRevision))
+                    {
+                        <div class="mt-3 p-3 bg-light rounded">
+                            <small class="text-muted">
+                                <strong>Selected:</strong><br/>
+                                <i class="bi bi-building text-primary me-1"></i>@Plants.FirstOrDefault(p => p.PlantID.ToString() == SelectedPlantId)?.LongDescription<br/>
+                                <i class="bi bi-gear text-success me-1"></i>PCS: @SelectedPCS<br/>
+                                <i class="bi bi-journals text-warning me-1"></i>Revision: @SelectedRevision
+                            </small>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-9">
+            @if (!string.IsNullOrEmpty(ErrorMessage))
+            {
+                <div class="alert alert-danger alert-dismissible fade show">
+                    <strong>Error:</strong> @ErrorMessage
+                    <button type="button" class="btn-close" @onclick="ClearError"></button>
+                </div>
+            }
+
+            @if (PipeSizesList?.Any() == true)
+            {
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">
+                            <i class="bi bi-table me-2"></i>Pipe Size Specifications - @SelectedPCS (Rev. @SelectedRevision)
+                        </h5>
+                        <div>
+                            <button class="btn btn-success" @onclick="ExportToExcel" title="Export to Excel" style="padding: 8px 12px;">
+                                <i class="bi bi-download text-white fs-6"></i>Excel
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Filtering Controls -->
+                    <div class="card-body border-bottom bg-light">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold">
+                                    <i class="bi bi-funnel me-1"></i>Schedule Filter:
+                                </label>
+                                <select class="form-select" @bind="ScheduleFilter">
+                                    <option value="">All Schedules</option>
+                                    @foreach (var schedule in GetUniqueSchedules())
+                                    {
+                                        <option value="@schedule">@schedule</option>
+                                    }
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-3 d-flex align-items-center">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="compareToggle" @bind="ComparisonMode">
+                                    <label class="form-check-label fw-bold" for="compareToggle">
+                                        <i class="bi bi-arrow-left-right me-1 text-primary"></i>Compare Revisions
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            @if (ComparisonMode)
+                            {
+                                <div class="col-md-3">
+                                    <label class="form-label fw-bold text-warning">
+                                        <i class="bi bi-journals me-1"></i>Compare with:
+                                    </label>
+                                    <select class="form-select border-warning" @bind="CompareRevision" @bind:after="LoadComparisonData">
+                                        <option value="">Select revision...</option>
+                                        @foreach (var revision in Revisions.Where(r => r != SelectedRevision))
+                                        {
+                                            <option value="@revision">Rev @revision</option>
+                                        }
+                                    </select>
+                                </div>
+                            }
+                            
+                            <div class="col-md-2 d-flex align-items-end">
+                                <button class="btn btn-outline-secondary" @onclick="ClearFilters">
+                                    <i class="bi bi-x-circle me-1"></i>Clear
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-primary">
+                                    <tr>
+                                        <th class="fw-bold">
+                                            <i class="bi bi-rulers me-1"></i>Nom Size
+                                        </th>
+                                        <th class="fw-bold">
+                                            <i class="bi bi-circle me-1"></i>Outer Diameter
+                                            @if (ComparisonMode && !string.IsNullOrEmpty(CompareRevision))
+                                            {
+                                                <br/><small class="text-muted">Rev @CompareRevision → Rev @SelectedRevision</small>
+                                            }
+                                        </th>
+                                        <th class="fw-bold">
+                                            <i class="bi bi-thickness me-1"></i>Wall Thickness
+                                            @if (ComparisonMode && !string.IsNullOrEmpty(CompareRevision))
+                                            {
+                                                <br/><small class="text-muted">Rev @CompareRevision → Rev @SelectedRevision</small>
+                                            }
+                                        </th>
+                                        <th class="fw-bold">
+                                            <i class="bi bi-calendar me-1"></i>Schedule
+                                            @if (ComparisonMode && !string.IsNullOrEmpty(CompareRevision))
+                                            {
+                                                <br/><small class="text-muted">Rev @CompareRevision → Rev @SelectedRevision</small>
+                                            }
+                                        </th>
+                                        <th class="fw-bold">Under Tolerance
+                                            @if (ComparisonMode && !string.IsNullOrEmpty(CompareRevision))
+                                            {
+                                                <br/><small class="text-muted">Rev @CompareRevision → Rev @SelectedRevision</small>
+                                            }
+                                        </th>
+                                        <th class="fw-bold">Corrosion Allow.
+                                            @if (ComparisonMode && !string.IsNullOrEmpty(CompareRevision))
+                                            {
+                                                <br/><small class="text-muted">Rev @CompareRevision → Rev @SelectedRevision</small>
+                                            }
+                                        </th>
+                                        <th class="fw-bold">Welding Factor
+                                            @if (ComparisonMode && !string.IsNullOrEmpty(CompareRevision))
+                                            {
+                                                <br/><small class="text-muted">Rev @CompareRevision → Rev @SelectedRevision</small>
+                                            }
+                                        </th>
+                                        <th class="fw-bold text-center">In Matrix
+                                            @if (ComparisonMode && !string.IsNullOrEmpty(CompareRevision))
+                                            {
+                                                <br/><small class="text-muted">Rev @CompareRevision → Rev @SelectedRevision</small>
+                                            }
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var pipeSize in FilteredPipeSizes)
+                                    {
+                                        var compareSize = ComparisonMode && ComparisonPipeSizes.Any() 
+                                            ? ComparisonPipeSizes.FirstOrDefault(c => c.NomSize == pipeSize.NomSize)
+                                            : null;
+                                        <tr class="align-middle">
+                                            <td class="fw-bold fs-5">@pipeSize.NomSize"</td>
+                                            <td class="fw-semibold">
+                                                @if (compareSize != null)
+                                                {
+                                                    <div class="@GetComparisonClass(compareSize.OuterDiam, pipeSize.OuterDiam)">
+                                                        @GetComparisonText(compareSize.OuterDiam, pipeSize.OuterDiam) mm
+                                                        @if (compareSize.OuterDiam != pipeSize.OuterDiam)
+                                                        {
+                                                            <small class="ms-1">(@GetDifferenceText(compareSize.OuterDiam, pipeSize.OuterDiam))</small>
+                                                        }
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    <span>@pipeSize.OuterDiam mm</span>
+                                                }
+                                            </td>
+                                            <td class="fw-semibold">
+                                                @if (compareSize != null)
+                                                {
+                                                    <div class="@GetComparisonClass(compareSize.WallThickness, pipeSize.WallThickness)">
+                                                        @GetComparisonText(compareSize.WallThickness, pipeSize.WallThickness) mm
+                                                        @if (compareSize.WallThickness != pipeSize.WallThickness)
+                                                        {
+                                                            <small class="ms-1">(@GetDifferenceText(compareSize.WallThickness, pipeSize.WallThickness))</small>
+                                                        }
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    <span>@pipeSize.WallThickness mm</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (compareSize != null)
+                                                {
+                                                    <div class="@GetComparisonClass(compareSize.Schedule, pipeSize.Schedule)">
+                                                        @GetComparisonText(compareSize.Schedule, pipeSize.Schedule)
+                                                        @if (compareSize.Schedule != pipeSize.Schedule)
+                                                        {
+                                                            <small class="ms-1">(changed)</small>
+                                                        }
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-info text-white">@pipeSize.Schedule</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (compareSize != null)
+                                                {
+                                                    <div class="@GetComparisonClass(compareSize.UnderTolerance, pipeSize.UnderTolerance)">
+                                                        @GetComparisonText(compareSize.UnderTolerance, pipeSize.UnderTolerance)%
+                                                        @if (compareSize.UnderTolerance != pipeSize.UnderTolerance)
+                                                        {
+                                                            <small class="ms-1">(@GetDifferenceText(compareSize.UnderTolerance, pipeSize.UnderTolerance))</small>
+                                                        }
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    <span>@pipeSize.UnderTolerance%</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (compareSize != null)
+                                                {
+                                                    <div class="@GetComparisonClass(compareSize.CorrosionAllowance, pipeSize.CorrosionAllowance)">
+                                                        @GetComparisonText(compareSize.CorrosionAllowance, pipeSize.CorrosionAllowance)
+                                                        @if (compareSize.CorrosionAllowance != pipeSize.CorrosionAllowance)
+                                                        {
+                                                            <small class="ms-1">(@GetDifferenceText(compareSize.CorrosionAllowance, pipeSize.CorrosionAllowance))</small>
+                                                        }
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    <span>@pipeSize.CorrosionAllowance</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (compareSize != null)
+                                                {
+                                                    <div class="@GetComparisonClass(compareSize.WeldingFactor, pipeSize.WeldingFactor)">
+                                                        @GetComparisonText(compareSize.WeldingFactor, pipeSize.WeldingFactor)
+                                                        @if (compareSize.WeldingFactor != pipeSize.WeldingFactor)
+                                                        {
+                                                            <small class="ms-1">(@GetDifferenceText(compareSize.WeldingFactor, pipeSize.WeldingFactor))</small>
+                                                        }
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    <span>@pipeSize.WeldingFactor</span>
+                                                }
+                                            </td>
+                                            <td class="text-center">
+                                                @if (compareSize != null)
+                                                {
+                                                    <div class="@GetComparisonClass(compareSize.ScheduleInMatrix, pipeSize.ScheduleInMatrix)">
+                                                        @if (compareSize.ScheduleInMatrix == pipeSize.ScheduleInMatrix)
+                                                        {
+                                                            @if (compareSize.ScheduleInMatrix == "Y")
+                                                            {
+                                                                <span class="badge bg-success">
+                                                                    <i class="bi bi-check-circle me-1"></i>Yes → Yes
+                                                                </span>
+                                                            }
+                                                            else
+                                                            {
+                                                                <span class="badge bg-secondary">
+                                                                    <i class="bi bi-x-circle me-1"></i>No → No
+                                                                </span>
+                                                            }
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="badge bg-warning text-dark">
+                                                                @(compareSize.ScheduleInMatrix == "Y" ? "Yes" : "No") → @(pipeSize.ScheduleInMatrix == "Y" ? "Yes" : "No")
+                                                            </span>
+                                                        }
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    @if (pipeSize.ScheduleInMatrix == "Y")
+                                                    {
+                                                        <span class="badge bg-success">
+                                                            <i class="bi bi-check-circle me-1"></i>Yes
+                                                        </span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-secondary">
+                                                            <i class="bi bi-x-circle me-1"></i>No
+                                                        </span>
+                                                    }
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            }
+            else if (IsLoading)
+            {
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body text-center py-5">
+                        <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <h5 class="text-primary">Loading Pipe Specifications...</h5>
+                        <p class="text-muted">Retrieving data from Equinor PipeSpec API</p>
+                    </div>
+                </div>
+            }
+            else if (!string.IsNullOrEmpty(SelectedRevision))
+            {
+                <div class="card border-0 shadow-sm border-info">
+                    <div class="card-body text-center py-5">
+                        <div class="text-info mb-3">
+                            <i class="bi bi-search display-1"></i>
+                        </div>
+                        <h5 class="text-info">Ready to Load Specifications</h5>
+                        <p class="text-muted mb-3">Click "Get Pipe Sizes" to retrieve detailed specifications for the selected combination.</p>
+                        <small class="text-muted">
+                            <strong>Current Selection:</strong> @SelectedPCS (Rev. @SelectedRevision)
+                        </small>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body text-center py-5">
+                        <div class="text-primary mb-3">
+                            <i class="bi bi-funnel display-1"></i>
+                        </div>
+                        <h5 class="text-primary">Welcome to Pipe Size Explorer</h5>
+                        <p class="text-muted mb-4">Use the selection panel on the left to choose your plant, pipe class, and revision.</p>
+                        <div class="row justify-content-center">
+                            <div class="col-md-8">
+                                <div class="d-flex justify-content-between align-items-center p-3 bg-light rounded">
+                                    <span class="badge bg-primary rounded-pill">1</span>
+                                    <span class="text-muted">Select Plant</span>
+                                    <i class="bi bi-arrow-right text-muted"></i>
+                                    <span class="badge bg-success rounded-pill">2</span>
+                                    <span class="text-muted">Choose PCS</span>
+                                    <i class="bi bi-arrow-right text-muted"></i>
+                                    <span class="badge bg-warning rounded-pill">3</span>
+                                    <span class="text-muted">Pick Revision</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    // Data models
+    public class Plant
+    {
+        public int PlantID { get; set; }
+        public string LongDescription { get; set; } = "";
+        public string ShortDescription { get; set; } = "";
+    }
+
+    public class PCSData
+    {
+        public string PCS { get; set; } = "";
+        public string Revision { get; set; } = "";
+        public string Status { get; set; } = "";
+        public string RevDate { get; set; } = "";
+    }
+
+    public class PipeSize
+    {
+        public string NomSize { get; set; } = "";
+        public string OuterDiam { get; set; } = "";
+        public string WallThickness { get; set; } = "";
+        public string Schedule { get; set; } = "";
+        public string UnderTolerance { get; set; } = "";
+        public string CorrosionAllowance { get; set; } = "";
+        public string WeldingFactor { get; set; } = "";
+        public string DimElementChange { get; set; } = "";
+        public string ScheduleInMatrix { get; set; } = "";
+    }
+
+    public class ApiResponse<T>
+    {
+        public bool Success { get; set; }
+        public List<T>? GetPlant { get; set; }
+        public List<T>? GetPCS { get; set; }
+        public List<T>? GetPipeSize { get; set; }
+    }
+
+    // Component state
+    private List<Plant> Plants = new();
+    private List<PCSData> PCSList = new();
+    private List<string> Revisions = new();
+    private List<PipeSize> PipeSizesList = new();
+
+    private string SelectedPlantId = "";
+    private string SelectedPCS = "";
+    private string SelectedRevision = "";
+
+    private bool IsLoading = false;
+    private string ErrorMessage = "";
+
+    // Filtering variables
+    private string ScheduleFilter = "";
+
+    // Comparison variables
+    private bool ComparisonMode = false;
+    private string CompareRevision = "";
+    private List<PipeSize> ComparisonPipeSizes = new();
+
+    private const string ApiBaseUrl = "https://equinor.pipespec-api.presight.com";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPlants();
+    }
+
+    private async Task LoadPlants()
+    {
+        try
+        {
+            IsLoading = true;
+            ErrorMessage = "";
+
+            var response = await Http.GetFromJsonAsync<ApiResponse<Plant>>($"{ApiBaseUrl}/plants");
+            if (response?.Success == true && response.GetPlant != null)
+            {
+                Plants = response.GetPlant
+                    .Where(p => !string.IsNullOrEmpty(p.LongDescription))
+                    .OrderBy(p => p.LongDescription)
+                    .ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to load plants: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task OnPlantChanged()
+    {
+        if (string.IsNullOrEmpty(SelectedPlantId))
+        {
+            PCSList.Clear();
+            Revisions.Clear();
+            PipeSizesList.Clear();
+            SelectedPCS = "";
+            SelectedRevision = "";
+            return;
+        }
+
+        await LoadPCS();
+    }
+
+    private async Task LoadPCS()
+    {
+        try
+        {
+            IsLoading = true;
+            ErrorMessage = "";
+            PCSList.Clear();
+            Revisions.Clear();
+            PipeSizesList.Clear();
+            SelectedPCS = "";
+            SelectedRevision = "";
+
+            var response = await Http.GetFromJsonAsync<ApiResponse<PCSData>>($"{ApiBaseUrl}/plants/{SelectedPlantId}/pcs");
+            if (response?.Success == true && response.GetPCS != null)
+            {
+                PCSList = response.GetPCS
+                    .GroupBy(p => p.PCS)
+                    .Select(g => g.First())
+                    .OrderBy(p => p.PCS)
+                    .ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to load PCS list: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task OnPCSChanged()
+    {
+        if (string.IsNullOrEmpty(SelectedPCS))
+        {
+            Revisions.Clear();
+            PipeSizesList.Clear();
+            SelectedRevision = "";
+            return;
+        }
+
+        await LoadRevisions();
+    }
+
+    private async Task LoadRevisions()
+    {
+        try
+        {
+            IsLoading = true;
+            ErrorMessage = "";
+            Revisions.Clear();
+            PipeSizesList.Clear();
+            SelectedRevision = "";
+
+            var response = await Http.GetFromJsonAsync<ApiResponse<PCSData>>($"{ApiBaseUrl}/plants/{SelectedPlantId}/pcs");
+            if (response?.Success == true && response.GetPCS != null)
+            {
+                Revisions = response.GetPCS
+                    .Where(p => p.PCS == SelectedPCS)
+                    .Select(p => p.Revision)
+                    .Where(r => !string.IsNullOrEmpty(r))
+                    .Distinct()
+                    .OrderBy(r => r)
+                    .ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to load revisions: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void OnRevisionChanged()
+    {
+        PipeSizesList.Clear();
+    }
+
+    private async Task LoadPipeSizes()
+    {
+        if (string.IsNullOrEmpty(SelectedPlantId) || string.IsNullOrEmpty(SelectedPCS) || string.IsNullOrEmpty(SelectedRevision))
+            return;
+
+        try
+        {
+            IsLoading = true;
+            ErrorMessage = "";
+            PipeSizesList.Clear();
+
+            var response = await Http.GetFromJsonAsync<ApiResponse<PipeSize>>($"{ApiBaseUrl}/plants/{SelectedPlantId}/pcs/{SelectedPCS}/rev/{SelectedRevision}/pipe-sizes");
+            if (response?.Success == true && response.GetPipeSize != null)
+            {
+                PipeSizesList = response.GetPipeSize
+                    .OrderBy(p => decimal.TryParse(p.NomSize, out var size) ? size : 0)
+                    .ToList();
+            }
+            else
+            {
+                ErrorMessage = "No pipe sizes found for the selected combination.";
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to load pipe sizes: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void ClearError()
+    {
+        ErrorMessage = "";
+    }
+
+    // Filtering and conditional formatting methods
+    private IEnumerable<PipeSize> FilteredPipeSizes
+    {
+        get
+        {
+            var filtered = PipeSizesList.AsEnumerable();
+
+            if (!string.IsNullOrEmpty(ScheduleFilter))
+            {
+                filtered = filtered.Where(p => p.Schedule == ScheduleFilter);
+            }
+
+            return filtered;
+        }
+    }
+
+    private List<string> GetUniqueSchedules()
+    {
+        return PipeSizesList.Select(p => p.Schedule).Distinct().OrderBy(s => s).ToList();
+    }
+
+    private void ClearFilters()
+    {
+        ScheduleFilter = "";
+        ComparisonMode = false;
+        CompareRevision = "";
+        ComparisonPipeSizes.Clear();
+    }
+
+    private async Task LoadComparisonData()
+    {
+        if (string.IsNullOrEmpty(CompareRevision) || !ComparisonMode)
+        {
+            ComparisonPipeSizes.Clear();
+            return;
+        }
+
+        try
+        {
+            IsLoading = true;
+            ErrorMessage = "";
+
+            var response = await Http.GetFromJsonAsync<ApiResponse<PipeSize>>($"{ApiBaseUrl}/plants/{SelectedPlantId}/pcs/{SelectedPCS}/rev/{CompareRevision}/pipe-sizes");
+            if (response?.Success == true && response.GetPipeSize != null)
+            {
+                ComparisonPipeSizes = response.GetPipeSize
+                    .OrderBy(p => decimal.TryParse(p.NomSize, out var size) ? size : 0)
+                    .ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Failed to load comparison data: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+
+    // Comparison helper methods
+    private string GetComparisonClass(string value1, string value2)
+    {
+        if (value1 == value2) return "text-success fw-bold"; // Same values - green
+        return "text-danger fw-bold"; // Different values - red
+    }
+
+    private string GetComparisonText(string value1, string value2)
+    {
+        var display1 = string.IsNullOrEmpty(value1) ? "Null" : value1;
+        var display2 = string.IsNullOrEmpty(value2) ? "Null" : value2;
+        return $"{display1} → {display2}";
+    }
+
+    private string GetDifferenceText(string value1, string value2)
+    {
+        if (decimal.TryParse(value1, out var val1) && decimal.TryParse(value2, out var val2))
+        {
+            var diff = val2 - val1;
+            var sign = diff > 0 ? "+" : "";
+            return $"{sign}{diff:F2}";
+        }
+        return "changed";
+    }
+
+    // Excel export functionality
+    private async Task ExportToExcel()
+    {
+        try
+        {
+            var csv = new StringBuilder();
+            
+            // Headers
+            csv.AppendLine("Plant,PCS,Revision,Nominal Size,Outer Diameter (mm),Wall Thickness (mm),Schedule,Under Tolerance (%),Corrosion Allowance,Welding Factor,Schedule In Matrix");
+            
+            // Data
+            foreach (var pipeSize in FilteredPipeSizes)
+            {
+                var plantName = Plants.FirstOrDefault(p => p.PlantID.ToString() == SelectedPlantId)?.LongDescription ?? "";
+                csv.AppendLine($"{plantName},{SelectedPCS},{SelectedRevision},{pipeSize.NomSize},{pipeSize.OuterDiam},{pipeSize.WallThickness},{pipeSize.Schedule},{pipeSize.UnderTolerance},{pipeSize.CorrosionAllowance},{pipeSize.WeldingFactor},{pipeSize.ScheduleInMatrix}");
+            }
+
+            var fileName = $"PipeSizes_{SelectedPCS}_Rev{SelectedRevision}_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+            var bytes = Encoding.UTF8.GetBytes(csv.ToString());
+            var base64 = Convert.ToBase64String(bytes);
+
+            await JSRuntime.InvokeVoidAsync("downloadFile", fileName, base64, "text/csv");
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Export failed: {ex.Message}";
+        }
+    }
+}
+
+<style>
+    .form-select:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    }
+    
+    .card {
+        transition: all 0.3s ease;
+    }
+    
+    .card:hover {
+        transform: translateY(-2px);
+    }
+    
+    .table tbody tr:hover {
+        background-color: rgba(13, 110, 253, 0.1);
+        transform: scale(1.01);
+        transition: all 0.2s ease;
+    }
+    
+    .badge {
+        font-size: 0.75em;
+        padding: 0.5em 0.75em;
+    }
+    
+    .btn-success:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .spinner-border {
+        animation: spin 1s linear infinite;
+    }
+    
+    @@keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .card-body {
+        animation: fadeIn 0.5s ease-in-out;
+    }
+</style>

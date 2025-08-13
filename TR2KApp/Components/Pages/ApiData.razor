@@ -124,46 +124,49 @@
                 <div class="card-header">
                     <h6>Endpoint Details</h6>
                 </div>
-                <div class="card-body" style="font-size: 0.85rem;">
-                    <div class="mb-2">
-                        <strong>Template:</strong><br>
-                        <code class="text-info">/@SelectedEndpoint.Endpoint | @SelectedEndpoint.HttpMethod</code>
+                <div class="card-body p-2" style="font-size: 0.8rem;">
+                    <div class="mb-1">
+                        <strong>Template:</strong> <code class="text-info small">/@SelectedEndpoint.Endpoint | @SelectedEndpoint.HttpMethod</code>
                     </div>
                     @if (SelectedEndpoint.Parameters.Any())
                     {
-                        <div class="mb-2">
-                            <strong>Generated:</strong><br>
-                            <code class="text-primary">/@GetFinalEndpoint()</code>
+                        <div class="mb-1">
+                            <strong>Generated:</strong> <code class="text-primary small">/@GetFinalEndpoint()</code>
                         </div>
                     }
-                    <div class="mb-2">
-                        <strong>Table:</strong> <code>@SelectedEndpoint.TableName</code>
+                    <div class="row mb-1">
+                        <div class="col-5">
+                            <strong>Table:</strong><br>
+                            <code class="small">@SelectedEndpoint.TableName</code>
+                        </div>
+                        @if (!string.IsNullOrEmpty(SelectedEndpoint.Description))
+                        {
+                            <div class="col-7">
+                                <strong>Description:</strong><br>
+                                <small class="text-muted">@SelectedEndpoint.Description</small>
+                            </div>
+                        }
                     </div>
-                    @if (!string.IsNullOrEmpty(SelectedEndpoint.Description))
-                    {
-                        <div class="mb-2">
-                            <strong>Description:</strong><br>
-                            <small>@SelectedEndpoint.Description</small>
-                        </div>
-                    }
                     @if (SelectedEndpoint.Parameters.Any())
                     {
-                        <div class="mb-2">
-                            <strong>Parameters:</strong>
-                            @foreach (var param in SelectedEndpoint.Parameters)
-                            {
-                                <div class="ms-2 font-monospace small">@param.Name.ToUpper() = [Int32]</div>
-                            }
+                        <div class="mb-1">
+                            <strong>Params:</strong>
+                            <span class="ms-1 font-monospace small">
+                                @foreach (var param in SelectedEndpoint.Parameters)
+                                {
+                                    <span>@param.Name.ToUpper()=[Int32]</span>
+                                }
+                            </span>
                         </div>
                     }
                     @if (SelectedEndpoint.ResponseFields.Any())
                     {
                         <div>
-                            <strong>Returns:</strong>
-                            <div class="font-monospace" style="max-height: 150px; overflow-y: auto; background: #f8f9fa; padding: 6px; border-radius: 3px; margin-top: 4px; font-size: 0.8rem;">
+                            <strong>Returns (@SelectedEndpoint.ResponseFields.Count fields):</strong>
+                            <div class="font-monospace" style="background: #f8f9fa; padding: 3px 5px; border-radius: 2px; margin-top: 2px; font-size: 0.75rem; line-height: 1.2;">
                                 @foreach (var field in SelectedEndpoint.ResponseFields)
                                 {
-                                    <div>@field.Name = @field.Type</div>
+                                    <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@field.Name=@field.Type</div>
                                 }
                             </div>
                         </div>

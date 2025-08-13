@@ -275,37 +275,16 @@
         
         try
         {
-            // For single plant endpoint, fetch and display directly without storing in DB
-            if (SelectedEndpoint?.Key == "plant")
+            var result = await ImportService.ImportDataAsync(endpoint, overwriteExisting: true);
+            if (result.Success)
             {
-                var apiData = await ApiService.FetchDataAsync(endpoint);
-                var deserializedData = Deserializer.DeserializeApiResponse(apiData, endpoint);
-                
-                if (deserializedData != null && deserializedData.Any())
-                {
-                    // Convert to dynamic for display
-                    ImportedData = deserializedData.Cast<dynamic>();
-                    StatusMessage = $"✅ Retrieved {deserializedData.Count} record(s) from API!";
-                    ShowViewData = true;
-                }
-                else
-                {
-                    StatusMessage = "⚠️ No data found for this plant ID.";
-                }
+                StatusMessage = $"✅ Imported {result.RecordsImported} records successfully into '{SelectedEndpoint?.TableName}' table!";
+                ShowViewData = true;
+                await LoadImportedData();
             }
             else
             {
-                var result = await ImportService.ImportDataAsync(endpoint, overwriteExisting: true);
-                if (result.Success)
-                {
-                    StatusMessage = $"✅ Imported {result.RecordsImported} records successfully into '{SelectedEndpoint?.TableName}' table!";
-                    ShowViewData = true;
-                    await LoadImportedData();
-                }
-                else
-                {
-                    StatusMessage = $"❌ Import failed: {result.ErrorMessage}";
-                }
+                StatusMessage = $"❌ Import failed: {result.ErrorMessage}";
             }
         }
         catch (Exception ex)
@@ -378,13 +357,6 @@
         
         try
         {
-            // Single plant data comes directly from API, not from database
-            if (SelectedEndpoint.Key == "plant")
-            {
-                // Data is already loaded directly in ImportData method
-                return;
-            }
-            
             ImportedData = await ImportService.GetImportedDataAsync(SelectedEndpoint.TableName);
             StateHasChanged();
         }

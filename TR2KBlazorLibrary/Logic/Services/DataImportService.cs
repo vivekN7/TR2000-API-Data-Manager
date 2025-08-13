@@ -106,10 +106,10 @@ public class DataImportService
     {
         var lowerEndpoint = endpoint.ToLower();
         
-        // For single plant endpoint, don't clear all plants
+        // For single plant endpoint, also clear all plants (will insert just one)
         if (System.Text.RegularExpressions.Regex.IsMatch(lowerEndpoint, @"^plants/\d+$"))
         {
-            // Don't clear anything for single plant queries
+            await _plantRepository.DeleteAllAsync("plants");
             return;
         }
         
@@ -145,9 +145,9 @@ public class DataImportService
         // Handle plants/{id} endpoint (single plant)
         if (System.Text.RegularExpressions.Regex.IsMatch(lowerEndpoint, @"^plants/\d+$"))
         {
-            // For single plant, don't import to database at all
-            // The data is just for display purposes
-            return data.Count;
+            // Import single plant to database (after clearing all plants)
+            await EnsureOperatorsExistAsync();
+            return await ImportPlantsAsync(data);
         }
         
         switch (lowerEndpoint)

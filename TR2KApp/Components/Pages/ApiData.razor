@@ -185,7 +185,17 @@
         <div class="col-12">
             <div class="card">
                 <div class="card-header">
-                    <h5>Imported Data from '@(SelectedEndpoint?.TableName)' (@ImportedData.Count() records)</h5>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5>Imported Data from '@(SelectedEndpoint?.TableName)' (@(FilteredData?.Count() ?? 0) filtered / @ImportedData.Count() total)</h5>
+                        <div class="d-flex gap-2">
+                            <input type="text" class="form-control form-control-sm" style="width: 250px;" 
+                                   placeholder="Search all columns..." 
+                                   @bind="SearchText" 
+                                   @bind:event="oninput"
+                                   @bind:after="ApplyFilter" />
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="ClearFilter">Clear</button>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -194,7 +204,13 @@
                                 <tr>
                                     @foreach (var column in GetTableColumns())
                                     {
-                                        <th>@column</th>
+                                        <th style="cursor: pointer; user-select: none;" @onclick="() => SortByColumn(column)">
+                                            @column
+                                            @if (SortColumn == column)
+                                            {
+                                                <span class="ms-1">@(SortAscending ? "▲" : "▼")</span>
+                                            }
+                                        </th>
                                     }
                                 </tr>
                             </thead>
@@ -214,7 +230,7 @@
                         {
                             <div class="d-flex justify-content-between align-items-center mt-3">
                                 <div>
-                                    Showing @((CurrentPage - 1) * PageSize + 1) to @Math.Min(CurrentPage * PageSize, ImportedData.Count()) of @ImportedData.Count() records
+                                    Showing @((CurrentPage - 1) * PageSize + 1) to @Math.Min(CurrentPage * PageSize, FilteredData?.Count() ?? 0) of @(FilteredData?.Count() ?? 0) records
                                 </div>
                                 <div>
                                     <button class="btn btn-sm btn-outline-primary me-2" 
@@ -251,8 +267,12 @@
     private bool IsLoadingDropdowns = false;
     private bool ShowViewData = false;
     private IEnumerable<dynamic>? ImportedData = null;
+    private IEnumerable<dynamic>? FilteredData = null;
     private int CurrentPage = 1;
     private int PageSize = 100;
+    private string SearchText = "";
+    private string SortColumn = "";
+    private bool SortAscending = true;
     
     private async Task TestConnection()
     {
@@ -384,6 +404,9 @@
         try
         {
             ImportedData = await ImportService.GetImportedDataAsync(SelectedEndpoint.TableName);
+            FilteredData = ImportedData; // Initialize filtered data
+            SearchText = ""; // Clear search
+            SortColumn = ""; // Clear sort
             CurrentPage = 1; // Reset to first page when loading new data
             StateHasChanged();
         }
@@ -396,14 +419,104 @@
     
     private IEnumerable<dynamic> GetPagedData()
     {
-        if (ImportedData == null) return Enumerable.Empty<dynamic>();
-        return ImportedData.Skip((CurrentPage - 1) * PageSize).Take(PageSize);
+        if (FilteredData == null) return Enumerable.Empty<dynamic>();
+        return FilteredData.Skip((CurrentPage - 1) * PageSize).Take(PageSize);
     }
     
     private int GetTotalPages()
     {
-        if (ImportedData == null || !ImportedData.Any()) return 1;
-        return (int)Math.Ceiling((double)ImportedData.Count() / PageSize);
+        if (FilteredData == null || !FilteredData.Any()) return 1;
+        return (int)Math.Ceiling((double)FilteredData.Count() / PageSize);
+    }
+    
+    private void ApplyFilter()
+    {
+        if (ImportedData == null)
+        {
+            FilteredData = null;
+            return;
+        }
+        
+        if (string.IsNullOrWhiteSpace(SearchText))
+        {
+            FilteredData = ImportedData;
+        }
+        else
+        {
+            var searchLower = SearchText.ToLower();
+            FilteredData = ImportedData.Where(row =>
+            {
+                foreach (var column in GetTableColumns())
+                {
+                    var value = GetCellValue(row, column)?.ToString()?.ToLower() ?? "";
+                    if (value.Contains(searchLower))
+                        return true;
+                }
+                return false;
+            });
+        }
+        
+        // Apply sorting if active
+        if (!string.IsNullOrEmpty(SortColumn))
+        {
+            ApplySort();
+        }
+        
+        CurrentPage = 1; // Reset to first page after filtering
+        StateHasChanged();
+    }
+    
+    private void ClearFilter()
+    {
+        SearchText = "";
+        ApplyFilter();
+    }
+    
+    private void SortByColumn(string column)
+    {
+        if (SortColumn == column)
+        {
+            SortAscending = !SortAscending;
+        }
+        else
+        {
+            SortColumn = column;
+            SortAscending = true;
+        }
+        
+        ApplySort();
+        CurrentPage = 1; // Reset to first page after sorting
+        StateHasChanged();
+    }
+    
+    private void ApplySort()
+    {
+        if (FilteredData == null || string.IsNullOrEmpty(SortColumn)) return;
+        
+        if (SortAscending)
+        {
+            FilteredData = FilteredData.OrderBy(row =>
+            {
+                var value = GetCellValue(row, SortColumn);
+                var strValue = value?.ToString() ?? "";
+                // Try to parse as number for numeric sorting
+                if (int.TryParse(strValue, out int intValue))
+                    return (object)intValue;
+                return strValue;
+            });
+        }
+        else
+        {
+            FilteredData = FilteredData.OrderByDescending(row =>
+            {
+                var value = GetCellValue(row, SortColumn);
+                var strValue = value?.ToString() ?? "";
+                // Try to parse as number for numeric sorting
+                if (int.TryParse(strValue, out int intValue))
+                    return (object)intValue;
+                return strValue;
+            });
+        }
     }
     
     private void NextPage()

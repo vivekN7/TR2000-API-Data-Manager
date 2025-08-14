@@ -72,6 +72,13 @@ cd /workspace/TR2000/TR2K/TR2KApp
 
 ## Recent Work
 
+### 2025-08-14 Session (Part 3)
+1. **Fixed Parameter Names and Display**:
+   - Changed parameter names to uppercase (PLANTID, ISSUEREV, OPERATORID)
+   - Fixed parameter type display to show actual types not hardcoded [Int32]
+   - Updated URL building to convert uppercase params to lowercase
+   - Parameter display now correctly shows: PLANTID=[String] ISSUEREV=[String]
+
 ### 2025-08-14 Session (Part 2)
 1. **Fixed PlantID Type and Alphanumeric Support**:
    - Changed PlantID from INTEGER to TEXT in database

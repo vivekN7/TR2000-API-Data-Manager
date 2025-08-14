@@ -205,6 +205,13 @@ public class DataImportService
 
     private async Task<int> ImportOperatorsAsync(List<Dictionary<string, object>> data)
     {
+        // Clear the entire operators table to mirror the API response
+        var deleteCount = await _operatorRepository.DeleteAllAsync("operators");
+        if (deleteCount > 0)
+        {
+            _logger.LogInformation("Cleared {Count} existing operators to mirror API response", deleteCount);
+        }
+        
         var operators = data.Select(item => new Operator
         {
             OperatorID = Convert.ToInt32(item.GetValueOrDefault("OperatorID", 0)),
@@ -217,6 +224,13 @@ public class DataImportService
 
     private async Task<int> ImportPlantsAsync(List<Dictionary<string, object>> data)
     {
+        // Clear the entire plants table to mirror the API response
+        var deleteCount = await _plantRepository.DeleteAllAsync("plants");
+        if (deleteCount > 0)
+        {
+            _logger.LogInformation("Cleared {Count} existing plants to mirror API response", deleteCount);
+        }
+        
         var plants = data.Select(item => new Plant
         {
             PlantID = item.GetValueOrDefault("PlantID", "")?.ToString(),
@@ -237,12 +251,11 @@ public class DataImportService
 
     private async Task<int> ImportPCSAsync(List<Dictionary<string, object>> data, string plantId)
     {
-        // First, delete existing PCS data for this plant
-        var deleteSql = "DELETE FROM [pcs] WHERE PlantID = @PlantID";
-        var deleteCount = await _pcsRepository.ExecuteAsync(deleteSql, new { PlantID = plantId });
+        // Clear the entire PCS table to mirror the API response
+        var deleteCount = await _pcsRepository.DeleteAllAsync("pcs");
         if (deleteCount > 0)
         {
-            _logger.LogInformation("Deleted {Count} existing PCS records for PlantID={PlantID}", deleteCount, plantId);
+            _logger.LogInformation("Cleared {Count} existing PCS records to mirror API response", deleteCount);
         }
         
         var pcsItems = data.Select(item => new PCS
@@ -271,12 +284,11 @@ public class DataImportService
 
     private async Task<int> ImportIssuesAsync(List<Dictionary<string, object>> data, string plantId)
     {
-        // First, delete existing issues for this plant
-        var deleteSql = "DELETE FROM [issues] WHERE PlantID = @PlantID";
-        var deleteCount = await _issueRepository.ExecuteAsync(deleteSql, new { PlantID = plantId });
+        // Clear the entire issues table to mirror the API response
+        var deleteCount = await _issueRepository.DeleteAllAsync("issues");
         if (deleteCount > 0)
         {
-            _logger.LogInformation("Deleted {Count} existing issues for PlantID={PlantID}", deleteCount, plantId);
+            _logger.LogInformation("Cleared {Count} existing issues to mirror API response", deleteCount);
         }
         
         var issues = data.Select(item => new Issue
@@ -364,26 +376,16 @@ public class DataImportService
         {
             using var connection = await _connectionFactory.GetConnectionAsync();
             
-            // First, delete existing data for this plant and issue revision
-            var deleteSQL = $"DELETE FROM [{tableName}] WHERE PlantID = @PlantID AND IssueRevision = @IssueRevision";
+            // Clear the entire table to mirror the API response exactly
+            var deleteSQL = $"DELETE FROM [{tableName}]";
             using (var deleteCommand = connection.CreateCommand())
             {
                 deleteCommand.CommandText = deleteSQL;
-                var plantIdParam = deleteCommand.CreateParameter();
-                plantIdParam.ParameterName = "@PlantID";
-                plantIdParam.Value = plantIdStr;
-                deleteCommand.Parameters.Add(plantIdParam);
-                
-                var issueRevParam = deleteCommand.CreateParameter();
-                issueRevParam.ParameterName = "@IssueRevision";
-                issueRevParam.Value = issueRevision;
-                deleteCommand.Parameters.Add(issueRevParam);
-                
                 var deletedCount = await deleteCommand.ExecuteNonQueryAsync();
                 if (deletedCount > 0)
                 {
-                    _logger.LogInformation("Deleted {Count} existing records for PlantID={PlantID}, IssueRevision={Revision} from {Table}", 
-                        deletedCount, plantIdStr, issueRevision, tableName);
+                    _logger.LogInformation("Cleared {Count} existing records from {Table} to mirror API response", 
+                        deletedCount, tableName);
                 }
             }
             

@@ -237,6 +237,14 @@ public class DataImportService
 
     private async Task<int> ImportPCSAsync(List<Dictionary<string, object>> data, string plantId)
     {
+        // First, delete existing PCS data for this plant
+        var deleteSql = "DELETE FROM [pcs] WHERE PlantID = @PlantID";
+        var deleteCount = await _pcsRepository.ExecuteAsync(deleteSql, new { PlantID = plantId });
+        if (deleteCount > 0)
+        {
+            _logger.LogInformation("Deleted {Count} existing PCS records for PlantID={PlantID}", deleteCount, plantId);
+        }
+        
         var pcsItems = data.Select(item => new PCS
         {
             PCSName = item.GetValueOrDefault("PCS", "")?.ToString(),
@@ -263,6 +271,14 @@ public class DataImportService
 
     private async Task<int> ImportIssuesAsync(List<Dictionary<string, object>> data, string plantId)
     {
+        // First, delete existing issues for this plant
+        var deleteSql = "DELETE FROM [issues] WHERE PlantID = @PlantID";
+        var deleteCount = await _issueRepository.ExecuteAsync(deleteSql, new { PlantID = plantId });
+        if (deleteCount > 0)
+        {
+            _logger.LogInformation("Deleted {Count} existing issues for PlantID={PlantID}", deleteCount, plantId);
+        }
+        
         var issues = data.Select(item => new Issue
         {
             IssueRevision = item.GetValueOrDefault("IssueRevision", "")?.ToString(),
@@ -347,6 +363,29 @@ public class DataImportService
         if (itemsToInsert.Any())
         {
             using var connection = await _connectionFactory.GetConnectionAsync();
+            
+            // First, delete existing data for this plant and issue revision
+            var deleteSQL = $"DELETE FROM [{tableName}] WHERE PlantID = @PlantID AND IssueRevision = @IssueRevision";
+            using (var deleteCommand = connection.CreateCommand())
+            {
+                deleteCommand.CommandText = deleteSQL;
+                var plantIdParam = deleteCommand.CreateParameter();
+                plantIdParam.ParameterName = "@PlantID";
+                plantIdParam.Value = plantIdStr;
+                deleteCommand.Parameters.Add(plantIdParam);
+                
+                var issueRevParam = deleteCommand.CreateParameter();
+                issueRevParam.ParameterName = "@IssueRevision";
+                issueRevParam.Value = issueRevision;
+                deleteCommand.Parameters.Add(issueRevParam);
+                
+                var deletedCount = await deleteCommand.ExecuteNonQueryAsync();
+                if (deletedCount > 0)
+                {
+                    _logger.LogInformation("Deleted {Count} existing records for PlantID={PlantID}, IssueRevision={Revision} from {Table}", 
+                        deletedCount, plantIdStr, issueRevision, tableName);
+                }
+            }
             
             // Get column names from the first item
             var firstItem = itemsToInsert.First();

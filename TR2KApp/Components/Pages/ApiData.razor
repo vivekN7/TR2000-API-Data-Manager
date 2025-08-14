@@ -22,7 +22,7 @@
             <div class="card-body">
                 <div class="mb-3">
                     <label class="form-label">1. Select Endpoint:</label>
-                    <select class="form-select" @bind="SelectedEndpointKey" @bind:after="OnEndpointChanged">
+                    <select class="form-select" @bind="SelectedEndpointKey" @bind:after="OnEndpointChanged" disabled="@IsLoading">
                         <option value="">Choose endpoint...</option>
                         @foreach (var group in EndpointRegistry.AllEndpoints.GroupBy(e => e.Section))
                         {
@@ -56,7 +56,7 @@
                                         <select class="form-select form-select-sm" 
                                                 value="@GetParameterValue(param.Name)"
                                                 @onchange="@(async e => await SetParameterValue(param.Name, e.Value?.ToString() ?? ""))"
-                                                disabled="@(!DropdownData.ContainsKey(param.DropdownSource) || (param.DependsOn != null && string.IsNullOrEmpty(GetParameterValue(param.DependsOn))))">
+                                                disabled="@(IsLoading || !DropdownData.ContainsKey(param.DropdownSource) || (param.DependsOn != null && string.IsNullOrEmpty(GetParameterValue(param.DependsOn))))">
                                             <option value="">Choose...</option>
                                             @if (DropdownData.ContainsKey(param.DropdownSource))
                                             {
@@ -73,14 +73,16 @@
                                         <input type="number" class="form-control form-control-sm" 
                                                value="@GetParameterValue(param.Name)"
                                                @onchange="@(async e => await SetParameterValue(param.Name, e.Value?.ToString() ?? ""))"
-                                               placeholder="Enter @param.DisplayName" />
+                                               placeholder="Enter @param.DisplayName" 
+                                               disabled="@IsLoading" />
                                     }
                                     else
                                     {
                                         <input type="text" class="form-control form-control-sm" 
                                                value="@GetParameterValue(param.Name)"
                                                @onchange="@(async e => await SetParameterValue(param.Name, e.Value?.ToString() ?? ""))"
-                                               placeholder="Enter @param.DisplayName" />
+                                               placeholder="Enter @param.DisplayName" 
+                                               disabled="@IsLoading" />
                                     }
                                 </div>
                             }
@@ -91,18 +93,18 @@
                 <div class="mb-3">
                     <button class="btn btn-primary me-2" 
                             @onclick="TestConnection" 
-                            disabled="@(!CanImport())">
+                            disabled="@(!CanImport() || IsLoading)">
                         @(IsTesting ? "Testing..." : "Test Connection")
                     </button>
                     <button class="btn btn-success" 
                             @onclick="ImportData" 
-                            disabled="@(!CanImport())">
+                            disabled="@(!CanImport() || IsLoading)">
                         @(IsImporting ? "Importing..." : "Import Data")
                     </button>
                     
                     @if (ShowViewData)
                     {
-                        <button class="btn btn-warning ms-2" @onclick="ExportToCsv">
+                        <button class="btn btn-warning ms-2" @onclick="ExportToCsv" disabled="@IsLoading">
                             Export to CSV
                         </button>
                     }
@@ -183,54 +185,80 @@
     </div>
 </div>
 
-@if (ImportedData != null && ImportedData.Any())
+@if (ShowViewData && SelectedEndpoint != null)
 {
     <div class="row mt-4">
         <div class="col-12">
             <div class="card">
                 <div class="card-header">
                     <div class="d-flex justify-content-between align-items-center">
-                        <h5>Imported Data from '@(SelectedEndpoint?.TableName)' (@(FilteredData?.Count() ?? 0) filtered / @ImportedData.Count() total)</h5>
+                        <h5>Imported Data from '@(SelectedEndpoint?.TableName)' 
+                            @if (!IsLoading && ImportedData != null)
+                            {
+                                <span>(@(FilteredData?.Count() ?? 0) filtered / @ImportedData.Count() total)</span>
+                            }
+                        </h5>
                         <div class="d-flex gap-2">
                             <input type="text" class="form-control form-control-sm" style="width: 250px;" 
                                    placeholder="Search all columns..." 
                                    @bind="SearchText" 
                                    @bind:event="oninput"
-                                   @bind:after="ApplyFilter" />
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="ClearFilter">Clear</button>
+                                   @bind:after="ApplyFilter" 
+                                   disabled="@IsLoading" />
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="ClearFilter" disabled="@IsLoading">Clear</button>
                         </div>
                     </div>
                 </div>
                 <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-striped table-hover">
-                            <thead>
-                                <tr>
-                                    @foreach (var column in GetTableColumns())
-                                    {
-                                        <th style="cursor: pointer; user-select: none;" @onclick="() => SortByColumn(column)">
-                                            @column
-                                            @if (SortColumn == column)
-                                            {
-                                                <span class="ms-1">@(SortAscending ? "▲" : "▼")</span>
-                                            }
-                                        </th>
-                                    }
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var row in GetPagedData())
-                                {
+                    @if (IsLoading)
+                    {
+                        <div class="text-center py-5">
+                            <div class="spinner-border text-primary mb-3" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <div class="text-muted">@LoadingMessage</div>
+                            <div class="text-muted small mt-2">Please wait, this may take a moment...</div>
+                        </div>
+                    }
+                    else if (ImportedData != null && ImportedData.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
                                     <tr>
                                         @foreach (var column in GetTableColumns())
                                         {
-                                            <td>@GetCellValue(row, column)</td>
+                                            <th style="cursor: pointer; user-select: none;" @onclick="() => SortByColumn(column)">
+                                                @column
+                                                @if (SortColumn == column)
+                                                {
+                                                    <span class="ms-1">@(SortAscending ? "▲" : "▼")</span>
+                                                }
+                                            </th>
                                         }
                                     </tr>
-                                }
-                            </tbody>
-                        </table>
-                        @if (GetTotalPages() > 1)
+                                </thead>
+                                <tbody>
+                                    @foreach (var row in GetPagedData())
+                                    {
+                                        <tr>
+                                            @foreach (var column in GetTableColumns())
+                                            {
+                                                <td>@GetCellValue(row, column)</td>
+                                            }
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else if (!IsLoading)
+                    {
+                        <div class="text-center py-5 text-muted">
+                            <p>No data available. Please import data first.</p>
+                        </div>
+                    }
+                    @if (!IsLoading && ImportedData != null && ImportedData.Any() && GetTotalPages() > 1)
                         {
                             <div class="d-flex justify-content-between align-items-center mt-3">
                                 <div>
@@ -318,8 +346,13 @@
             Console.WriteLine($"Parameter {kv.Key} = {kv.Value}");
         }
         
+        // Clear existing data immediately to show loading state
+        ImportedData = null;
+        FilteredData = null;
+        ShowViewData = true; // Show the data section with loading spinner
+        
         IsImporting = true;
-        LoadingMessage = "Importing data...";
+        LoadingMessage = "Importing data from API...";
         StatusMessage = "";
         StateHasChanged();
         
@@ -407,6 +440,9 @@
         
         try
         {
+            LoadingMessage = "Loading data from database...";
+            StateHasChanged();
+            
             ImportedData = await ImportService.GetImportedDataAsync(SelectedEndpoint.TableName);
             FilteredData = ImportedData; // Initialize filtered data
             SearchText = ""; // Clear search
@@ -417,6 +453,8 @@
         catch (Exception ex)
         {
             StatusMessage = $"❌ Error loading data: {ex.Message}";
+            ImportedData = null;
+            FilteredData = null;
             StateHasChanged();
         }
     }

@@ -665,24 +665,42 @@ public static class EndpointRegistry
             Key = "pcs_header",
             Name = "Get header and properties",
             Section = "PCS",
-            Endpoint = "pcs/{pcsid}/rev/{revision}/header",
+            Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}/header",
             TableName = "pcs_header",
             HttpMethod = "GET",
             Parameters = new()
             {
                 new EndpointParameter 
                 { 
-                    Name = "PCSID", 
-                    DisplayName = "PCS ID", 
+                    Name = "PLANTID", 
+                    DisplayName = "Select Plant", 
                     IsRequired = true, 
-                    Type = "string"
+                    Type = "dropdown",
+                    DropdownSource = "plants",
+                    ValueField = "PlantID",
+                    DisplayField = "ShortDescription"
+                },
+                new EndpointParameter 
+                { 
+                    Name = "PCSID", 
+                    DisplayName = "Select PCS", 
+                    IsRequired = true, 
+                    Type = "dropdown",
+                    DropdownSource = "pcs",
+                    ValueField = "PCS",
+                    DisplayField = "PCS",
+                    DependsOn = "PLANTID"
                 },
                 new EndpointParameter
                 {
                     Name = "REVISION",
-                    DisplayName = "Revision",
+                    DisplayName = "Select Revision",
                     IsRequired = true,
-                    Type = "string"
+                    Type = "dropdown",
+                    DropdownSource = "pcs",
+                    ValueField = "Revision",
+                    DisplayField = "Revision",
+                    DependsOn = "PCSID"
                 }
             },
             Description = "Retrieve header and properties for a specific PCS",
@@ -699,24 +717,42 @@ public static class EndpointRegistry
             Key = "pcs_temperature_pressure",
             Name = "Get temperature and pressure",
             Section = "PCS",
-            Endpoint = "pcs/{pcsid}/rev/{revision}/temperature-pressure",
+            Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}/temperature-pressure",
             TableName = "pcs_temperature_pressure",
             HttpMethod = "GET",
             Parameters = new()
             {
                 new EndpointParameter 
                 { 
-                    Name = "PCSID", 
-                    DisplayName = "PCS ID", 
+                    Name = "PLANTID", 
+                    DisplayName = "Select Plant", 
                     IsRequired = true, 
-                    Type = "string"
+                    Type = "dropdown",
+                    DropdownSource = "plants",
+                    ValueField = "PlantID",
+                    DisplayField = "ShortDescription"
+                },
+                new EndpointParameter 
+                { 
+                    Name = "PCSID", 
+                    DisplayName = "Select PCS", 
+                    IsRequired = true, 
+                    Type = "dropdown",
+                    DropdownSource = "pcs",
+                    ValueField = "PCS",
+                    DisplayField = "PCS",
+                    DependsOn = "PLANTID"
                 },
                 new EndpointParameter
                 {
                     Name = "REVISION",
-                    DisplayName = "Revision",
+                    DisplayName = "Select Revision",
                     IsRequired = true,
-                    Type = "string"
+                    Type = "dropdown",
+                    DropdownSource = "pcs",
+                    ValueField = "Revision",
+                    DisplayField = "Revision",
+                    DependsOn = "PCSID"
                 }
             },
             Description = "Retrieve temperature and pressure data for a specific PCS",
@@ -734,24 +770,42 @@ public static class EndpointRegistry
             Key = "pcs_pipe_size",
             Name = "Get pipe size",
             Section = "PCS",
-            Endpoint = "pcs/{pcsid}/rev/{revision}/pipe-size",
+            Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}/pipe-size",
             TableName = "pcs_pipe_size",
             HttpMethod = "GET",
             Parameters = new()
             {
                 new EndpointParameter 
                 { 
-                    Name = "PCSID", 
-                    DisplayName = "PCS ID", 
+                    Name = "PLANTID", 
+                    DisplayName = "Select Plant", 
                     IsRequired = true, 
-                    Type = "string"
+                    Type = "dropdown",
+                    DropdownSource = "plants",
+                    ValueField = "PlantID",
+                    DisplayField = "ShortDescription"
+                },
+                new EndpointParameter 
+                { 
+                    Name = "PCSID", 
+                    DisplayName = "Select PCS", 
+                    IsRequired = true, 
+                    Type = "dropdown",
+                    DropdownSource = "pcs",
+                    ValueField = "PCS",
+                    DisplayField = "PCS",
+                    DependsOn = "PLANTID"
                 },
                 new EndpointParameter
                 {
                     Name = "REVISION",
-                    DisplayName = "Revision",
+                    DisplayName = "Select Revision",
                     IsRequired = true,
-                    Type = "string"
+                    Type = "dropdown",
+                    DropdownSource = "pcs",
+                    ValueField = "Revision",
+                    DisplayField = "Revision",
+                    DependsOn = "PCSID"
                 }
             },
             Description = "Retrieve pipe size data for a specific PCS",
@@ -769,24 +823,42 @@ public static class EndpointRegistry
             Key = "pcs_pipe_element",
             Name = "Get pipe element",
             Section = "PCS",
-            Endpoint = "pcs/{pcsid}/rev/{revision}/pipe-element",
+            Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}/pipe-element",
             TableName = "pcs_pipe_element",
             HttpMethod = "GET",
             Parameters = new()
             {
                 new EndpointParameter 
                 { 
-                    Name = "PCSID", 
-                    DisplayName = "PCS ID", 
+                    Name = "PLANTID", 
+                    DisplayName = "Select Plant", 
                     IsRequired = true, 
-                    Type = "string"
+                    Type = "dropdown",
+                    DropdownSource = "plants",
+                    ValueField = "PlantID",
+                    DisplayField = "ShortDescription"
+                },
+                new EndpointParameter 
+                { 
+                    Name = "PCSID", 
+                    DisplayName = "Select PCS", 
+                    IsRequired = true, 
+                    Type = "dropdown",
+                    DropdownSource = "pcs",
+                    ValueField = "PCS",
+                    DisplayField = "PCS",
+                    DependsOn = "PLANTID"
                 },
                 new EndpointParameter
                 {
                     Name = "REVISION",
-                    DisplayName = "Revision",
+                    DisplayName = "Select Revision",
                     IsRequired = true,
-                    Type = "string"
+                    Type = "dropdown",
+                    DropdownSource = "pcs",
+                    ValueField = "Revision",
+                    DisplayField = "Revision",
+                    DependsOn = "PCSID"
                 }
             },
             Description = "Retrieve pipe element data for a specific PCS",
@@ -804,24 +876,42 @@ public static class EndpointRegistry
             Key = "pcs_valve_element",
             Name = "Get valve element",
             Section = "PCS",
-            Endpoint = "pcs/{pcsid}/rev/{revision}/valve-element",
+            Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}/valve-element",
             TableName = "pcs_valve_element",
             HttpMethod = "GET",
             Parameters = new()
             {
                 new EndpointParameter 
                 { 
-                    Name = "PCSID", 
-                    DisplayName = "PCS ID", 
+                    Name = "PLANTID", 
+                    DisplayName = "Select Plant", 
                     IsRequired = true, 
-                    Type = "string"
+                    Type = "dropdown",
+                    DropdownSource = "plants",
+                    ValueField = "PlantID",
+                    DisplayField = "ShortDescription"
+                },
+                new EndpointParameter 
+                { 
+                    Name = "PCSID", 
+                    DisplayName = "Select PCS", 
+                    IsRequired = true, 
+                    Type = "dropdown",
+                    DropdownSource = "pcs",
+                    ValueField = "PCS",
+                    DisplayField = "PCS",
+                    DependsOn = "PLANTID"
                 },
                 new EndpointParameter
                 {
                     Name = "REVISION",
-                    DisplayName = "Revision",
+                    DisplayName = "Select Revision",
                     IsRequired = true,
-                    Type = "string"
+                    Type = "dropdown",
+                    DropdownSource = "pcs",
+                    ValueField = "Revision",
+                    DisplayField = "Revision",
+                    DependsOn = "PCSID"
                 }
             },
             Description = "Retrieve valve element data for a specific PCS",
@@ -839,24 +929,42 @@ public static class EndpointRegistry
             Key = "pcs_embedded_note",
             Name = "Get embedded note",
             Section = "PCS",
-            Endpoint = "pcs/{pcsid}/rev/{revision}/embedded-note",
+            Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}/embedded-note",
             TableName = "pcs_embedded_note",
             HttpMethod = "GET",
             Parameters = new()
             {
                 new EndpointParameter 
                 { 
-                    Name = "PCSID", 
-                    DisplayName = "PCS ID", 
+                    Name = "PLANTID", 
+                    DisplayName = "Select Plant", 
                     IsRequired = true, 
-                    Type = "string"
+                    Type = "dropdown",
+                    DropdownSource = "plants",
+                    ValueField = "PlantID",
+                    DisplayField = "ShortDescription"
+                },
+                new EndpointParameter 
+                { 
+                    Name = "PCSID", 
+                    DisplayName = "Select PCS", 
+                    IsRequired = true, 
+                    Type = "dropdown",
+                    DropdownSource = "pcs",
+                    ValueField = "PCS",
+                    DisplayField = "PCS",
+                    DependsOn = "PLANTID"
                 },
                 new EndpointParameter
                 {
                     Name = "REVISION",
-                    DisplayName = "Revision",
+                    DisplayName = "Select Revision",
                     IsRequired = true,
-                    Type = "string"
+                    Type = "dropdown",
+                    DropdownSource = "pcs",
+                    ValueField = "Revision",
+                    DisplayField = "Revision",
+                    DependsOn = "PCSID"
                 }
             },
             Description = "Retrieve embedded notes for a specific PCS",

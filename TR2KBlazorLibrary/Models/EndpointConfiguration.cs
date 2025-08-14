@@ -657,6 +657,216 @@ public static class EndpointRegistry
                 new ResponseField { Name = "TubePCS", Type = "[String]" },
                 new ResponseField { Name = "NewVDSSection", Type = "[String]" }
             }
+        },
+        
+        // Additional PCS endpoints
+        new EndpointConfiguration
+        {
+            Key = "pcs_header",
+            Name = "Get header and properties",
+            Section = "PCS",
+            Endpoint = "pcs/{pcsid}/rev/{revision}/header",
+            TableName = "pcs_header",
+            HttpMethod = "GET",
+            Parameters = new()
+            {
+                new EndpointParameter 
+                { 
+                    Name = "PCSID", 
+                    DisplayName = "PCS ID", 
+                    IsRequired = true, 
+                    Type = "string"
+                },
+                new EndpointParameter
+                {
+                    Name = "REVISION",
+                    DisplayName = "Revision",
+                    IsRequired = true,
+                    Type = "string"
+                }
+            },
+            Description = "Retrieve header and properties for a specific PCS",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "PCS", Type = "[String]" },
+                new ResponseField { Name = "Revision", Type = "[String]" },
+                new ResponseField { Name = "Properties", Type = "[Object]" }
+            }
+        },
+        
+        new EndpointConfiguration
+        {
+            Key = "pcs_temperature_pressure",
+            Name = "Get temperature and pressure",
+            Section = "PCS",
+            Endpoint = "pcs/{pcsid}/rev/{revision}/temperature-pressure",
+            TableName = "pcs_temperature_pressure",
+            HttpMethod = "GET",
+            Parameters = new()
+            {
+                new EndpointParameter 
+                { 
+                    Name = "PCSID", 
+                    DisplayName = "PCS ID", 
+                    IsRequired = true, 
+                    Type = "string"
+                },
+                new EndpointParameter
+                {
+                    Name = "REVISION",
+                    DisplayName = "Revision",
+                    IsRequired = true,
+                    Type = "string"
+                }
+            },
+            Description = "Retrieve temperature and pressure data for a specific PCS",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "Temperature", Type = "[String]" },
+                new ResponseField { Name = "Pressure", Type = "[String]" },
+                new ResponseField { Name = "DesignTemperature", Type = "[String]" },
+                new ResponseField { Name = "DesignPressure", Type = "[String]" }
+            }
+        },
+        
+        new EndpointConfiguration
+        {
+            Key = "pcs_pipe_size",
+            Name = "Get pipe size",
+            Section = "PCS",
+            Endpoint = "pcs/{pcsid}/rev/{revision}/pipe-size",
+            TableName = "pcs_pipe_size",
+            HttpMethod = "GET",
+            Parameters = new()
+            {
+                new EndpointParameter 
+                { 
+                    Name = "PCSID", 
+                    DisplayName = "PCS ID", 
+                    IsRequired = true, 
+                    Type = "string"
+                },
+                new EndpointParameter
+                {
+                    Name = "REVISION",
+                    DisplayName = "Revision",
+                    IsRequired = true,
+                    Type = "string"
+                }
+            },
+            Description = "Retrieve pipe size data for a specific PCS",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "NominalSize", Type = "[String]" },
+                new ResponseField { Name = "OutsideDiameter", Type = "[String]" },
+                new ResponseField { Name = "WallThickness", Type = "[String]" },
+                new ResponseField { Name = "Schedule", Type = "[String]" }
+            }
+        },
+        
+        new EndpointConfiguration
+        {
+            Key = "pcs_pipe_element",
+            Name = "Get pipe element",
+            Section = "PCS",
+            Endpoint = "pcs/{pcsid}/rev/{revision}/pipe-element",
+            TableName = "pcs_pipe_element",
+            HttpMethod = "GET",
+            Parameters = new()
+            {
+                new EndpointParameter 
+                { 
+                    Name = "PCSID", 
+                    DisplayName = "PCS ID", 
+                    IsRequired = true, 
+                    Type = "string"
+                },
+                new EndpointParameter
+                {
+                    Name = "REVISION",
+                    DisplayName = "Revision",
+                    IsRequired = true,
+                    Type = "string"
+                }
+            },
+            Description = "Retrieve pipe element data for a specific PCS",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "ElementID", Type = "[String]" },
+                new ResponseField { Name = "ElementType", Type = "[String]" },
+                new ResponseField { Name = "Material", Type = "[String]" },
+                new ResponseField { Name = "Specification", Type = "[String]" }
+            }
+        },
+        
+        new EndpointConfiguration
+        {
+            Key = "pcs_valve_element",
+            Name = "Get valve element",
+            Section = "PCS",
+            Endpoint = "pcs/{pcsid}/rev/{revision}/valve-element",
+            TableName = "pcs_valve_element",
+            HttpMethod = "GET",
+            Parameters = new()
+            {
+                new EndpointParameter 
+                { 
+                    Name = "PCSID", 
+                    DisplayName = "PCS ID", 
+                    IsRequired = true, 
+                    Type = "string"
+                },
+                new EndpointParameter
+                {
+                    Name = "REVISION",
+                    DisplayName = "Revision",
+                    IsRequired = true,
+                    Type = "string"
+                }
+            },
+            Description = "Retrieve valve element data for a specific PCS",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "ValveType", Type = "[String]" },
+                new ResponseField { Name = "ValveClass", Type = "[String]" },
+                new ResponseField { Name = "EndConnection", Type = "[String]" },
+                new ResponseField { Name = "Material", Type = "[String]" }
+            }
+        },
+        
+        new EndpointConfiguration
+        {
+            Key = "pcs_embedded_note",
+            Name = "Get embedded note",
+            Section = "PCS",
+            Endpoint = "pcs/{pcsid}/rev/{revision}/embedded-note",
+            TableName = "pcs_embedded_note",
+            HttpMethod = "GET",
+            Parameters = new()
+            {
+                new EndpointParameter 
+                { 
+                    Name = "PCSID", 
+                    DisplayName = "PCS ID", 
+                    IsRequired = true, 
+                    Type = "string"
+                },
+                new EndpointParameter
+                {
+                    Name = "REVISION",
+                    DisplayName = "Revision",
+                    IsRequired = true,
+                    Type = "string"
+                }
+            },
+            Description = "Retrieve embedded notes for a specific PCS",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "NoteID", Type = "[String]" },
+                new ResponseField { Name = "NoteText", Type = "[String]" },
+                new ResponseField { Name = "CreatedDate", Type = "[String]" },
+                new ResponseField { Name = "CreatedBy", Type = "[String]" }
+            }
         }
     };
 }

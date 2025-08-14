@@ -253,6 +253,71 @@ CREATE TABLE esk_references (
     FOREIGN KEY (PlantID) REFERENCES plants(PlantID)
 );
 
+-- PCS Detail Tables
+-- Create pcs_header table
+CREATE TABLE pcs_header (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    PCS TEXT,
+    Revision TEXT,
+    Properties TEXT,
+    CreatedDate DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ModifiedDate DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create pcs_temperature_pressure table
+CREATE TABLE pcs_temperature_pressure (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    Temperature TEXT,
+    Pressure TEXT,
+    DesignTemperature TEXT,
+    DesignPressure TEXT,
+    CreatedDate DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ModifiedDate DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create pcs_pipe_size table
+CREATE TABLE pcs_pipe_size (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    NominalSize TEXT,
+    OutsideDiameter TEXT,
+    WallThickness TEXT,
+    Schedule TEXT,
+    CreatedDate DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ModifiedDate DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create pcs_pipe_element table
+CREATE TABLE pcs_pipe_element (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ElementID TEXT,
+    ElementType TEXT,
+    Material TEXT,
+    Specification TEXT,
+    CreatedDate DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ModifiedDate DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create pcs_valve_element table
+CREATE TABLE pcs_valve_element (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ValveType TEXT,
+    ValveClass TEXT,
+    EndConnection TEXT,
+    Material TEXT,
+    CreatedDate DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ModifiedDate DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create pcs_embedded_note table
+CREATE TABLE pcs_embedded_note (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    NoteID TEXT,
+    NoteText TEXT,
+    CreatedDate DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ModifiedDate DATETIME DEFAULT CURRENT_TIMESTAMP,
+    CreatedBy TEXT
+);
+
 -- Create pipe_element_references table (TR2000 API: /plants/{id}/issues/rev/{rev}/pipe-elements)
 CREATE TABLE pipe_element_references (
     Id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -325,4 +390,10 @@ Console.WriteLine("  - mds_references (MDS references for issues)");
 Console.WriteLine("  - vsk_references (VSK references for issues)");
 Console.WriteLine("  - esk_references (ESK references for issues)");
 Console.WriteLine("  - pipe_element_references (Pipe element references)");
+Console.WriteLine("  - pcs_header (PCS header and properties)");
+Console.WriteLine("  - pcs_temperature_pressure (PCS temperature and pressure)");
+Console.WriteLine("  - pcs_pipe_size (PCS pipe size)");
+Console.WriteLine("  - pcs_pipe_element (PCS pipe element)");
+Console.WriteLine("  - pcs_valve_element (PCS valve element)");
+Console.WriteLine("  - pcs_embedded_note (PCS embedded notes)");
 Console.WriteLine("✅ All tables have proper indexes and foreign keys!");

@@ -160,7 +160,7 @@
                             <span class="ms-1 font-monospace small">
                                 @foreach (var param in SelectedEndpoint.Parameters)
                                 {
-                                    <span>@param.Name.ToUpper()=[Int32]</span>
+                                    <span>@param.Name=[@(param.Type == "int" ? "Int32" : "String")]</span>
                                 }
                             </span>
                         </div>
@@ -676,7 +676,7 @@
             foreach (var depParam in dependentParams)
             {
                 // Load issues for the selected plant
-                if (depParam.DropdownSource == "issues" && paramName == "plantId" && !string.IsNullOrEmpty(value))
+                if (depParam.DropdownSource == "issues" && paramName == "PLANTID" && !string.IsNullOrEmpty(value))
                 {
                     await LoadIssuesForPlant(value);
                 }
@@ -840,12 +840,18 @@
             if (ParameterValues.TryGetValue(param.Name, out var value) && !string.IsNullOrEmpty(value))
             {
                 // URL encode revision parameters to handle special characters
-                if (param.Name.Contains("Revision") || param.Name == "issueRevision")
+                if (param.Name.Contains("REV") || param.Name == "ISSUEREV")
                 {
                     value = System.Net.WebUtility.UrlEncode(value);
                 }
-                Console.WriteLine($"GetFinalEndpoint: Replacing {{{param.Name}}} with {value}");
-                endpoint = endpoint.Replace($"{{{param.Name}}}", value);
+                // Convert parameter name to lowercase for URL replacement
+                var urlParamName = param.Name.ToLower();
+                if (param.Name == "ISSUEREV") urlParamName = "issuerev";
+                if (param.Name == "PLANTID") urlParamName = "plantid";
+                if (param.Name == "OPERATORID") urlParamName = "operatorid";
+                
+                Console.WriteLine($"GetFinalEndpoint: Replacing {{{urlParamName}}} with {value}");
+                endpoint = endpoint.Replace($"{{{urlParamName}}}", value);
             }
             else if (param.IsRequired)
             {

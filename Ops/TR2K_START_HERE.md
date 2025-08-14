@@ -73,11 +73,12 @@ cd /workspace/TR2000/TR2K/TR2KApp
 ## Recent Work
 
 ### 2025-08-14 Session (Part 4)
-1. **Fixed Data Import Behavior**:
-   - Reference data now clears existing records for PlantID/IssueRevision before import
-   - Issues clear existing records for PlantID before import
-   - PCS clears existing records for PlantID before import
-   - Importing different revisions now replaces data instead of appending
+1. **Fixed Data Import to Mirror API Responses**:
+   - ALL tables now clear completely before importing new data
+   - SQLite database mirrors exactly what the API returns
+   - No accumulation of data from multiple API calls
+   - Each import completely replaces the table contents
+   - Database acts as a true mirror of the last API endpoint response
 
 ### 2025-08-14 Session (Part 3)
 1. **Fixed Parameter Names and Display**:

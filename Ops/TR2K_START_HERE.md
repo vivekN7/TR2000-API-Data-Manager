@@ -72,7 +72,15 @@ cd /workspace/TR2000/TR2K/TR2KApp
 
 ## Recent Work
 
-### 2025-08-14 Session
+### 2025-08-14 Session (Part 2)
+1. **Fixed PlantID Type and Alphanumeric Support**:
+   - Changed PlantID from INTEGER to TEXT in database
+   - Updated all models (Plant, PCS, Issue) to use string for PlantID
+   - Fixed regex to accept alphanumeric plant IDs (e.g., "JSV")
+   - Corrected endpoint parameter types in UI display
+   - Application now supports both numeric (105) and alphanumeric (JSV) plant IDs
+
+### 2025-08-14 Session (Part 1)
 1. **Fixed Reference Table Column Mismatch**:
    - Analyzed API responses for all reference endpoints
    - Corrected column definitions in DatabaseCreator
@@ -230,8 +238,10 @@ curl -s "https://equinor.pipespec-api.presight.com/plants/34/issues/rev/1/pcs" |
 ```
 
 ---
-Last Updated: 2025-08-14
+Last Updated: 2025-08-14 (End of Day)
 - ✅ FIXED: All reference table column mismatches resolved
+- ✅ FIXED: PlantID now supports alphanumeric values (e.g., "JSV")
+- ✅ FIXED: Endpoint parameter types corrected in UI display
 - All reference endpoints (PCS, SC, VSM, VDS, EDS, MDS, VSK, ESK) now working
-- Database schema corrected and recreated
-- All changes committed and pushed to GitHub
+- Database schema updated to support TEXT for PlantID
+- All changes committed locally (NOT pushed to GitHub)

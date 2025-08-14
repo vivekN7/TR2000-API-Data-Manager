@@ -219,7 +219,7 @@ public class DataImportService
     {
         var plants = data.Select(item => new Plant
         {
-            PlantID = Convert.ToInt32(item.GetValueOrDefault("PlantID", 0)),
+            PlantID = item.GetValueOrDefault("PlantID", "")?.ToString(),
             ShortDescription = item.GetValueOrDefault("ShortDescription", "")?.ToString(),
             LongDescription = item.GetValueOrDefault("LongDescription", "")?.ToString(),
             OperatorID = Convert.ToInt32(item.GetValueOrDefault("OperatorID", 0)),
@@ -235,7 +235,7 @@ public class DataImportService
         return plants.Count;
     }
 
-    private async Task<int> ImportPCSAsync(List<Dictionary<string, object>> data, int plantId)
+    private async Task<int> ImportPCSAsync(List<Dictionary<string, object>> data, string plantId)
     {
         var pcsItems = data.Select(item => new PCS
         {
@@ -261,7 +261,7 @@ public class DataImportService
         return pcsItems.Count;
     }
 
-    private async Task<int> ImportIssuesAsync(List<Dictionary<string, object>> data, int plantId)
+    private async Task<int> ImportIssuesAsync(List<Dictionary<string, object>> data, string plantId)
     {
         var issues = data.Select(item => new Issue
         {
@@ -308,13 +308,14 @@ public class DataImportService
     private async Task<int> ImportReferencesAsync(List<Dictionary<string, object>> data, string endpoint)
     {
         // Extract plant ID and issue revision from the endpoint
-        var match = System.Text.RegularExpressions.Regex.Match(endpoint, @"plants/(\d+)/issues/rev/([^/]+)/(.+)");
+        // Plant ID can be numeric (e.g., 105) or alphanumeric (e.g., JSV)
+        var match = System.Text.RegularExpressions.Regex.Match(endpoint, @"plants/([^/]+)/issues/rev/([^/]+)/(.+)");
         if (!match.Success)
         {
             throw new ArgumentException($"Invalid reference endpoint format: {endpoint}");
         }
         
-        int plantId = int.Parse(match.Groups[1].Value);
+        string plantIdStr = match.Groups[1].Value;
         string issueRevision = match.Groups[2].Value;
         string endpointType = match.Groups[3].Value;
         
@@ -337,7 +338,7 @@ public class DataImportService
         var itemsToInsert = data.Select(item =>
         {
             var newItem = new Dictionary<string, object>(item);
-            newItem["PlantID"] = plantId;
+            newItem["PlantID"] = plantIdStr; // PlantID is now TEXT in database, supports alphanumeric
             newItem["IssueRevision"] = issueRevision;
             return newItem;
         }).ToList();
@@ -376,15 +377,16 @@ public class DataImportService
         return itemsToInsert.Count;
     }
 
-    private static int ExtractPlantId(string endpoint)
+    private static string ExtractPlantId(string endpoint)
     {
-        // Extract plant ID from endpoints like "plants/1/pcs" or "plants/2/issues"
+        // Extract plant ID from endpoints like "plants/105/pcs" or "plants/JSV/issues"
+        // Plant ID can be numeric or alphanumeric
         var parts = endpoint.Split('/');
-        if (parts.Length >= 2 && int.TryParse(parts[1], out var plantId))
+        if (parts.Length >= 2 && !string.IsNullOrEmpty(parts[1]))
         {
-            return plantId;
+            return parts[1];
         }
-        return 0;
+        return "";
     }
 
     private async Task EnsureOperatorsExistAsync()
@@ -403,7 +405,7 @@ public class DataImportService
         }
     }
 
-    private async Task EnsurePlantExistsAsync(int plantId)
+    private async Task EnsurePlantExistsAsync(string plantId)
     {
         var existingPlants = await _plantRepository.GetAllAsync("plants");
         var plantExists = existingPlants.OfType<Plant>().Any(p => p.PlantID == plantId);

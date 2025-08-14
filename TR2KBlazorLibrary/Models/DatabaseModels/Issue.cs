@@ -5,7 +5,7 @@ namespace TR2KBlazorLibrary.Models.DatabaseModels;
 public class Issue : BaseEntity
 {
     public string? IssueRevision { get; set; }
-    public int? PlantID { get; set; }
+    public string? PlantID { get; set; }
     public string? Status { get; set; }
     public string? RevDate { get; set; }
     public string? ProtectStatus { get; set; }

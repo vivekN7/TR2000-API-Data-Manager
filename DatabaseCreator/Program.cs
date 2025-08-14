@@ -50,7 +50,7 @@ CREATE TABLE operators (
 -- Create plants table (TR2000 API: /plants)
 CREATE TABLE plants (
     Id INTEGER PRIMARY KEY AUTOINCREMENT,
-    PlantID INTEGER,
+    PlantID TEXT,
     ShortDescription TEXT,
     LongDescription TEXT,
     OperatorID INTEGER,
@@ -69,7 +69,7 @@ CREATE TABLE plants (
 CREATE TABLE pcs (
     Id INTEGER PRIMARY KEY AUTOINCREMENT,
     PCSName TEXT,
-    PlantID INTEGER,
+    PlantID TEXT,
     Revision TEXT,
     Status TEXT,
     RevDate TEXT,
@@ -93,7 +93,7 @@ CREATE TABLE pcs (
 CREATE TABLE issues (
     Id INTEGER PRIMARY KEY AUTOINCREMENT,
     IssueRevision TEXT,
-    PlantID INTEGER,
+    PlantID TEXT,
     Status TEXT,
     RevDate TEXT,
     ProtectStatus TEXT,
@@ -123,7 +123,7 @@ CREATE TABLE issues (
 -- Create pcs_references table (TR2000 API: /plants/{id}/issues/rev/{rev}/pcs)
 CREATE TABLE pcs_references (
     Id INTEGER PRIMARY KEY AUTOINCREMENT,
-    PlantID INTEGER,
+    PlantID TEXT,
     IssueRevision TEXT,
     PCS TEXT,
     Revision TEXT,
@@ -143,7 +143,7 @@ CREATE TABLE pcs_references (
 -- Create sc_references table (TR2000 API: /plants/{id}/issues/rev/{rev}/sc)
 CREATE TABLE sc_references (
     Id INTEGER PRIMARY KEY AUTOINCREMENT,
-    PlantID INTEGER,
+    PlantID TEXT,
     IssueRevision TEXT,
     SC TEXT,
     Revision TEXT,
@@ -159,7 +159,7 @@ CREATE TABLE sc_references (
 -- Create vsm_references table (TR2000 API: /plants/{id}/issues/rev/{rev}/vsm)
 CREATE TABLE vsm_references (
     Id INTEGER PRIMARY KEY AUTOINCREMENT,
-    PlantID INTEGER,
+    PlantID TEXT,
     IssueRevision TEXT,
     VSM TEXT,
     Revision TEXT,
@@ -175,7 +175,7 @@ CREATE TABLE vsm_references (
 -- Create vds_references table (TR2000 API: /plants/{id}/issues/rev/{rev}/vds)
 CREATE TABLE vds_references (
     Id INTEGER PRIMARY KEY AUTOINCREMENT,
-    PlantID INTEGER,
+    PlantID TEXT,
     IssueRevision TEXT,
     VDS TEXT,
     Revision TEXT,
@@ -191,7 +191,7 @@ CREATE TABLE vds_references (
 -- Create eds_references table (TR2000 API: /plants/{id}/issues/rev/{rev}/eds)
 CREATE TABLE eds_references (
     Id INTEGER PRIMARY KEY AUTOINCREMENT,
-    PlantID INTEGER,
+    PlantID TEXT,
     IssueRevision TEXT,
     EDS TEXT,
     Revision TEXT,
@@ -207,7 +207,7 @@ CREATE TABLE eds_references (
 -- Create mds_references table (TR2000 API: /plants/{id}/issues/rev/{rev}/mds)
 CREATE TABLE mds_references (
     Id INTEGER PRIMARY KEY AUTOINCREMENT,
-    PlantID INTEGER,
+    PlantID TEXT,
     IssueRevision TEXT,
     MDS TEXT,
     Revision TEXT,
@@ -224,7 +224,7 @@ CREATE TABLE mds_references (
 -- Create vsk_references table (TR2000 API: /plants/{id}/issues/rev/{rev}/vsk)
 CREATE TABLE vsk_references (
     Id INTEGER PRIMARY KEY AUTOINCREMENT,
-    PlantID INTEGER,
+    PlantID TEXT,
     IssueRevision TEXT,
     VSK TEXT,
     Revision TEXT,
@@ -240,7 +240,7 @@ CREATE TABLE vsk_references (
 -- Create esk_references table (TR2000 API: /plants/{id}/issues/rev/{rev}/esk)
 CREATE TABLE esk_references (
     Id INTEGER PRIMARY KEY AUTOINCREMENT,
-    PlantID INTEGER,
+    PlantID TEXT,
     IssueRevision TEXT,
     ESK TEXT,
     Revision TEXT,
@@ -256,7 +256,7 @@ CREATE TABLE esk_references (
 -- Create pipe_element_references table (TR2000 API: /plants/{id}/issues/rev/{rev}/pipe-elements)
 CREATE TABLE pipe_element_references (
     Id INTEGER PRIMARY KEY AUTOINCREMENT,
-    PlantID INTEGER,
+    PlantID TEXT,
     IssueRevision TEXT,
     ElementType TEXT,
     ElementCode TEXT,

@@ -4,7 +4,7 @@ namespace TR2KBlazorLibrary.Models.DatabaseModels;
 
 public class Plant : BaseEntity
 {
-    public int? PlantID { get; set; }
+    public string? PlantID { get; set; } // Can be numeric (e.g., "105") or alphanumeric (e.g., "JSV")
     public string? ShortDescription { get; set; }
     public string? LongDescription { get; set; }
     public int? OperatorID { get; set; }

@@ -81,7 +81,7 @@ public static class EndpointRegistry
             {
                 new ResponseField { Name = "OperatorID", Type = "[Int32]" },
                 new ResponseField { Name = "OperatorName", Type = "[String]" },
-                new ResponseField { Name = "PlantID", Type = "[Int32]" },
+                new ResponseField { Name = "PlantID", Type = "[String]" },
                 new ResponseField { Name = "ShortDescription", Type = "[String]" },
                 new ResponseField { Name = "Project", Type = "[String]" },
                 new ResponseField { Name = "LongDescription", Type = "[String]" },
@@ -106,7 +106,7 @@ public static class EndpointRegistry
             {
                 new ResponseField { Name = "OperatorID", Type = "[Int32]" },
                 new ResponseField { Name = "OperatorName", Type = "[String]" },
-                new ResponseField { Name = "PlantID", Type = "[Int32]" },
+                new ResponseField { Name = "PlantID", Type = "[String]" },
                 new ResponseField { Name = "ShortDescription", Type = "[String]" },
                 new ResponseField { Name = "Project", Type = "[String]" },
                 new ResponseField { Name = "LongDescription", Type = "[String]" },
@@ -130,9 +130,9 @@ public static class EndpointRegistry
                 new EndpointParameter 
                 { 
                     Name = "plantId", 
-                    DisplayName = "Plant ID", 
+                    DisplayName = "Plant ID (numeric or alphanumeric)", 
                     IsRequired = true, 
-                    Type = "int"
+                    Type = "string"
                 }
             },
             Description = "Retrieve a specific plant by ID",
@@ -140,7 +140,7 @@ public static class EndpointRegistry
             {
                 new ResponseField { Name = "OperatorID", Type = "[Int32]" },
                 new ResponseField { Name = "OperatorName", Type = "[String]" },
-                new ResponseField { Name = "PlantID", Type = "[Int32]" },
+                new ResponseField { Name = "PlantID", Type = "[String]" },
                 new ResponseField { Name = "ShortDescription", Type = "[String]" },
                 new ResponseField { Name = "Project", Type = "[String]" },
                 new ResponseField { Name = "LongDescription", Type = "[String]" },
@@ -239,8 +239,14 @@ public static class EndpointRegistry
             {
                 new ResponseField { Name = "PCS", Type = "[String]" },
                 new ResponseField { Name = "Revision", Type = "[String]" },
+                new ResponseField { Name = "RevDate", Type = "[String]" },
                 new ResponseField { Name = "Status", Type = "[String]" },
-                new ResponseField { Name = "RevDate", Type = "[String]" }
+                new ResponseField { Name = "OfficialRevision", Type = "[String]" },
+                new ResponseField { Name = "RevisionSuffix", Type = "[String]" },
+                new ResponseField { Name = "RatingClass", Type = "[String]" },
+                new ResponseField { Name = "MaterialGroup", Type = "[String]" },
+                new ResponseField { Name = "HistoricalPCS", Type = "[String]" },
+                new ResponseField { Name = "Delta", Type = "[String]" }
             }
         },
         
@@ -283,9 +289,10 @@ public static class EndpointRegistry
             {
                 new ResponseField { Name = "SC", Type = "[String]" },
                 new ResponseField { Name = "Revision", Type = "[String]" },
-                new ResponseField { Name = "Status", Type = "[String]" },
                 new ResponseField { Name = "RevDate", Type = "[String]" },
-                new ResponseField { Name = "Description", Type = "[String]" }
+                new ResponseField { Name = "Status", Type = "[String]" },
+                new ResponseField { Name = "OfficialRevision", Type = "[String]" },
+                new ResponseField { Name = "Delta", Type = "[String]" }
             }
         },
         
@@ -328,9 +335,10 @@ public static class EndpointRegistry
             {
                 new ResponseField { Name = "VSM", Type = "[String]" },
                 new ResponseField { Name = "Revision", Type = "[String]" },
-                new ResponseField { Name = "Status", Type = "[String]" },
                 new ResponseField { Name = "RevDate", Type = "[String]" },
-                new ResponseField { Name = "Description", Type = "[String]" }
+                new ResponseField { Name = "Status", Type = "[String]" },
+                new ResponseField { Name = "OfficialRevision", Type = "[String]" },
+                new ResponseField { Name = "Delta", Type = "[String]" }
             }
         },
         
@@ -373,9 +381,10 @@ public static class EndpointRegistry
             {
                 new ResponseField { Name = "VDS", Type = "[String]" },
                 new ResponseField { Name = "Revision", Type = "[String]" },
-                new ResponseField { Name = "Status", Type = "[String]" },
                 new ResponseField { Name = "RevDate", Type = "[String]" },
-                new ResponseField { Name = "Description", Type = "[String]" }
+                new ResponseField { Name = "Status", Type = "[String]" },
+                new ResponseField { Name = "OfficialRevision", Type = "[String]" },
+                new ResponseField { Name = "Delta", Type = "[String]" }
             }
         },
         
@@ -418,9 +427,10 @@ public static class EndpointRegistry
             {
                 new ResponseField { Name = "EDS", Type = "[String]" },
                 new ResponseField { Name = "Revision", Type = "[String]" },
-                new ResponseField { Name = "Status", Type = "[String]" },
                 new ResponseField { Name = "RevDate", Type = "[String]" },
-                new ResponseField { Name = "Description", Type = "[String]" }
+                new ResponseField { Name = "Status", Type = "[String]" },
+                new ResponseField { Name = "OfficialRevision", Type = "[String]" },
+                new ResponseField { Name = "Delta", Type = "[String]" }
             }
         },
         
@@ -463,9 +473,11 @@ public static class EndpointRegistry
             {
                 new ResponseField { Name = "MDS", Type = "[String]" },
                 new ResponseField { Name = "Revision", Type = "[String]" },
-                new ResponseField { Name = "Status", Type = "[String]" },
+                new ResponseField { Name = "Area", Type = "[String]" },
                 new ResponseField { Name = "RevDate", Type = "[String]" },
-                new ResponseField { Name = "Description", Type = "[String]" }
+                new ResponseField { Name = "Status", Type = "[String]" },
+                new ResponseField { Name = "OfficialRevision", Type = "[String]" },
+                new ResponseField { Name = "Delta", Type = "[String]" }
             }
         },
         
@@ -508,9 +520,10 @@ public static class EndpointRegistry
             {
                 new ResponseField { Name = "VSK", Type = "[String]" },
                 new ResponseField { Name = "Revision", Type = "[String]" },
-                new ResponseField { Name = "Status", Type = "[String]" },
                 new ResponseField { Name = "RevDate", Type = "[String]" },
-                new ResponseField { Name = "Description", Type = "[String]" }
+                new ResponseField { Name = "Status", Type = "[String]" },
+                new ResponseField { Name = "OfficialRevision", Type = "[String]" },
+                new ResponseField { Name = "Delta", Type = "[String]" }
             }
         },
         
@@ -551,9 +564,10 @@ public static class EndpointRegistry
             {
                 new ResponseField { Name = "ESK", Type = "[String]" },
                 new ResponseField { Name = "Revision", Type = "[String]" },
-                new ResponseField { Name = "Status", Type = "[String]" },
                 new ResponseField { Name = "RevDate", Type = "[String]" },
-                new ResponseField { Name = "Description", Type = "[String]" }
+                new ResponseField { Name = "Status", Type = "[String]" },
+                new ResponseField { Name = "OfficialRevision", Type = "[String]" },
+                new ResponseField { Name = "Delta", Type = "[String]" }
             }
         },
         

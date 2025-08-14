@@ -5,7 +5,7 @@ namespace TR2KBlazorLibrary.Models.DatabaseModels;
 public class PCS : BaseEntity
 {
     public string? PCSName { get; set; }
-    public int? PlantID { get; set; }
+    public string? PlantID { get; set; }
     public string? Revision { get; set; }
     public string? Status { get; set; }
     public string? RevDate { get; set; }

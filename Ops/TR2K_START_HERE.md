@@ -38,7 +38,40 @@ cd /workspace/TR2000/TR2K/TR2KApp
 # Access at: http://localhost:5003/api-data
 ```
 
-## Latest Fixes (2025-08-14)
+## Latest Updates (2025-08-14 - End of Day Session 2)
+
+### Major Improvements Completed Today:
+1. **✅ Fixed pipe_element_references table schema**
+   - Corrected column mismatch issue
+   - Table now matches API response structure exactly
+   - All pipe element imports working correctly
+
+2. **✅ Enhanced Loading Experience**
+   - Added loading spinner with informative messages
+   - Table clears immediately when loading starts
+   - All controls (buttons, inputs, dropdowns) disabled during loading
+   - Clear visual feedback for long-running operations
+   - Users can see exactly what's happening during imports
+
+3. **✅ Added Complete PCS Section (Section 3)**
+   - Implemented all 7 PCS endpoints:
+     - Get PCS list (already existed)
+     - Get header and properties
+     - Get temperature and pressure  
+     - Get pipe size
+     - Get pipe element
+     - Get valve element
+     - Get embedded note
+   - Created corresponding database tables for each endpoint
+   - All PCS endpoints use dropdown parameters:
+     - Plant selection (auto-populated from plants table)
+     - PCS ID selection (filtered by selected plant)
+     - Revision selection (filtered by selected PCS)
+
+### Known Issue to Fix Next Session:
+- **PCS Dropdown Population Issue**: The PCS ID and Revision dropdowns in the new PCS detail endpoints (header, temperature, etc.) are not populating correctly. Need to investigate the dropdown loading mechanism for dependent fields.
+
+## Latest Fixes (2025-08-14 - Earlier Sessions)
 1. **✅ Reference Table Columns**: Fixed to match API response structure
 2. **✅ PlantID Support**: Now supports alphanumeric IDs (e.g., "JSV", "110")
 3. **✅ Parameter Display**: Shows correct names (PLANTID, ISSUEREV) and types [String]
@@ -182,9 +215,21 @@ cd /workspace/TR2000/TR2K/TR2KApp
 
 ## Next Steps / Remaining Work
 
+### IMMEDIATE PRIORITY (Next Session):
+1. **Fix PCS Dropdown Population Issue**:
+   - Investigate why PCS ID dropdown isn't loading when Plant is selected
+   - Check if it's related to how the ApiData.razor loads dependent dropdowns
+   - May need to update the LoadDropdownData method to handle PCS table properly
+   - Test with existing working dropdowns (Issues section) for comparison
+
+2. **Verify PCS API Endpoints**:
+   - Current URLs are estimates: `plants/{plantid}/pcs/{pcsid}/rev/{revision}/...`
+   - Need to test actual API endpoints to confirm correct URL patterns
+   - Update EndpointConfiguration.cs with correct URLs once verified
+
+### Future Work:
 1. **Add Remaining API Sections**:
-   - PCS detailed endpoints (if any)
-   - Other sections from API documentation
+   - Continue adding other sections from API documentation
 
 2. **Oracle Database Migration**:
    - Current SQLite is for testing
@@ -265,8 +310,26 @@ curl -s "https://equinor.pipespec-api.presight.com/plants/34/issues/rev/1/vsm" |
 curl -s "https://equinor.pipespec-api.presight.com/plants/34/issues/rev/1/pcs" | python3 -m json.tool | head -20
 ```
 
+## Technical Notes for Next Session:
+
+### PCS Dropdown Issue Investigation Points:
+1. **Check ApiData.razor LoadDropdownData method**:
+   - Look at line ~500-600 where dropdown data is loaded
+   - See how it handles the "pcs" dropdown source
+   - Compare with how "issues" dropdown works (which is functioning)
+
+2. **Possible Issues**:
+   - PCS table might need PlantID column for filtering
+   - LoadDropdownData might not be fetching PCS data correctly when PLANTID changes
+   - Revision dropdown might need special handling since multiple PCS can have same revision
+
+3. **Debug Steps**:
+   - Add console logging to see what data is being fetched
+   - Check browser F12 console for any JavaScript errors
+   - Verify PCS data exists in database after importing "Get PCS list"
+
 ---
-Last Updated: 2025-08-14 (End of Session)
+Last Updated: 2025-08-14 (End of Day Session 2)
 ## Summary of Today's Major Fixes:
 - ✅ FIXED: All reference table column mismatches resolved
 - ✅ FIXED: PlantID now supports alphanumeric values (e.g., "JSV")

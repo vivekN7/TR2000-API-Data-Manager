@@ -130,9 +130,12 @@ public static class EndpointRegistry
                 new EndpointParameter 
                 { 
                     Name = "PLANTID", 
-                    DisplayName = "Plant ID (numeric or alphanumeric)", 
+                    DisplayName = "Select Plant", 
                     IsRequired = true, 
-                    Type = "string"
+                    Type = "dropdown",
+                    DropdownSource = "plants",
+                    ValueField = "PlantID",
+                    DisplayField = "PlantID"
                 }
             },
             Description = "Retrieve a specific plant by ID",

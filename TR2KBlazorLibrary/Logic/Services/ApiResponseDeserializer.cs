@@ -28,9 +28,29 @@ public class ApiResponseDeserializer
             // Handle wrapper objects with arrays (TR2000 API format)
             if (root.ValueKind == JsonValueKind.Object)
             {
-                foreach (var property in root.EnumerateObject())
+                // Check if this looks like a TR2000 wrapper (has a single array property starting with "get")
+                var properties = root.EnumerateObject().ToList();
+                
+                // Look for the main data array (usually starts with "get" like "getPCS", "getIssues", etc.)
+                var mainArrayProperty = properties.FirstOrDefault(p => 
+                    p.Value.ValueKind == JsonValueKind.Array && 
+                    (p.Name.StartsWith("get") || p.Name == "data" || p.Name == "result"));
+                
+                if (mainArrayProperty.Value.ValueKind == JsonValueKind.Array)
                 {
-                    if (property.Value.ValueKind == JsonValueKind.Array)
+                    return ParseArray(mainArrayProperty.Value);
+                }
+                
+                // If no main array found but has success=true, treat as single object response
+                if (properties.Any(p => p.Name == "success" && p.Value.ValueKind == JsonValueKind.True))
+                {
+                    return new List<Dictionary<string, object>> { ParseObject(root) };
+                }
+                
+                // Fallback: Look for any array property
+                foreach (var property in properties)
+                {
+                    if (property.Value.ValueKind == JsonValueKind.Array && property.Value.GetArrayLength() > 0)
                     {
                         return ParseArray(property.Value);
                     }

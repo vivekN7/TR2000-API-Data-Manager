@@ -663,11 +663,12 @@ public static class EndpointRegistry
         },
         
         // Additional PCS endpoints
-        // NOTE: PCS detail endpoints below are estimates - actual API endpoints need to be verified
+        // NOTE: PCS detail endpoints below DO NOT EXIST in the API - they return 404
+        // The PCS list endpoint (plants/{plantid}/pcs) already contains all PCS information
         new EndpointConfiguration
         {
             Key = "pcs_header",
-            Name = "Get header and properties (ENDPOINT NOT VERIFIED)",
+            Name = "Get header and properties (NOT AVAILABLE - 404)",
             Section = "PCS",
             Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}/header",
             TableName = "pcs_header",
@@ -719,7 +720,7 @@ public static class EndpointRegistry
         new EndpointConfiguration
         {
             Key = "pcs_temperature_pressure",
-            Name = "Get temperature and pressure (ENDPOINT NOT VERIFIED)",
+            Name = "Get temperature and pressure (NOT AVAILABLE - 404)",
             Section = "PCS",
             Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}/temperature-pressure",
             TableName = "pcs_temperature_pressure",
@@ -772,7 +773,7 @@ public static class EndpointRegistry
         new EndpointConfiguration
         {
             Key = "pcs_pipe_size",
-            Name = "Get pipe size (ENDPOINT NOT VERIFIED)",
+            Name = "Get pipe size (NOT AVAILABLE - 404)",
             Section = "PCS",
             Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}/pipe-size",
             TableName = "pcs_pipe_size",
@@ -825,7 +826,7 @@ public static class EndpointRegistry
         new EndpointConfiguration
         {
             Key = "pcs_pipe_element",
-            Name = "Get pipe element (ENDPOINT NOT VERIFIED)",
+            Name = "Get pipe element (NOT AVAILABLE - 404)",
             Section = "PCS",
             Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}/pipe-element",
             TableName = "pcs_pipe_element",
@@ -878,7 +879,7 @@ public static class EndpointRegistry
         new EndpointConfiguration
         {
             Key = "pcs_valve_element",
-            Name = "Get valve element (ENDPOINT NOT VERIFIED)",
+            Name = "Get valve element (NOT AVAILABLE - 404)",
             Section = "PCS",
             Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}/valve-element",
             TableName = "pcs_valve_element",
@@ -931,7 +932,7 @@ public static class EndpointRegistry
         new EndpointConfiguration
         {
             Key = "pcs_embedded_note",
-            Name = "Get embedded note (ENDPOINT NOT VERIFIED)",
+            Name = "Get embedded note (NOT AVAILABLE - 404)",
             Section = "PCS",
             Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}/embedded-note",
             TableName = "pcs_embedded_note",

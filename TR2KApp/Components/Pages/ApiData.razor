@@ -306,6 +306,14 @@
     
     private async Task TestConnection()
     {
+        // Check if this is a non-existent PCS detail endpoint
+        if (SelectedEndpoint != null && SelectedEndpoint.Name.Contains("(NOT AVAILABLE - 404)"))
+        {
+            StatusMessage = "❌ This endpoint does not exist in the API. The PCS list endpoint already contains all PCS information.";
+            StateHasChanged();
+            return;
+        }
+        
         var endpoint = GetFinalEndpoint();
         if (string.IsNullOrEmpty(endpoint)) return;
         
@@ -334,6 +342,14 @@
     
     private async Task ImportData()
     {
+        // Check if this is a non-existent PCS detail endpoint
+        if (SelectedEndpoint != null && SelectedEndpoint.Name.Contains("(NOT AVAILABLE - 404)"))
+        {
+            StatusMessage = "❌ This endpoint does not exist in the API. The PCS list endpoint already contains all PCS information.";
+            StateHasChanged();
+            return;
+        }
+        
         var endpoint = GetFinalEndpoint();
         if (string.IsNullOrEmpty(endpoint)) return;
         

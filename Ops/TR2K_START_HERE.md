@@ -46,6 +46,12 @@ cd /workspace/TR2000/TR2K/TR2KApp
 # Access at: http://localhost:5003/api-data
 ```
 
+## ⚠️ IMPORTANT: Hot Reload Limitations
+**Hot reload doesn't work well with Blazor Server applications.** After making code changes, you MUST:
+1. Stop the running application (Ctrl+C or `pkill -f "dotnet.*run"`)
+2. Rebuild and restart the application using the commands above
+3. This ensures all changes are properly compiled and reflected in the running application
+
 ## Latest Updates (2025-08-15 - Session 6 FINAL)
 
 ### COMPLETED FEATURES IN THIS SESSION:
@@ -312,7 +318,9 @@ git log --oneline -10
 ```
 
 ## Development Tips
-1. **Always rebuild after changes**: Hot reload doesn't work properly
+1. **ALWAYS rebuild after changes**: Hot reload doesn't work properly with Blazor Server
+   - Stop the app: `pkill -f "dotnet.*run"`
+   - Restart: `cd /workspace/TR2000/TR2K/TR2KApp && /home/node/.dotnet/dotnet run --urls "http://0.0.0.0:5003"`
 2. **Check console output**: F12 in browser for debugging
 3. **Use proper port binding**: `--host 0.0.0.0` is mandatory in WSL
 4. **Test with small datasets first**: Some plants have many records

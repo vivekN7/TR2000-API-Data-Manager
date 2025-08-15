@@ -15,7 +15,7 @@ public class TR2000ApiService
     {
         _httpClient = httpClient;
         _logger = logger;
-        _httpClient.Timeout = TimeSpan.FromSeconds(30);
+        _httpClient.Timeout = TimeSpan.FromMinutes(5); // Increased timeout for large datasets like VDS
     }
 
     public async Task<TestConnectionResult> TestConnectionAsync(string endpoint)

@@ -96,6 +96,12 @@ public class ApiResponseDeserializer
                         p.Value.ValueKind != JsonValueKind.Array && 
                         p.Name != "success").ToList();
                     
+                    // Log header fields for debugging
+                    if (headerFields.Any())
+                    {
+                        _logger.LogInformation($"Found {headerFields.Count} header fields: {string.Join(", ", headerFields.Select(h => h.Name))}");
+                    }
+                    
                     if (headerFields.Any() && result.Any())
                     {
                         foreach (var item in result)

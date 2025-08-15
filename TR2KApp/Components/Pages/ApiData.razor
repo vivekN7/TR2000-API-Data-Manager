@@ -591,7 +591,8 @@
     private IEnumerable<string> GetTableColumns()
     {
         var columns = new List<string>();
-        var dataColumns = new HashSet<string>();
+        var dataColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var addedColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         
         // First collect all data columns
         if (ImportedData != null && ImportedData.Any())
@@ -616,33 +617,60 @@
             }
         }
         
-        // Add special header fields first (for Issue revisions)
+        // Add special header fields first (for Issue revisions and other endpoints)
         var headerFields = new[] { "UserName", "UserEntryTime", "UserProtected" };
         foreach (var field in headerFields)
         {
             if (dataColumns.Contains(field))
             {
                 columns.Add(field);
+                addedColumns.Add(field);
                 dataColumns.Remove(field);
             }
         }
         
         // Then add the input parameters as columns (for database primary keys)
-        // Only add if they don't already exist in the data
+        // Only add if they don't already exist in the data or columns
         if (SelectedEndpoint != null)
         {
             foreach (var param in SelectedEndpoint.Parameters.Where(p => p.IsRequired))
             {
-                // Check if this parameter already exists in the data
-                if (!dataColumns.Contains(param.Name) && !columns.Contains(param.Name))
+                // Check various possible column names to avoid duplicates
+                var paramNameLower = param.Name.ToLower();
+                var possibleNames = new[] {
+                    param.Name,
+                    param.Name.Replace("ID", ""),  // e.g., OPERATORID -> OPERATOR
+                    param.Name.Replace("NAME", ""), // e.g., PCSNAME -> PCS
+                    // Check for actual column names in data
+                    "OperatorID", "PlantID", "PCS", "Revision", "PCSNAME"
+                };
+                
+                bool alreadyExists = false;
+                foreach (var name in possibleNames)
+                {
+                    if (dataColumns.Contains(name) || addedColumns.Contains(name))
+                    {
+                        alreadyExists = true;
+                        break;
+                    }
+                }
+                
+                if (!alreadyExists)
                 {
                     columns.Add($"[Input] {param.Name}");
+                    addedColumns.Add(param.Name);
                 }
             }
         }
         
-        // Finally add remaining data columns
-        columns.AddRange(dataColumns);
+        // Finally add remaining data columns (skip if already added)
+        foreach (var col in dataColumns)
+        {
+            if (!addedColumns.Contains(col))
+            {
+                columns.Add(col);
+            }
+        }
         
         return columns;
     }
@@ -676,7 +704,17 @@
     {
         SelectedEndpoint = EndpointRegistry.AllEndpoints.FirstOrDefault(e => e.Key == SelectedEndpointKey);
         ParameterValues.Clear();
+        
+        // Only clear dropdown data that's not reusable
+        // Keep PCS data if switching between PCS endpoints
+        var currentPcsData = DropdownData.ContainsKey("pcs") ? DropdownData["pcs"] : null;
         DropdownData.Clear();
+        if (currentPcsData != null && SelectedEndpoint != null && 
+            SelectedEndpoint.Parameters.Any(p => p.DropdownSource == "pcs"))
+        {
+            DropdownData["pcs"] = currentPcsData;
+        }
+        
         ImportedData = null;
         ShowViewData = false;
         StatusMessage = "";

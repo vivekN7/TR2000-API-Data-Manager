@@ -4,6 +4,11 @@
 1. **NEVER push to GitHub without explicit permission from the user**
 2. **Commit locally as often as needed, but DO NOT use 'git push' unless specifically asked**
 3. **Always ask before pushing: "Would you like me to push these changes to GitHub?"**
+4. **ALWAYS use https://tr2000api.equinor.com/Home/Help for API endpoint documentation**
+   - This help page has comprehensive details about each endpoint
+   - It provides URL templates, input params with types, return params with types
+   - It includes example URLs and JSON raw output examples
+   - We must match our implementation exactly with this help page
 
 ## Current State (2025-08-15)
 The TR2000 API Data Manager is a Blazor Server application (.NET 9.0) that interfaces with the TR2000 API to manage piping specification data. The project is approximately 98% complete with all major functionality working correctly.

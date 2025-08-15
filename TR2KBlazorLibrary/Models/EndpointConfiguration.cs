@@ -1116,6 +1116,359 @@ public static class EndpointRegistry
                 new ResponseField { Name = "SubsegmentName", Type = "[String]" },
                 new ResponseField { Name = "Sequence", Type = "[Int32]" }
             }
+        },
+        
+        // ===== BOLT TENSION SECTION =====
+        new EndpointConfiguration
+        {
+            Key = "bolt_tension_flange_type",
+            Name = "Get Flange Type",
+            Section = "BoltTension",
+            Endpoint = "BoltTension/getFlangeType",
+            TableName = "bolt_tension_flange_type",
+            HttpMethod = "GET",
+            Parameters = new()
+            {
+                new EndpointParameter
+                {
+                    Name = "PLANTID",
+                    DisplayName = "Plant ID",
+                    IsRequired = true,
+                    Type = "text"
+                },
+                new EndpointParameter
+                {
+                    Name = "PCS",
+                    DisplayName = "PCS",
+                    IsRequired = true,
+                    Type = "text"
+                },
+                new EndpointParameter
+                {
+                    Name = "FlangeSize",
+                    DisplayName = "Flange Size",
+                    IsRequired = true,
+                    Type = "int"
+                }
+            },
+            Description = "Retrieve flange type information for bolt tension calculations",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "Display", Type = "[String]" },
+                new ResponseField { Name = "FlangeTypeId", Type = "[Int32]" },
+                new ResponseField { Name = "ComponentType", Type = "[String]" },
+                new ResponseField { Name = "FlangeOrMechjoint", Type = "[String]" },
+                new ResponseField { Name = "RatingClass", Type = "[String]" }
+            }
+        },
+        
+        new EndpointConfiguration
+        {
+            Key = "bolt_tension_gasket_type",
+            Name = "Get Gasket Type",
+            Section = "BoltTension",
+            Endpoint = "BoltTension/getGasketType",
+            TableName = "bolt_tension_gasket_type",
+            HttpMethod = "GET",
+            Parameters = new()
+            {
+                new EndpointParameter
+                {
+                    Name = "PLANTID",
+                    DisplayName = "Plant ID",
+                    IsRequired = true,
+                    Type = "text"
+                },
+                new EndpointParameter
+                {
+                    Name = "PCS",
+                    DisplayName = "PCS",
+                    IsRequired = true,
+                    Type = "text"
+                },
+                new EndpointParameter
+                {
+                    Name = "FlangeTypeId",
+                    DisplayName = "Flange Type ID",
+                    IsRequired = true,
+                    Type = "int"
+                },
+                new EndpointParameter
+                {
+                    Name = "FlangeSize",
+                    DisplayName = "Flange Size",
+                    IsRequired = true,
+                    Type = "text"
+                }
+            },
+            Description = "Retrieve gasket type information for bolt tension calculations",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "GasketId", Type = "[Int32]" },
+                new ResponseField { Name = "Display", Type = "[String]" }
+            }
+        },
+        
+        new EndpointConfiguration
+        {
+            Key = "bolt_tension_bolt_material",
+            Name = "Get Bolt Material",
+            Section = "BoltTension",
+            Endpoint = "BoltTension/getBoltMaterial",
+            TableName = "bolt_tension_bolt_material",
+            HttpMethod = "GET",
+            Parameters = new()
+            {
+                new EndpointParameter
+                {
+                    Name = "PLANTID",
+                    DisplayName = "Plant ID",
+                    IsRequired = true,
+                    Type = "text"
+                },
+                new EndpointParameter
+                {
+                    Name = "PCS",
+                    DisplayName = "PCS",
+                    IsRequired = true,
+                    Type = "text"
+                },
+                new EndpointParameter
+                {
+                    Name = "FlangeTypeId",
+                    DisplayName = "Flange Type ID",
+                    IsRequired = true,
+                    Type = "int"
+                },
+                new EndpointParameter
+                {
+                    Name = "LubricantId",
+                    DisplayName = "Lubricant ID",
+                    IsRequired = true,
+                    Type = "int"
+                }
+            },
+            Description = "Retrieve bolt material information for bolt tension calculations",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "BoltMaterialId", Type = "[Int32]" },
+                new ResponseField { Name = "Display", Type = "[String]" }
+            }
+        },
+        
+        new EndpointConfiguration
+        {
+            Key = "bolt_tension_tension_forces",
+            Name = "Get Tension Forces",
+            Section = "BoltTension",
+            Endpoint = "BoltTension/getTensionForces",
+            TableName = "bolt_tension_tension_forces",
+            HttpMethod = "GET",
+            Parameters = new()
+            {
+                new EndpointParameter
+                {
+                    Name = "PLANTID",
+                    DisplayName = "Plant ID",
+                    IsRequired = true,
+                    Type = "text"
+                },
+                new EndpointParameter
+                {
+                    Name = "PCS",
+                    DisplayName = "PCS",
+                    IsRequired = true,
+                    Type = "text"
+                },
+                new EndpointParameter
+                {
+                    Name = "FlangeTypeId",
+                    DisplayName = "Flange Type ID",
+                    IsRequired = true,
+                    Type = "int"
+                },
+                new EndpointParameter
+                {
+                    Name = "GasketTypeId",
+                    DisplayName = "Gasket Type ID",
+                    IsRequired = true,
+                    Type = "int"
+                },
+                new EndpointParameter
+                {
+                    Name = "BoltMaterialId",
+                    DisplayName = "Bolt Material ID",
+                    IsRequired = true,
+                    Type = "int"
+                },
+                new EndpointParameter
+                {
+                    Name = "FlangeSize",
+                    DisplayName = "Flange Size",
+                    IsRequired = true,
+                    Type = "text"
+                },
+                new EndpointParameter
+                {
+                    Name = "ComponentType",
+                    DisplayName = "Component Type",
+                    IsRequired = true,
+                    Type = "text"
+                },
+                new EndpointParameter
+                {
+                    Name = "LubricantId",
+                    DisplayName = "Lubricant ID",
+                    IsRequired = true,
+                    Type = "int"
+                }
+            },
+            Description = "Calculate tension forces for bolt tension",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "NoOfBolts", Type = "[Int32]" },
+                new ResponseField { Name = "BoltDiameter", Type = "[String]" },
+                new ResponseField { Name = "BoltDiameterDisplay", Type = "[String]" },
+                new ResponseField { Name = "NutNomSize", Type = "[String]" },
+                new ResponseField { Name = "kn", Type = "[Int32]" },
+                new ResponseField { Name = "nm", Type = "[Int32]" }
+            }
+        },
+        
+        new EndpointConfiguration
+        {
+            Key = "bolt_tension_tool",
+            Name = "Get Tool",
+            Section = "BoltTension",
+            Endpoint = "BoltTension/getTool",
+            TableName = "bolt_tension_tool",
+            HttpMethod = "GET",
+            Parameters = new()
+            {
+                new EndpointParameter
+                {
+                    Name = "PLANTID",
+                    DisplayName = "Plant ID",
+                    IsRequired = true,
+                    Type = "text"
+                },
+                new EndpointParameter
+                {
+                    Name = "BoltDim",
+                    DisplayName = "Bolt Dimension",
+                    IsRequired = true,
+                    Type = "text"
+                }
+            },
+            Description = "Retrieve tool information for bolt tension",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "ToolId", Type = "[Int32]" },
+                new ResponseField { Name = "Display", Type = "[String]" },
+                new ResponseField { Name = "PlantDefault", Type = "[String]" }
+            }
+        },
+        
+        new EndpointConfiguration
+        {
+            Key = "bolt_tension_tool_pressure",
+            Name = "Get Tool Pressure",
+            Section = "BoltTension",
+            Endpoint = "BoltTension/getToolPressure",
+            TableName = "bolt_tension_tool_pressure",
+            HttpMethod = "GET",
+            Parameters = new()
+            {
+                new EndpointParameter
+                {
+                    Name = "ToolId",
+                    DisplayName = "Tool ID",
+                    IsRequired = true,
+                    Type = "int"
+                },
+                new EndpointParameter
+                {
+                    Name = "BoltForceKN",
+                    DisplayName = "Bolt Force (kN)",
+                    IsRequired = true,
+                    Type = "int"
+                },
+                new EndpointParameter
+                {
+                    Name = "TorqueNM",
+                    DisplayName = "Torque (Nm)",
+                    IsRequired = true,
+                    Type = "int"
+                },
+                new EndpointParameter
+                {
+                    Name = "FlangeOrMechjoint",
+                    DisplayName = "Flange or Mech Joint",
+                    IsRequired = true,
+                    Type = "text"
+                }
+            },
+            Description = "Calculate tool pressure for bolt tension",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "ToolPressureA", Type = "[Int32]" },
+                new ResponseField { Name = "ToolPressureB", Type = "[Int32]" },
+                new ResponseField { Name = "Unit", Type = "[String]" }
+            }
+        },
+        
+        new EndpointConfiguration
+        {
+            Key = "bolt_tension_plant_info",
+            Name = "Get Plant Info",
+            Section = "BoltTension",
+            Endpoint = "BoltTension/getPlantInfo/{plantid}",
+            TableName = "bolt_tension_plant_info",
+            HttpMethod = "GET",
+            Parameters = new()
+            {
+                new EndpointParameter
+                {
+                    Name = "PLANTID",
+                    DisplayName = "Plant ID",
+                    IsRequired = true,
+                    Type = "text"
+                }
+            },
+            Description = "Retrieve plant information for bolt tension",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "PlantName", Type = "[String]" },
+                new ResponseField { Name = "ToolSerie", Type = "[String]" },
+                new ResponseField { Name = "Lubricant", Type = "[String]" }
+            }
+        },
+        
+        new EndpointConfiguration
+        {
+            Key = "bolt_tension_lubricant",
+            Name = "Get Lubricant",
+            Section = "BoltTension",
+            Endpoint = "BoltTension/getLubricant/{plantid}",
+            TableName = "bolt_tension_lubricant",
+            HttpMethod = "GET",
+            Parameters = new()
+            {
+                new EndpointParameter
+                {
+                    Name = "PLANTID",
+                    DisplayName = "Plant ID",
+                    IsRequired = true,
+                    Type = "text"
+                }
+            },
+            Description = "Retrieve lubricant information for bolt tension",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "LubricantId", Type = "[Int32]" },
+                new ResponseField { Name = "Display", Type = "[String]" },
+                new ResponseField { Name = "PlantDefault", Type = "[Int32]" }
+            }
         }
     };
 }

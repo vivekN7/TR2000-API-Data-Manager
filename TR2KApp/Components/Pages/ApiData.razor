@@ -703,6 +703,29 @@
         ParameterValues[paramName] = value;
         Console.WriteLine($"SetParameterValue: {paramName} = {value}");
         
+        // Clear dependent parameter values when parent changes
+        if (SelectedEndpoint != null)
+        {
+            var dependentParams = SelectedEndpoint.Parameters
+                .Where(p => p.DependsOn == paramName)
+                .ToList();
+                
+            foreach (var depParam in dependentParams)
+            {
+                // Clear the dependent parameter value
+                ParameterValues.Remove(depParam.Name);
+                
+                // Clear any parameters that depend on this dependent parameter
+                var subDependentParams = SelectedEndpoint.Parameters
+                    .Where(p => p.DependsOn == depParam.Name)
+                    .ToList();
+                foreach (var subParam in subDependentParams)
+                {
+                    ParameterValues.Remove(subParam.Name);
+                }
+            }
+        }
+        
         // Check if any other parameters depend on this one
         if (SelectedEndpoint != null)
         {
@@ -716,6 +739,11 @@
                 if (depParam.DropdownSource == "issues" && paramName == "PLANTID" && !string.IsNullOrEmpty(value))
                 {
                     await LoadIssuesForPlant(value);
+                }
+                // Load PCS data for the selected plant
+                else if (depParam.DropdownSource == "pcs" && paramName == "PLANTID" && !string.IsNullOrEmpty(value))
+                {
+                    await LoadPCSForPlant(value);
                 }
             }
         }
@@ -756,6 +784,46 @@
         }
     }
     
+    private async Task LoadPCSForPlant(string plantId)
+    {
+        try
+        {
+            IsLoadingDropdowns = true;
+            LoadingMessage = $"Loading PCS for plant {plantId}...";
+            StateHasChanged();
+            
+            // Check if we already have PCS data for this plant in the database
+            var data = await ImportService.GetImportedDataAsync("pcs");
+            
+            // If no data or data is not for this plant, fetch from API
+            if (data == null || !data.Any() || !data.Any(item => GetDropdownValue(item, "PlantID") == plantId))
+            {
+                // Fetch PCS for this plant
+                var endpoint = $"plants/{plantId}/pcs";
+                var apiData = await ApiService.FetchDataAsync(endpoint);
+                var deserializedData = Deserializer.DeserializeApiResponse(apiData, endpoint);
+                
+                // Import to database
+                await ImportService.ImportDataByEndpointAsync(endpoint, deserializedData);
+                data = await ImportService.GetImportedDataAsync("pcs");
+            }
+            
+            // Store PCS data - we'll use it for PCS ID and revision dropdowns
+            DropdownData["pcs"] = data ?? new List<dynamic>();
+            StatusMessage = $"✅ Loaded {data?.Where(item => GetDropdownValue(item, "PlantID") == plantId).Count() ?? 0} PCS for selected plant";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"⚠️ Warning: Could not load PCS: {ex.Message}";
+            DropdownData["pcs"] = new List<dynamic>();
+        }
+        finally
+        {
+            IsLoadingDropdowns = false;
+            StateHasChanged();
+        }
+    }
+    
     private List<(string Value, string Display)> GetUniqueAndSortedDropdownItems(EndpointParameter param)
     {
         if (!DropdownData.ContainsKey(param.DropdownSource!))
@@ -764,7 +832,39 @@
         var items = new List<(string Value, string Display)>();
         var seenValues = new HashSet<string>();
         
-        foreach (var item in DropdownData[param.DropdownSource!])
+        // Get the data to iterate through - may need filtering
+        var dataToProcess = DropdownData[param.DropdownSource!];
+        
+        // Filter based on dependencies
+        if (!string.IsNullOrEmpty(param.DependsOn))
+        {
+            var dependencyValue = GetParameterValue(param.DependsOn);
+            if (!string.IsNullOrEmpty(dependencyValue))
+            {
+                // Filter PCS items by PlantID
+                if (param.DropdownSource == "pcs" && param.DependsOn == "PLANTID")
+                {
+                    dataToProcess = dataToProcess.Where(item =>
+                    {
+                        var plantId = GetDropdownValue(item, "PlantID");
+                        return plantId == dependencyValue;
+                    }).ToList();
+                }
+                // Filter PCS revisions by PCSID
+                else if (param.DropdownSource == "pcs" && param.DependsOn == "PCSID")
+                {
+                    dataToProcess = dataToProcess.Where(item =>
+                    {
+                        var pcsId = GetDropdownValue(item, "PCS");
+                        var plantId = GetParameterValue("PLANTID");
+                        var itemPlantId = GetDropdownValue(item, "PlantID");
+                        return pcsId == dependencyValue && itemPlantId == plantId;
+                    }).ToList();
+                }
+            }
+        }
+        
+        foreach (var item in dataToProcess)
         {
             var value = GetDropdownValue(item, param.ValueField);
             var display = GetDropdownDisplay(item, param.DisplayField);
@@ -777,7 +877,7 @@
         }
         
         // Special sorting for revision fields
-        if (param.DropdownSource == "issues" && param.ValueField?.Contains("Revision") == true)
+        if ((param.DropdownSource == "issues" || param.DropdownSource == "pcs") && param.ValueField?.Contains("Revision") == true)
         {
             return SortRevisions(items);
         }

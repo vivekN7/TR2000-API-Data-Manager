@@ -918,24 +918,19 @@
         
         Console.WriteLine($"Generated {items.Count} unique items for {param.Name}");
         
-        // Special sorting for revision fields
-        if ((param.DropdownSource == "issues" || param.DropdownSource == "pcs") && param.ValueField?.Contains("Revision") == true)
-        {
-            return SortRevisions(items);
-        }
-        
-        // Default sorting for other fields
-        return items.OrderBy(i => i.Display).ToList();
+        // Apply numeric-first sorting to all dropdowns
+        return SortDropdownItems(items);
     }
     
-    private List<(string Value, string Display)> SortRevisions(List<(string Value, string Display)> items)
+    private List<(string Value, string Display)> SortDropdownItems(List<(string Value, string Display)> items)
     {
         var numericOnly = new List<(string Value, string Display, int NumValue)>();
         var alphanumeric = new List<(string Value, string Display)>();
         
         foreach (var item in items)
         {
-            if (int.TryParse(item.Value, out int numValue))
+            // Use Display value for sorting (since that's what users see)
+            if (int.TryParse(item.Display, out int numValue))
             {
                 numericOnly.Add((item.Value, item.Display, numValue));
             }
@@ -945,20 +940,20 @@
             }
         }
         
-        // Sort numeric revisions numerically
+        // Sort numeric items numerically
         var sortedNumeric = numericOnly.OrderBy(i => i.NumValue).Select(i => (i.Value, i.Display));
         
-        // Sort alphanumeric revisions - if starts with number, extract it for sorting
+        // Sort alphanumeric items - if starts with number, extract it for sorting
         var sortedAlpha = alphanumeric.OrderBy(i => 
         {
             // Try to extract leading number for sorting
-            var match = System.Text.RegularExpressions.Regex.Match(i.Value, @"^(\d+)");
+            var match = System.Text.RegularExpressions.Regex.Match(i.Display, @"^(\d+)");
             if (match.Success && int.TryParse(match.Groups[1].Value, out int leadingNum))
             {
                 // Pad the number for proper string sorting, then add the rest
-                return leadingNum.ToString("D10") + i.Value.Substring(match.Length);
+                return leadingNum.ToString("D10") + i.Display.Substring(match.Length);
             }
-            return "Z" + i.Value; // Put non-numeric start after all numeric
+            return "Z" + i.Display; // Put non-numeric start after all numeric
         }).Select(i => (i.Value, i.Display));
         
         // Combine: numbers first, then alphanumeric

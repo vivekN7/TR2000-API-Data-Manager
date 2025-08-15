@@ -643,9 +643,15 @@
         
         foreach (var param in SelectedEndpoint.Parameters.Where(p => p.Type == "dropdown" && !string.IsNullOrEmpty(p.DropdownSource)))
         {
-            // Skip dependent dropdowns - they'll be loaded when their dependency changes
+            // For dependent dropdowns, initialize empty list so they're not disabled
             if (!string.IsNullOrEmpty(param.DependsOn))
+            {
+                if (!DropdownData.ContainsKey(param.DropdownSource!))
+                {
+                    DropdownData[param.DropdownSource!] = new List<dynamic>();
+                }
                 continue;
+            }
                 
             if (!DropdownData.ContainsKey(param.DropdownSource!))
             {
@@ -703,7 +709,7 @@
         ParameterValues[paramName] = value;
         Console.WriteLine($"SetParameterValue: {paramName} = {value}");
         
-        // Clear dependent parameter values when parent changes
+        // Clear dependent parameter values and their dropdown data when parent changes
         if (SelectedEndpoint != null)
         {
             var dependentParams = SelectedEndpoint.Parameters
@@ -715,6 +721,12 @@
                 // Clear the dependent parameter value
                 ParameterValues.Remove(depParam.Name);
                 
+                // Clear dropdown data for dependent fields to show loading state
+                if (depParam.Type == "dropdown" && depParam.DropdownSource != null)
+                {
+                    DropdownData[depParam.DropdownSource] = new List<dynamic>();
+                }
+                
                 // Clear any parameters that depend on this dependent parameter
                 var subDependentParams = SelectedEndpoint.Parameters
                     .Where(p => p.DependsOn == depParam.Name)
@@ -722,6 +734,11 @@
                 foreach (var subParam in subDependentParams)
                 {
                     ParameterValues.Remove(subParam.Name);
+                    // Also clear sub-dependent dropdown data
+                    if (subParam.Type == "dropdown" && subParam.DropdownSource != null)
+                    {
+                        DropdownData[subParam.DropdownSource] = new List<dynamic>();
+                    }
                 }
             }
         }
@@ -733,8 +750,12 @@
                 .Where(p => p.DependsOn == paramName && p.Type == "dropdown")
                 .ToList();
                 
+            Console.WriteLine($"Found {dependentParams.Count} dependent params for {paramName}");
+            
             foreach (var depParam in dependentParams)
             {
+                Console.WriteLine($"Dependent param: {depParam.Name}, DropdownSource: {depParam.DropdownSource}, DependsOn: {depParam.DependsOn}");
+                
                 // Load issues for the selected plant
                 if (depParam.DropdownSource == "issues" && paramName == "PLANTID" && !string.IsNullOrEmpty(value))
                 {
@@ -743,6 +764,7 @@
                 // Load PCS data for the selected plant
                 else if (depParam.DropdownSource == "pcs" && paramName == "PLANTID" && !string.IsNullOrEmpty(value))
                 {
+                    Console.WriteLine($"Loading PCS for plant {value}");
                     await LoadPCSForPlant(value);
                 }
             }
@@ -755,8 +777,8 @@
     {
         try
         {
-            IsLoadingDropdowns = true;
-            LoadingMessage = $"Loading issues for plant {plantId}...";
+            // Don't set IsLoadingDropdowns here as it disables all dropdowns
+            StatusMessage = $"Loading issues for plant {plantId}...";
             StateHasChanged();
             
             // Fetch issues for this plant
@@ -779,7 +801,7 @@
         }
         finally
         {
-            IsLoadingDropdowns = false;
+            // Don't need to reset IsLoadingDropdowns as we didn't set it
             StateHasChanged();
         }
     }
@@ -788,12 +810,14 @@
     {
         try
         {
-            IsLoadingDropdowns = true;
-            LoadingMessage = $"Loading PCS for plant {plantId}...";
+            Console.WriteLine($"LoadPCSForPlant called for plant {plantId}");
+            // Don't set IsLoadingDropdowns here as it disables all dropdowns
+            StatusMessage = $"Loading PCS for plant {plantId}...";
             StateHasChanged();
             
             // Check if we already have PCS data for this plant in the database
             var data = await ImportService.GetImportedDataAsync("pcs");
+            Console.WriteLine($"Retrieved {data?.Count() ?? 0} PCS records from database");
             
             // If no data or data is not for this plant, fetch from API
             if (data == null || !data.Any() || !data.Any(item => GetDropdownValue(item, "PlantID") == plantId))
@@ -819,7 +843,7 @@
         }
         finally
         {
-            IsLoadingDropdowns = false;
+            // Don't need to reset IsLoadingDropdowns as we didn't set it
             StateHasChanged();
         }
     }
@@ -827,13 +851,17 @@
     private List<(string Value, string Display)> GetUniqueAndSortedDropdownItems(EndpointParameter param)
     {
         if (!DropdownData.ContainsKey(param.DropdownSource!))
+        {
+            Console.WriteLine($"No dropdown data for source: {param.DropdownSource}");
             return new List<(string, string)>();
+        }
             
         var items = new List<(string Value, string Display)>();
         var seenValues = new HashSet<string>();
         
         // Get the data to iterate through - may need filtering
         var dataToProcess = DropdownData[param.DropdownSource!];
+        Console.WriteLine($"Processing {dataToProcess.Count()} items for {param.Name} (source: {param.DropdownSource})");
         
         // Filter based on dependencies
         if (!string.IsNullOrEmpty(param.DependsOn))
@@ -844,18 +872,25 @@
                 // Filter PCS items by PlantID
                 if (param.DropdownSource == "pcs" && param.DependsOn == "PLANTID")
                 {
+                    Console.WriteLine($"Filtering PCS by PlantID = {dependencyValue}");
                     dataToProcess = dataToProcess.Where(item =>
                     {
                         var plantId = GetDropdownValue(item, "PlantID");
-                        return plantId == dependencyValue;
+                        var matches = plantId == dependencyValue;
+                        if (!matches && dataToProcess.Count() < 10) // Log first few mismatches for debugging
+                        {
+                            Console.WriteLine($"PCS item PlantID '{plantId}' != '{dependencyValue}'");
+                        }
+                        return matches;
                     }).ToList();
+                    Console.WriteLine($"After filtering: {dataToProcess.Count()} PCS items for plant {dependencyValue}");
                 }
                 // Filter PCS revisions by PCSID
                 else if (param.DropdownSource == "pcs" && param.DependsOn == "PCSID")
                 {
                     dataToProcess = dataToProcess.Where(item =>
                     {
-                        var pcsId = GetDropdownValue(item, "PCS");
+                        var pcsId = GetDropdownValue(item, "PCSName");
                         var plantId = GetParameterValue("PLANTID");
                         var itemPlantId = GetDropdownValue(item, "PlantID");
                         return pcsId == dependencyValue && itemPlantId == plantId;
@@ -875,6 +910,8 @@
                 items.Add((value, display));
             }
         }
+        
+        Console.WriteLine($"Generated {items.Count} unique items for {param.Name}");
         
         // Special sorting for revision fields
         if ((param.DropdownSource == "issues" || param.DropdownSource == "pcs") && param.ValueField?.Contains("Revision") == true)

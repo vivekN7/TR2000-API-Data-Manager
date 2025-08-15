@@ -699,9 +699,14 @@
                 ParameterValues.Remove(depParam.Name);
                 
                 // Clear dropdown data for dependent fields to show loading state
+                // BUT: Don't clear PCS data when PCSID changes, as REVISION needs to filter the same PCS data
                 if (depParam.Type == "dropdown" && depParam.DropdownSource != null)
                 {
-                    DropdownData[depParam.DropdownSource] = new List<dynamic>();
+                    // Only clear if it's not a PCS revision dropdown depending on PCSID
+                    if (!(depParam.DropdownSource == "pcs" && paramName == "PCSID"))
+                    {
+                        DropdownData[depParam.DropdownSource] = new List<dynamic>();
+                    }
                 }
                 
                 // Clear any parameters that depend on this dependent parameter

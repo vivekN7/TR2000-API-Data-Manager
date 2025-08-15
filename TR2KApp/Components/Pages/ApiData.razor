@@ -661,29 +661,23 @@
                 
                 try
                 {
-                    // Load from database if already imported, otherwise fetch from API
-                    var data = await ImportService.GetImportedDataAsync(param.DropdownSource!);
-                    if (data == null || !data.Any())
+                    // Always fetch directly from API for dropdowns
+                    StatusMessage = $"📥 Fetching {param.DropdownSource} from API...";
+                    StateHasChanged();
+                    
+                    var apiData = await ApiService.FetchDataAsync(param.DropdownSource!);
+                    var deserializedData = Deserializer.DeserializeApiResponse(apiData, param.DropdownSource!);
+                    
+                    // Convert to list
+                    var dataList = new List<dynamic>();
+                    foreach (var item in deserializedData)
                     {
-                        // If no data in database, fetch from API
-                        StatusMessage = $"📥 Fetching {param.DropdownSource} from API...";
-                        StateHasChanged();
-                        
-                        var apiData = await ApiService.FetchDataAsync(param.DropdownSource!);
-                        var deserializedData = Deserializer.DeserializeApiResponse(apiData, param.DropdownSource!);
-                        
-                        // Import to database for future use
-                        await ImportService.ImportDataByEndpointAsync(param.DropdownSource!, deserializedData);
-                        data = await ImportService.GetImportedDataAsync(param.DropdownSource!);
-                        
-                        StatusMessage = $"✅ Loaded {data?.Count() ?? 0} {param.DropdownSource}";
-                    }
-                    else
-                    {
-                        StatusMessage = $"✅ Loaded {data.Count()} {param.DropdownSource} from cache";
+                        dataList.Add(item);
                     }
                     
-                    DropdownData[param.DropdownSource!] = data ?? new List<dynamic>();
+                    DropdownData[param.DropdownSource!] = dataList;
+                    StatusMessage = $"✅ Loaded {dataList.Count} {param.DropdownSource}";
+                    Console.WriteLine($"Loaded {dataList.Count} items for {param.DropdownSource}");
                 }
                 catch (Exception ex)
                 {
@@ -777,31 +771,46 @@
     {
         try
         {
-            // Don't set IsLoadingDropdowns here as it disables all dropdowns
             StatusMessage = $"Loading issues for plant {plantId}...";
             StateHasChanged();
             
-            // Fetch issues for this plant
+            // Fetch issues directly from API without database
             var endpoint = $"plants/{plantId}/issues";
+            Console.WriteLine($"Fetching issues from API: {endpoint}");
+            
             var apiData = await ApiService.FetchDataAsync(endpoint);
             var deserializedData = Deserializer.DeserializeApiResponse(apiData, endpoint);
             
-            // Import to database
-            await ImportService.ImportDataByEndpointAsync(endpoint, deserializedData);
-            var data = await ImportService.GetImportedDataAsync("issues");
+            // Convert to list and ensure PlantID is set
+            var issuesList = new List<dynamic>();
+            foreach (var item in deserializedData)
+            {
+                var dict = new Dictionary<string, object>();
+                if (item is IDictionary<string, object> sourceDict)
+                {
+                    foreach (var kvp in sourceDict)
+                    {
+                        dict[kvp.Key] = kvp.Value;
+                    }
+                }
+                // Ensure PlantID is set
+                dict["PlantID"] = plantId;
+                issuesList.Add(dict);
+            }
             
-            // Store issues data - we'll use it for all revision dropdowns
-            DropdownData["issues"] = data ?? new List<dynamic>();
-            StatusMessage = $"✅ Loaded {data?.Count() ?? 0} issues for selected plant";
+            // Store issues data directly in DropdownData
+            DropdownData["issues"] = issuesList;
+            Console.WriteLine($"Loaded {issuesList.Count} issues for plant {plantId}");
+            StatusMessage = $"✅ Loaded {issuesList.Count} issues for plant {plantId}";
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"Error loading issues: {ex.Message}");
             StatusMessage = $"⚠️ Warning: Could not load issues: {ex.Message}";
             DropdownData["issues"] = new List<dynamic>();
         }
         finally
         {
-            // Don't need to reset IsLoadingDropdowns as we didn't set it
             StateHasChanged();
         }
     }
@@ -811,39 +820,52 @@
         try
         {
             Console.WriteLine($"LoadPCSForPlant called for plant {plantId}");
-            // Don't set IsLoadingDropdowns here as it disables all dropdowns
             StatusMessage = $"Loading PCS for plant {plantId}...";
             StateHasChanged();
             
-            // Check if we already have PCS data for this plant in the database
-            var data = await ImportService.GetImportedDataAsync("pcs");
-            Console.WriteLine($"Retrieved {data?.Count() ?? 0} PCS records from database");
+            // Fetch PCS directly from API without database
+            var endpoint = $"plants/{plantId}/pcs";
+            Console.WriteLine($"Fetching from API: {endpoint}");
             
-            // If no data or data is not for this plant, fetch from API
-            if (data == null || !data.Any() || !data.Any(item => GetDropdownValue(item, "PlantID") == plantId))
+            var apiData = await ApiService.FetchDataAsync(endpoint);
+            var deserializedData = Deserializer.DeserializeApiResponse(apiData, endpoint);
+            
+            // Convert to list and add PlantID to each item
+            var pcsList = new List<dynamic>();
+            foreach (var item in deserializedData)
             {
-                // Fetch PCS for this plant
-                var endpoint = $"plants/{plantId}/pcs";
-                var apiData = await ApiService.FetchDataAsync(endpoint);
-                var deserializedData = Deserializer.DeserializeApiResponse(apiData, endpoint);
-                
-                // Import to database
-                await ImportService.ImportDataByEndpointAsync(endpoint, deserializedData);
-                data = await ImportService.GetImportedDataAsync("pcs");
+                // Create a new dictionary with the API data plus PlantID
+                var dict = new Dictionary<string, object>();
+                if (item is IDictionary<string, object> sourceDict)
+                {
+                    foreach (var kvp in sourceDict)
+                    {
+                        dict[kvp.Key] = kvp.Value;
+                    }
+                }
+                // Add PlantID field
+                dict["PlantID"] = plantId;
+                // Map PCS to PCSName for consistency
+                if (dict.ContainsKey("PCS") && !dict.ContainsKey("PCSName"))
+                {
+                    dict["PCSName"] = dict["PCS"];
+                }
+                pcsList.Add(dict);
             }
             
-            // Store PCS data - we'll use it for PCS ID and revision dropdowns
-            DropdownData["pcs"] = data ?? new List<dynamic>();
-            StatusMessage = $"✅ Loaded {data?.Where(item => GetDropdownValue(item, "PlantID") == plantId).Count() ?? 0} PCS for selected plant";
+            // Store PCS data directly in DropdownData
+            DropdownData["pcs"] = pcsList;
+            Console.WriteLine($"Loaded {pcsList.Count} PCS items for plant {plantId}");
+            StatusMessage = $"✅ Loaded {pcsList.Count} PCS for plant {plantId}";
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"Error loading PCS: {ex.Message}");
             StatusMessage = $"⚠️ Warning: Could not load PCS: {ex.Message}";
             DropdownData["pcs"] = new List<dynamic>();
         }
         finally
         {
-            // Don't need to reset IsLoadingDropdowns as we didn't set it
             StateHasChanged();
         }
     }

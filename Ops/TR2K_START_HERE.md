@@ -5,7 +5,7 @@
 2. **Commit locally as often as needed, but DO NOT use 'git push' unless specifically asked**
 3. **Always ask before pushing: "Would you like me to push these changes to GitHub?"**
 
-## Current State (2025-08-14 - End of Day)
+## Current State (2025-08-15)
 The TR2000 API Data Manager is a Blazor Server application (.NET 9.0) that interfaces with the TR2000 API to manage piping specification data. The project is approximately 98% complete with all major functionality working correctly.
 
 ## Project Structure
@@ -68,8 +68,18 @@ cd /workspace/TR2000/TR2K/TR2KApp
      - PCS ID selection (filtered by selected plant)
      - Revision selection (filtered by selected PCS)
 
-### Known Issue to Fix Next Session:
-- **PCS Dropdown Population Issue**: The PCS ID and Revision dropdowns in the new PCS detail endpoints (header, temperature, etc.) are not populating correctly. Need to investigate the dropdown loading mechanism for dependent fields.
+### Latest Fixes (2025-08-15):
+1. **✅ Fixed PCS Dropdown Population**:
+   - PCS dropdowns now populate correctly when plant is selected
+   - Fixed field name mismatch (PCS vs PCSName) between API and database
+   - Dropdowns clear when parent selection changes for better UX
+   - Removed loading flag that was disabling all dropdowns
+
+### Known Issue - PCS Detail Endpoints:
+- **API Endpoints Not Verified**: The PCS detail endpoints (header, temperature, pressure, etc.) return 404
+- Current URLs are estimates: `plants/{plantid}/pcs/{pcsid}/rev/{revision}/header`
+- Need to verify correct API endpoint patterns with TR2000 API documentation
+- All PCS detail endpoints marked as "ENDPOINT NOT VERIFIED" in UI
 
 ## Latest Fixes (2025-08-14 - Earlier Sessions)
 1. **✅ Reference Table Columns**: Fixed to match API response structure
@@ -329,15 +339,16 @@ curl -s "https://equinor.pipespec-api.presight.com/plants/34/issues/rev/1/pcs" |
    - Verify PCS data exists in database after importing "Get PCS list"
 
 ---
-Last Updated: 2025-08-14 (End of Day Session 2)
-## Summary of Today's Major Fixes:
-- ✅ FIXED: All reference table column mismatches resolved
+Last Updated: 2025-08-15
+## Summary of Recent Major Fixes:
+- ✅ FIXED: PCS dropdown population issue - dropdowns now work correctly
+- ✅ FIXED: All reference table column mismatches resolved  
 - ✅ FIXED: PlantID now supports alphanumeric values (e.g., "JSV")
 - ✅ FIXED: Endpoint parameter types corrected in UI display (PLANTID=[String], ISSUEREV=[String])
 - ✅ FIXED: Data import now clears tables to mirror API responses exactly
 - ✅ All reference endpoints (PCS, SC, VSM, VDS, EDS, MDS, VSK, ESK) working perfectly
 - ✅ Database schema updated to support TEXT for PlantID
-- ✅ All changes committed AND pushed to GitHub (commit e128586)
+- ✅ Latest changes committed locally (commit 37c5c76) - NOT pushed to GitHub
 
 ## Application Status:
 - **Functionality**: ~98% complete

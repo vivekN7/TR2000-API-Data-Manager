@@ -591,7 +591,7 @@
     private IEnumerable<string> GetTableColumns()
     {
         var columns = new List<string>();
-        var dataColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var dataColumns = new List<string>();
         var addedColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         
         // First collect all data columns
@@ -600,21 +600,23 @@
             var firstItem = ImportedData.First();
             if (firstItem is IDictionary<string, object> dict)
             {
-                foreach (var key in dict.Keys.Where(k => k != "Id" && k != "CreatedDate" && k != "ModifiedDate"))
-                {
-                    dataColumns.Add(key);
-                }
+                dataColumns = dict.Keys.Where(k => k != "Id" && k != "CreatedDate" && k != "ModifiedDate").ToList();
             }
             else
             {
                 // Cast to object first to avoid dynamic issues
                 object obj = firstItem;
                 var properties = obj.GetType().GetProperties();
-                foreach (var prop in properties.Where(p => p.Name != "Id" && p.Name != "CreatedDate" && p.Name != "ModifiedDate"))
-                {
-                    dataColumns.Add(prop.Name);
-                }
+                dataColumns = properties
+                    .Where(p => p.Name != "Id" && p.Name != "CreatedDate" && p.Name != "ModifiedDate")
+                    .Select(p => p.Name).ToList();
             }
+        }
+        
+        // Log data columns for debugging
+        if (dataColumns.Any())
+        {
+            Console.WriteLine($"Data columns found: {string.Join(", ", dataColumns.Take(10))}...");
         }
         
         // Add special header fields first (for Issue revisions and other endpoints)
@@ -626,33 +628,40 @@
                 columns.Add(field);
                 addedColumns.Add(field);
                 dataColumns.Remove(field);
+                Console.WriteLine($"Added header field: {field}");
             }
         }
         
         // Then add the input parameters as columns (for database primary keys)
-        // Only add if they don't already exist in the data or columns
+        // Only add if they don't already exist in the data exactly
         if (SelectedEndpoint != null)
         {
             foreach (var param in SelectedEndpoint.Parameters.Where(p => p.IsRequired))
             {
-                // Check various possible column names to avoid duplicates
-                var paramNameLower = param.Name.ToLower();
-                var possibleNames = new[] {
-                    param.Name,
-                    param.Name.Replace("ID", ""),  // e.g., OPERATORID -> OPERATOR
-                    param.Name.Replace("NAME", ""), // e.g., PCSNAME -> PCS
-                    // Check for actual column names in data
-                    "OperatorID", "PlantID", "PCS", "Revision", "PCSNAME"
-                };
-                
+                // Only check for exact match to avoid being too aggressive
                 bool alreadyExists = false;
-                foreach (var name in possibleNames)
+                
+                // Check if the exact parameter name exists in data
+                if (dataColumns.Contains(param.Name, StringComparer.OrdinalIgnoreCase))
                 {
-                    if (dataColumns.Contains(name) || addedColumns.Contains(name))
-                    {
-                        alreadyExists = true;
-                        break;
-                    }
+                    alreadyExists = true;
+                }
+                // Special cases for known duplicates
+                else if (param.Name == "OPERATORID" && dataColumns.Contains("OperatorID", StringComparer.OrdinalIgnoreCase))
+                {
+                    alreadyExists = true;
+                }
+                else if (param.Name == "PLANTID" && dataColumns.Contains("PlantID", StringComparer.OrdinalIgnoreCase))
+                {
+                    alreadyExists = true;
+                }
+                else if (param.Name == "PCSNAME" && dataColumns.Contains("PCS", StringComparer.OrdinalIgnoreCase))
+                {
+                    alreadyExists = true;
+                }
+                else if (param.Name == "REVISION" && dataColumns.Contains("Revision", StringComparer.OrdinalIgnoreCase))
+                {
+                    alreadyExists = true;
                 }
                 
                 if (!alreadyExists)
@@ -663,7 +672,7 @@
             }
         }
         
-        // Finally add remaining data columns (skip if already added)
+        // Finally add remaining data columns
         foreach (var col in dataColumns)
         {
             if (!addedColumns.Contains(col))

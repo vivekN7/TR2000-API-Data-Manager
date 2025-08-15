@@ -100,6 +100,10 @@ public class ApiResponseDeserializer
                     if (headerFields.Any())
                     {
                         _logger.LogInformation($"Found {headerFields.Count} header fields: {string.Join(", ", headerFields.Select(h => h.Name))}");
+                        foreach (var field in headerFields)
+                        {
+                            _logger.LogInformation($"Header field {field.Name} = {ParseValue(field.Value)}");
+                        }
                     }
                     
                     if (headerFields.Any() && result.Any())
@@ -111,6 +115,12 @@ public class ApiResponseDeserializer
                                 // Add header fields to each row
                                 item[headerField.Name] = ParseValue(headerField.Value);
                             }
+                        }
+                        
+                        // Log first item to verify fields were added
+                        if (result.Count > 0 && result[0] is Dictionary<string, object> firstItem)
+                        {
+                            _logger.LogInformation($"First item keys after adding headers: {string.Join(", ", firstItem.Keys.Take(5))}");
                         }
                     }
                     

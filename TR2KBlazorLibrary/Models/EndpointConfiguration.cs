@@ -48,7 +48,7 @@ public static class EndpointRegistry
             TableName = "operators",
             HttpMethod = "GET",
             Parameters = new(),
-            Description = "Retrieve all operators - Missing API URL in endpoint details",
+            Description = "Retrieve all operators",
             ResponseFields = new()
             {
                 new ResponseField { Name = "OperatorID", Type = "[Int32]" },
@@ -102,7 +102,7 @@ public static class EndpointRegistry
             TableName = "plants",
             HttpMethod = "GET",
             Parameters = new(),
-            Description = "Retrieve all plants across all operators - Missing API URL in endpoint details",
+            Description = "Retrieve all plants across all operators",
             ResponseFields = new()
             {
                 new ResponseField { Name = "OperatorID", Type = "[Int32]" },
@@ -767,7 +767,7 @@ public static class EndpointRegistry
                     DropdownSource = "pcs",
                     ValueField = "Revision",
                     DisplayField = "Revision",
-                    DependsOn = "PCSID"
+                    DependsOn = "PCSNAME"
                 }
             },
             Description = "Retrieve complete details for a specific PCS revision",
@@ -776,59 +776,69 @@ public static class EndpointRegistry
                 new ResponseField { Name = "PCS", Type = "[String]" },
                 new ResponseField { Name = "Revision", Type = "[String]" },
                 new ResponseField { Name = "Status", Type = "[String]" },
-                new ResponseField { Name = "RevDate", Type = "[String]" }
-            }
-        },
-        
-        new EndpointConfiguration
-        {
-            Key = "pcs_properties",
-            Name = "Get PCS properties",
-            Section = "PCS",
-            Endpoint = "plants/{plantid}/pcs/{pcsname}/rev/{revision}/properties",
-            TableName = "pcs_properties",
-            HttpMethod = "GET",
-            Parameters = new()
-            {
-                new EndpointParameter 
-                { 
-                    Name = "PLANTID", 
-                    DisplayName = "Select Plant", 
-                    IsRequired = true, 
-                    Type = "dropdown",
-                    DropdownSource = "plants",
-                    ValueField = "PlantID",
-                    DisplayField = "LongDescription"
-                },
-                new EndpointParameter 
-                { 
-                    Name = "PCSNAME", 
-                    DisplayName = "PCS Name", 
-                    IsRequired = true, 
-                    Type = "dropdown",
-                    DropdownSource = "pcs",
-                    ValueField = "PCSName",
-                    DisplayField = "PCSName",
-                    DependsOn = "PLANTID"
-                },
-                new EndpointParameter
-                {
-                    Name = "REVISION",
-                    DisplayName = "Select Revision",
-                    IsRequired = true,
-                    Type = "dropdown",
-                    DropdownSource = "pcs",
-                    ValueField = "Revision",
-                    DisplayField = "Revision",
-                    DependsOn = "PCSID"
-                }
-            },
-            Description = "Retrieve property details for a specific PCS revision",
-            ResponseFields = new()
-            {
-                new ResponseField { Name = "PCS", Type = "[String]" },
-                new ResponseField { Name = "Revision", Type = "[String]" },
-                new ResponseField { Name = "Properties", Type = "[Object]" }
+                new ResponseField { Name = "RevDate", Type = "[String]" },
+                new ResponseField { Name = "RatingClass", Type = "[String]" },
+                new ResponseField { Name = "TestPressure", Type = "[String]" },
+                new ResponseField { Name = "MaterialGroup", Type = "[String]" },
+                new ResponseField { Name = "DesignCode", Type = "[String]" },
+                new ResponseField { Name = "LastUpdate", Type = "[String]" },
+                new ResponseField { Name = "LastUpdateBy", Type = "[String]" },
+                new ResponseField { Name = "Approver", Type = "[String]" },
+                new ResponseField { Name = "Notepad", Type = "[String]" },
+                new ResponseField { Name = "SC", Type = "[String]" },
+                new ResponseField { Name = "VSM", Type = "[String]" },
+                new ResponseField { Name = "DesignCodeRevMark", Type = "[String]" },
+                new ResponseField { Name = "CorrAllowance", Type = "[Int32]" },
+                new ResponseField { Name = "CorrAllowanceRevMark", Type = "[String]" },
+                new ResponseField { Name = "LongWeldEff", Type = "[String]" },
+                new ResponseField { Name = "LongWeldEffRevMark", Type = "[String]" },
+                new ResponseField { Name = "WallThkTol", Type = "[String]" },
+                new ResponseField { Name = "WallThkTolRevMark", Type = "[String]" },
+                new ResponseField { Name = "ServiceRemark", Type = "[String]" },
+                new ResponseField { Name = "ServiceRemarkRevMark", Type = "[String]" },
+                new ResponseField { Name = "DesignPress01", Type = "[String]" },
+                new ResponseField { Name = "DesignPress02", Type = "[String]" },
+                new ResponseField { Name = "DesignPress03", Type = "[String]" },
+                new ResponseField { Name = "DesignPress04", Type = "[String]" },
+                new ResponseField { Name = "DesignPress05", Type = "[String]" },
+                new ResponseField { Name = "DesignPress06", Type = "[String]" },
+                new ResponseField { Name = "DesignPress07", Type = "[String]" },
+                new ResponseField { Name = "DesignPress08", Type = "[String]" },
+                new ResponseField { Name = "DesignPress09", Type = "[String]" },
+                new ResponseField { Name = "DesignPress10", Type = "[String]" },
+                new ResponseField { Name = "DesignPress11", Type = "[String]" },
+                new ResponseField { Name = "DesignPress12", Type = "[String]" },
+                new ResponseField { Name = "DesignPressRevMark", Type = "[String]" },
+                new ResponseField { Name = "DesignTemp01", Type = "[String]" },
+                new ResponseField { Name = "DesignTemp02", Type = "[String]" },
+                new ResponseField { Name = "DesignTemp03", Type = "[String]" },
+                new ResponseField { Name = "DesignTemp04", Type = "[String]" },
+                new ResponseField { Name = "DesignTemp05", Type = "[String]" },
+                new ResponseField { Name = "DesignTemp06", Type = "[String]" },
+                new ResponseField { Name = "DesignTemp07", Type = "[String]" },
+                new ResponseField { Name = "DesignTemp08", Type = "[String]" },
+                new ResponseField { Name = "DesignTemp09", Type = "[String]" },
+                new ResponseField { Name = "DesignTemp10", Type = "[String]" },
+                new ResponseField { Name = "DesignTemp11", Type = "[String]" },
+                new ResponseField { Name = "DesignTemp12", Type = "[String]" },
+                new ResponseField { Name = "DesignTempRevMark", Type = "[String]" },
+                new ResponseField { Name = "NoteIDCorrAllowance", Type = "[String]" },
+                new ResponseField { Name = "NoteIDServiceCode", Type = "[String]" },
+                new ResponseField { Name = "NoteIDWallThkTol", Type = "[String]" },
+                new ResponseField { Name = "NoteIDLongWeldEff", Type = "[String]" },
+                new ResponseField { Name = "NoteIDGeneralPCS", Type = "[String]" },
+                new ResponseField { Name = "NoteIDDesignCode", Type = "[String]" },
+                new ResponseField { Name = "NoteIDPressTempTable", Type = "[String]" },
+                new ResponseField { Name = "NoteIDPipeSizeWthTable", Type = "[String]" },
+                new ResponseField { Name = "PressElementChange", Type = "[String]" },
+                new ResponseField { Name = "TempElementChange", Type = "[String]" },
+                new ResponseField { Name = "MaterialGroupID", Type = "[Int32]" },
+                new ResponseField { Name = "SpecialReqID", Type = "[Int32]" },
+                new ResponseField { Name = "SpecialReq", Type = "[String]" },
+                new ResponseField { Name = "NewVDSSection", Type = "[String]" },
+                new ResponseField { Name = "TubePCS", Type = "[String]" },
+                new ResponseField { Name = "EDSMJMatrix", Type = "[String]" },
+                new ResponseField { Name = "MJReductionFactor", Type = "[Int32]" }
             }
         },
         
@@ -872,23 +882,21 @@ public static class EndpointRegistry
                     DropdownSource = "pcs",
                     ValueField = "Revision",
                     DisplayField = "Revision",
-                    DependsOn = "PCSID"
+                    DependsOn = "PCSNAME"
                 }
             },
             Description = "Temperature and pressure endpoint",
             ResponseFields = new()
             {
                 new ResponseField { Name = "Temperature", Type = "[String]" },
-                new ResponseField { Name = "Pressure", Type = "[String]" },
-                new ResponseField { Name = "DesignTemperature", Type = "[String]" },
-                new ResponseField { Name = "DesignPressure", Type = "[String]" }
+                new ResponseField { Name = "Pressure", Type = "[String]" }
             }
         },
         
         new EndpointConfiguration
         {
             Key = "pcs_pipe_size",
-            Name = "Get pipe sizes",
+            Name = "Get pipe size",
             Section = "PCS",
             Endpoint = "plants/{plantid}/pcs/{pcsname}/rev/{revision}/pipe-sizes",
             TableName = "pcs_pipe_size",
@@ -925,23 +933,30 @@ public static class EndpointRegistry
                     DropdownSource = "pcs",
                     ValueField = "Revision",
                     DisplayField = "Revision",
-                    DependsOn = "PCSID"
+                    DependsOn = "PCSNAME"
                 }
             },
             Description = "Retrieve pipe sizes for a specific PCS revision",
             ResponseFields = new()
             {
-                new ResponseField { Name = "NominalSize", Type = "[String]" },
-                new ResponseField { Name = "OutsideDiameter", Type = "[String]" },
+                new ResponseField { Name = "PCS", Type = "[String]" },
+                new ResponseField { Name = "Revision", Type = "[String]" },
+                new ResponseField { Name = "NomSize", Type = "[String]" },
+                new ResponseField { Name = "OuterDiam", Type = "[String]" },
                 new ResponseField { Name = "WallThickness", Type = "[String]" },
-                new ResponseField { Name = "Schedule", Type = "[String]" }
+                new ResponseField { Name = "Schedule", Type = "[String]" },
+                new ResponseField { Name = "UnderTolerance", Type = "[String]" },
+                new ResponseField { Name = "CorrosionAllowance", Type = "[String]" },
+                new ResponseField { Name = "WeldingFactor", Type = "[String]" },
+                new ResponseField { Name = "DimElementChange", Type = "[String]" },
+                new ResponseField { Name = "ScheduleInMatrix", Type = "[String]" }
             }
         },
         
         new EndpointConfiguration
         {
             Key = "pcs_pipe_element",
-            Name = "Get pipe elements",
+            Name = "Get pipe element",
             Section = "PCS",
             Endpoint = "plants/{plantid}/pcs/{pcsname}/rev/{revision}/pipe-elements",
             TableName = "pcs_pipe_element",
@@ -978,23 +993,46 @@ public static class EndpointRegistry
                     DropdownSource = "pcs",
                     ValueField = "Revision",
                     DisplayField = "Revision",
-                    DependsOn = "PCSID"
+                    DependsOn = "PCSNAME"
                 }
             },
             Description = "Retrieve pipe elements for a specific PCS revision",
             ResponseFields = new()
             {
-                new ResponseField { Name = "ElementID", Type = "[String]" },
-                new ResponseField { Name = "ElementType", Type = "[String]" },
+                new ResponseField { Name = "PCS", Type = "[String]" },
+                new ResponseField { Name = "Revision", Type = "[String]" },
+                new ResponseField { Name = "MaterialGroupID", Type = "[Int32]" },
+                new ResponseField { Name = "ElementGroupNo", Type = "[Int32]" },
+                new ResponseField { Name = "LineNo", Type = "[Int32]" },
+                new ResponseField { Name = "Element", Type = "[String]" },
+                new ResponseField { Name = "DimStandard", Type = "[String]" },
+                new ResponseField { Name = "FromSize", Type = "[String]" },
+                new ResponseField { Name = "ToSize", Type = "[String]" },
+                new ResponseField { Name = "ProductForm", Type = "[String]" },
                 new ResponseField { Name = "Material", Type = "[String]" },
-                new ResponseField { Name = "Specification", Type = "[String]" }
+                new ResponseField { Name = "MDS", Type = "[String]" },
+                new ResponseField { Name = "EDS", Type = "[String]" },
+                new ResponseField { Name = "EDSRevision", Type = "[String]" },
+                new ResponseField { Name = "ESK", Type = "[String]" },
+                new ResponseField { Name = "Revmark", Type = "[String]" },
+                new ResponseField { Name = "Remark", Type = "[String]" },
+                new ResponseField { Name = "PageBreak", Type = "[String]" },
+                new ResponseField { Name = "ElementID", Type = "[Int32]" },
+                new ResponseField { Name = "FreeText", Type = "[String]" },
+                new ResponseField { Name = "NoteID", Type = "[String]" },
+                new ResponseField { Name = "NewDeletedLine", Type = "[String]" },
+                new ResponseField { Name = "InitialInfo", Type = "[String]" },
+                new ResponseField { Name = "InitialRevmark", Type = "[String]" },
+                new ResponseField { Name = "MDSVariant", Type = "[String]" },
+                new ResponseField { Name = "MDSRevision", Type = "[String]" },
+                new ResponseField { Name = "Area", Type = "[String]" }
             }
         },
         
         new EndpointConfiguration
         {
             Key = "pcs_valve_element",
-            Name = "Get valve elements",
+            Name = "Get valve element",
             Section = "PCS",
             Endpoint = "plants/{plantid}/pcs/{pcsname}/rev/{revision}/valve-elements",
             TableName = "pcs_valve_element",
@@ -1031,23 +1069,37 @@ public static class EndpointRegistry
                     DropdownSource = "pcs",
                     ValueField = "Revision",
                     DisplayField = "Revision",
-                    DependsOn = "PCSID"
+                    DependsOn = "PCSNAME"
                 }
             },
             Description = "Retrieve valve elements for a specific PCS revision",
             ResponseFields = new()
             {
+                new ResponseField { Name = "ValveGroupNo", Type = "[Int32]" },
+                new ResponseField { Name = "LineNo", Type = "[Int32]" },
                 new ResponseField { Name = "ValveType", Type = "[String]" },
-                new ResponseField { Name = "ValveClass", Type = "[String]" },
-                new ResponseField { Name = "EndConnection", Type = "[String]" },
-                new ResponseField { Name = "Material", Type = "[String]" }
+                new ResponseField { Name = "VDS", Type = "[String]" },
+                new ResponseField { Name = "ValveDescription", Type = "[String]" },
+                new ResponseField { Name = "FromSize", Type = "[String]" },
+                new ResponseField { Name = "ToSize", Type = "[String]" },
+                new ResponseField { Name = "Revmark", Type = "[String]" },
+                new ResponseField { Name = "Remark", Type = "[String]" },
+                new ResponseField { Name = "PageBreak", Type = "[String]" },
+                new ResponseField { Name = "NoteID", Type = "[String]" },
+                new ResponseField { Name = "PreviousVDS", Type = "[String]" },
+                new ResponseField { Name = "NewDeletedLine", Type = "[String]" },
+                new ResponseField { Name = "InitialInfo", Type = "[String]" },
+                new ResponseField { Name = "InitialRevmark", Type = "[String]" },
+                new ResponseField { Name = "SizeRange", Type = "[String]" },
+                new ResponseField { Name = "Status", Type = "[String]" },
+                new ResponseField { Name = "Revision", Type = "[String]" }
             }
         },
         
         new EndpointConfiguration
         {
             Key = "pcs_embedded_note",
-            Name = "Get embedded notes",
+            Name = "Get embedded note",
             Section = "PCS",
             Endpoint = "plants/{plantid}/pcs/{pcsname}/rev/{revision}/embedded-notes",
             TableName = "pcs_embedded_note",
@@ -1084,16 +1136,18 @@ public static class EndpointRegistry
                     DropdownSource = "pcs",
                     ValueField = "Revision",
                     DisplayField = "Revision",
-                    DependsOn = "PCSID"
+                    DependsOn = "PCSNAME"
                 }
             },
             Description = "Retrieve embedded notes for a specific PCS revision",
             ResponseFields = new()
             {
-                new ResponseField { Name = "NoteID", Type = "[String]" },
-                new ResponseField { Name = "NoteText", Type = "[String]" },
-                new ResponseField { Name = "CreatedDate", Type = "[String]" },
-                new ResponseField { Name = "CreatedBy", Type = "[String]" }
+                new ResponseField { Name = "PCSName", Type = "[String]" },
+                new ResponseField { Name = "Revision", Type = "[String]" },
+                new ResponseField { Name = "TextSectionID", Type = "[String]" },
+                new ResponseField { Name = "TextSectionDescription", Type = "[String]" },
+                new ResponseField { Name = "PageBreak", Type = "[String]" },
+                new ResponseField { Name = "HTMLCLOB", Type = "[String]" }
             }
         },
         
@@ -1106,7 +1160,113 @@ public static class EndpointRegistry
             Endpoint = "vds",
             TableName = "vds_list",
             HttpMethod = "GET",
-            Parameters = new(),
+            Parameters = new()
+            {
+                new EndpointParameter 
+                { 
+                    Name = "NAMEFILTER", 
+                    DisplayName = "Name Filter", 
+                    IsRequired = false, 
+                    Type = "string",
+                    ParameterLocation = "query"
+                },
+                new EndpointParameter 
+                { 
+                    Name = "STATUSFILTER", 
+                    DisplayName = "Status Filter", 
+                    IsRequired = false, 
+                    Type = "string",
+                    ParameterLocation = "query"
+                },
+                new EndpointParameter 
+                { 
+                    Name = "BASEDONSUBSEGMENT", 
+                    DisplayName = "Based On Subsegment", 
+                    IsRequired = false, 
+                    Type = "string",
+                    ParameterLocation = "query"
+                },
+                new EndpointParameter 
+                { 
+                    Name = "VDS", 
+                    DisplayName = "VDS", 
+                    IsRequired = false, 
+                    Type = "string",
+                    ParameterLocation = "query"
+                },
+                new EndpointParameter 
+                { 
+                    Name = "VALVETYPEID", 
+                    DisplayName = "Valve Type ID", 
+                    IsRequired = false, 
+                    Type = "int",
+                    ParameterLocation = "query"
+                },
+                new EndpointParameter 
+                { 
+                    Name = "RATINGCLASSID", 
+                    DisplayName = "Rating Class ID", 
+                    IsRequired = false, 
+                    Type = "int",
+                    ParameterLocation = "query"
+                },
+                new EndpointParameter 
+                { 
+                    Name = "MATERIALGROUPID", 
+                    DisplayName = "Material Group ID", 
+                    IsRequired = false, 
+                    Type = "int",
+                    ParameterLocation = "query"
+                },
+                new EndpointParameter 
+                { 
+                    Name = "ENDCONNECTIONID", 
+                    DisplayName = "End Connection ID", 
+                    IsRequired = false, 
+                    Type = "int",
+                    ParameterLocation = "query"
+                },
+                new EndpointParameter 
+                { 
+                    Name = "BOREID", 
+                    DisplayName = "Bore ID", 
+                    IsRequired = false, 
+                    Type = "int",
+                    ParameterLocation = "query"
+                },
+                new EndpointParameter 
+                { 
+                    Name = "VDSSIZEID", 
+                    DisplayName = "VDS Size ID", 
+                    IsRequired = false, 
+                    Type = "int",
+                    ParameterLocation = "query"
+                },
+                new EndpointParameter 
+                { 
+                    Name = "SPECIALREQID", 
+                    DisplayName = "Special Req ID", 
+                    IsRequired = false, 
+                    Type = "int",
+                    ParameterLocation = "query"
+                },
+                new EndpointParameter 
+                { 
+                    Name = "SUBSEGMENTREF", 
+                    DisplayName = "Subsegment Ref", 
+                    IsRequired = false, 
+                    Type = "int",
+                    ParameterLocation = "query"
+                },
+                new EndpointParameter 
+                { 
+                    Name = "TEXTBLOCKID", 
+                    DisplayName = "Text Block ID", 
+                    IsRequired = false, 
+                    Type = "int",
+                    ParameterLocation = "query"
+                }
+            },
             Description = "Retrieve complete list of all VDS (Valve Datasheet) items",
             ResponseFields = new()
             {

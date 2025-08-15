@@ -137,15 +137,15 @@
                     <div class="mb-1">
                         <strong>Template:</strong> <code class="text-info small">/@SelectedEndpoint.Endpoint | @SelectedEndpoint.HttpMethod</code>
                     </div>
+                    <div class="mb-1">
+                        <strong>API URL:</strong> <a href="@($"https://equinor.pipespec-api.presight.com/{SelectedEndpoint.Endpoint}")" target="_blank" class="text-decoration-none">
+                            <code class="text-success small">https://equinor.pipespec-api.presight.com/@SelectedEndpoint.Endpoint</code>
+                        </a>
+                    </div>
                     @if (SelectedEndpoint.Parameters.Any())
                     {
                         <div class="mb-1">
-                            <strong>Generated:</strong> <code class="text-primary small">/@GetFinalEndpoint()</code>
-                        </div>
-                        <div class="mb-1">
-                            <strong>API URL:</strong> <a href="@($"https://equinor.pipespec-api.presight.com/{GetFinalEndpoint()}")" target="_blank" class="text-decoration-none">
-                                <code class="text-success small">https://equinor.pipespec-api.presight.com/@GetFinalEndpoint()</code>
-                            </a>
+                            <strong>Generated:</strong> <code class="text-primary small">https://equinor.pipespec-api.presight.com/@GetFinalEndpoint()</code>
                         </div>
                     }
                     <div class="row mb-1">
@@ -165,12 +165,22 @@
                     {
                         <div class="mb-1">
                             <strong>Params:</strong>
-                            <span class="ms-1 font-monospace small">
+                            <div class="ms-2 font-monospace small">
                                 @foreach (var param in SelectedEndpoint.Parameters)
                                 {
-                                    <span>@param.Name=[@(param.Type == "int" ? "Int32" : "String")]</span>
+                                    <div>
+                                        @if (param.IsRequired)
+                                        {
+                                            <span class="text-danger">*</span>
+                                        }
+                                        <span>@param.Name=[@(param.Type == "int" ? "Int32" : "String")]</span>
+                                        @if (param.ParameterLocation == "query")
+                                        {
+                                            <span class="text-muted ms-1">(query)</span>
+                                        }
+                                    </div>
                                 }
-                            </span>
+                            </div>
                         </div>
                     }
                     @if (SelectedEndpoint.ResponseFields.Any())
@@ -1119,14 +1129,45 @@
         
         try
         {
-            if (item is IDictionary<string, object> dict && dict.ContainsKey(displayField))
+            // Special handling for plant dropdowns
+            if (displayField == "LongDescription")
             {
-                return dict[displayField]?.ToString() ?? "";
+                string plantName = "";
+                string longDesc = "";
+                string plantId = "";
+                
+                if (item is IDictionary<string, object> dict)
+                {
+                    plantName = dict.ContainsKey("ShortDescription") ? dict["ShortDescription"]?.ToString() ?? "" : "";
+                    longDesc = dict.ContainsKey("LongDescription") ? dict["LongDescription"]?.ToString() ?? "" : "";
+                    plantId = dict.ContainsKey("PlantID") ? dict["PlantID"]?.ToString() ?? "" : "";
+                }
+                else
+                {
+                    object obj = item;
+                    var plantNameProp = obj.GetType().GetProperty("ShortDescription");
+                    var longDescProp = obj.GetType().GetProperty("LongDescription");
+                    var plantIdProp = obj.GetType().GetProperty("PlantID");
+                    plantName = plantNameProp?.GetValue(obj)?.ToString() ?? "";
+                    longDesc = longDescProp?.GetValue(obj)?.ToString() ?? "";
+                    plantId = plantIdProp?.GetValue(obj)?.ToString() ?? "";
+                }
+                
+                if (!string.IsNullOrEmpty(plantId))
+                {
+                    return $"{plantName} ({longDesc}) - [PlantID: {plantId}]";
+                }
             }
             
-            object obj = item;
-            var prop = obj.GetType().GetProperty(displayField);
-            return prop?.GetValue(obj)?.ToString() ?? "";
+            // Default handling for other fields
+            if (item is IDictionary<string, object> dict2 && dict2.ContainsKey(displayField))
+            {
+                return dict2[displayField]?.ToString() ?? "";
+            }
+            
+            object obj2 = item;
+            var prop = obj2.GetType().GetProperty(displayField);
+            return prop?.GetValue(obj2)?.ToString() ?? "";
         }
         catch
         {

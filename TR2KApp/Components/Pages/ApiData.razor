@@ -591,34 +591,58 @@
     private IEnumerable<string> GetTableColumns()
     {
         var columns = new List<string>();
+        var dataColumns = new HashSet<string>();
         
-        // First add the input parameters as columns (for database primary keys)
-        if (SelectedEndpoint != null)
-        {
-            foreach (var param in SelectedEndpoint.Parameters.Where(p => p.IsRequired))
-            {
-                columns.Add($"[Input] {param.Name}");
-            }
-        }
-        
-        // Then add the data columns
+        // First collect all data columns
         if (ImportedData != null && ImportedData.Any())
         {
             var firstItem = ImportedData.First();
             if (firstItem is IDictionary<string, object> dict)
             {
-                columns.AddRange(dict.Keys.Where(k => k != "Id" && k != "CreatedDate" && k != "ModifiedDate"));
+                foreach (var key in dict.Keys.Where(k => k != "Id" && k != "CreatedDate" && k != "ModifiedDate"))
+                {
+                    dataColumns.Add(key);
+                }
             }
             else
             {
                 // Cast to object first to avoid dynamic issues
                 object obj = firstItem;
                 var properties = obj.GetType().GetProperties();
-                columns.AddRange(properties
-                    .Where(p => p.Name != "Id" && p.Name != "CreatedDate" && p.Name != "ModifiedDate")
-                    .Select(p => p.Name));
+                foreach (var prop in properties.Where(p => p.Name != "Id" && p.Name != "CreatedDate" && p.Name != "ModifiedDate"))
+                {
+                    dataColumns.Add(prop.Name);
+                }
             }
         }
+        
+        // Add special header fields first (for Issue revisions)
+        var headerFields = new[] { "UserName", "UserEntryTime", "UserProtected" };
+        foreach (var field in headerFields)
+        {
+            if (dataColumns.Contains(field))
+            {
+                columns.Add(field);
+                dataColumns.Remove(field);
+            }
+        }
+        
+        // Then add the input parameters as columns (for database primary keys)
+        // Only add if they don't already exist in the data
+        if (SelectedEndpoint != null)
+        {
+            foreach (var param in SelectedEndpoint.Parameters.Where(p => p.IsRequired))
+            {
+                // Check if this parameter already exists in the data
+                if (!dataColumns.Contains(param.Name) && !columns.Contains(param.Name))
+                {
+                    columns.Add($"[Input] {param.Name}");
+                }
+            }
+        }
+        
+        // Finally add remaining data columns
+        columns.AddRange(dataColumns);
         
         return columns;
     }
@@ -859,11 +883,11 @@
                 ParameterValues.Remove(depParam.Name);
                 
                 // Clear dropdown data for dependent fields to show loading state
-                // BUT: Don't clear PCS data when PCSID changes, as REVISION needs to filter the same PCS data
+                // BUT: Don't clear PCS data when PCSNAME changes, as REVISION needs to filter the same PCS data
                 if (depParam.Type == "dropdown" && depParam.DropdownSource != null)
                 {
-                    // Only clear if it's not a PCS revision dropdown depending on PCSID
-                    if (!(depParam.DropdownSource == "pcs" && paramName == "PCSID"))
+                    // Only clear if it's not a PCS revision dropdown depending on PCSNAME
+                    if (!(depParam.DropdownSource == "pcs" && paramName == "PCSNAME"))
                     {
                         DropdownData[depParam.DropdownSource] = new List<dynamic>();
                     }

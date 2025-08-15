@@ -1061,8 +1061,9 @@
         if (SelectedEndpoint == null) return "";
         
         var endpoint = SelectedEndpoint.Endpoint;
+        var queryParams = new List<string>();
         
-        // Replace parameters in the endpoint
+        // Process parameters based on their location (path or query)
         foreach (var param in SelectedEndpoint.Parameters)
         {
             if (ParameterValues.TryGetValue(param.Name, out var value) && !string.IsNullOrEmpty(value))
@@ -1072,20 +1073,50 @@
                 {
                     value = System.Net.WebUtility.UrlEncode(value);
                 }
-                // Convert parameter name to lowercase for URL replacement
-                var urlParamName = param.Name.ToLower();
-                if (param.Name == "ISSUEREV") urlParamName = "issuerev";
-                if (param.Name == "PLANTID") urlParamName = "plantid";
-                if (param.Name == "OPERATORID") urlParamName = "operatorid";
                 
-                Console.WriteLine($"GetFinalEndpoint: Replacing {{{urlParamName}}} with {value}");
-                endpoint = endpoint.Replace($"{{{urlParamName}}}", value);
+                // Check if this is a query parameter or path parameter
+                if (param.ParameterLocation == "query")
+                {
+                    // Add to query string
+                    queryParams.Add($"{param.Name}={value}");
+                }
+                else // Default to path parameter for backward compatibility
+                {
+                    // Convert parameter name to lowercase for URL replacement
+                    var urlParamName = param.Name.ToLower();
+                    if (param.Name == "ISSUEREV") urlParamName = "issuerev";
+                    if (param.Name == "PLANTID") urlParamName = "plantid";
+                    if (param.Name == "OPERATORID") urlParamName = "operatorid";
+                    if (param.Name == "VDSNAME") urlParamName = "vdsname";
+                    if (param.Name == "REVISION") urlParamName = "revision";
+                    if (param.Name == "PCS") urlParamName = "pcs";
+                    if (param.Name == "FlangeSize") urlParamName = "flangesize";
+                    if (param.Name == "FlangeTypeId") urlParamName = "flangetypeid";
+                    if (param.Name == "GasketTypeId") urlParamName = "gaskettypeid";
+                    if (param.Name == "BoltMaterialId") urlParamName = "boltmaterialid";
+                    if (param.Name == "ComponentType") urlParamName = "componenttype";
+                    if (param.Name == "LubricantId") urlParamName = "lubricantid";
+                    if (param.Name == "BoltDim") urlParamName = "boltdim";
+                    if (param.Name == "ToolId") urlParamName = "toolid";
+                    if (param.Name == "BoltForceKN") urlParamName = "boltforcekn";
+                    if (param.Name == "TorqueNM") urlParamName = "torquenm";
+                    if (param.Name == "FlangeOrMechjoint") urlParamName = "flangeormechjoint";
+                    
+                    Console.WriteLine($"GetFinalEndpoint: Replacing {{{urlParamName}}} with {value}");
+                    endpoint = endpoint.Replace($"{{{urlParamName}}}", value);
+                }
             }
             else if (param.IsRequired)
             {
                 Console.WriteLine($"GetFinalEndpoint: Missing required parameter {param.Name}");
                 return ""; // Required parameter is missing
             }
+        }
+        
+        // Append query string if there are query parameters
+        if (queryParams.Any())
+        {
+            endpoint = endpoint + "?" + string.Join("&", queryParams);
         }
         
         Console.WriteLine($"GetFinalEndpoint: Final endpoint = {endpoint}");

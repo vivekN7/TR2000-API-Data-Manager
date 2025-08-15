@@ -31,6 +31,7 @@ public class EndpointParameter
     public string? ValueField { get; set; } // e.g., "OperatorID", "PlantID", "IssueRevision"
     public string? DisplayField { get; set; } // e.g., "OperatorName", "LongDescription"
     public string? DependsOn { get; set; } // e.g., "plantId" - another parameter this depends on
+    public string ParameterLocation { get; set; } = "path"; // "path" or "query" - defaults to path for backward compatibility
 }
 
 public static class EndpointRegistry
@@ -1124,7 +1125,7 @@ public static class EndpointRegistry
             Key = "bolt_tension_flange_type",
             Name = "Get Flange Type",
             Section = "BoltTension",
-            Endpoint = "BoltTension/getFlangeType",
+            Endpoint = "BoltTension/getFlangeType/{plantid}/{pcs}/",
             TableName = "bolt_tension_flange_type",
             HttpMethod = "GET",
             Parameters = new()
@@ -1134,21 +1135,24 @@ public static class EndpointRegistry
                     Name = "PLANTID",
                     DisplayName = "Plant ID",
                     IsRequired = true,
-                    Type = "text"
+                    Type = "text",
+                    ParameterLocation = "path"
                 },
                 new EndpointParameter
                 {
                     Name = "PCS",
                     DisplayName = "PCS",
                     IsRequired = true,
-                    Type = "text"
+                    Type = "text",
+                    ParameterLocation = "path"
                 },
                 new EndpointParameter
                 {
                     Name = "FlangeSize",
                     DisplayName = "Flange Size",
                     IsRequired = true,
-                    Type = "int"
+                    Type = "int",
+                    ParameterLocation = "query"
                 }
             },
             Description = "Retrieve flange type information for bolt tension calculations",
@@ -1167,7 +1171,7 @@ public static class EndpointRegistry
             Key = "bolt_tension_gasket_type",
             Name = "Get Gasket Type",
             Section = "BoltTension",
-            Endpoint = "BoltTension/getGasketType",
+            Endpoint = "BoltTension/getGasketType/{plantid}/{pcs}/",
             TableName = "bolt_tension_gasket_type",
             HttpMethod = "GET",
             Parameters = new()
@@ -1177,28 +1181,32 @@ public static class EndpointRegistry
                     Name = "PLANTID",
                     DisplayName = "Plant ID",
                     IsRequired = true,
-                    Type = "text"
+                    Type = "text",
+                    ParameterLocation = "path"
                 },
                 new EndpointParameter
                 {
                     Name = "PCS",
                     DisplayName = "PCS",
                     IsRequired = true,
-                    Type = "text"
+                    Type = "text",
+                    ParameterLocation = "path"
                 },
                 new EndpointParameter
                 {
                     Name = "FlangeTypeId",
                     DisplayName = "Flange Type ID",
                     IsRequired = true,
-                    Type = "int"
+                    Type = "int",
+                    ParameterLocation = "query"
                 },
                 new EndpointParameter
                 {
                     Name = "FlangeSize",
                     DisplayName = "Flange Size",
                     IsRequired = true,
-                    Type = "text"
+                    Type = "text",
+                    ParameterLocation = "query"
                 }
             },
             Description = "Retrieve gasket type information for bolt tension calculations",
@@ -1214,7 +1222,7 @@ public static class EndpointRegistry
             Key = "bolt_tension_bolt_material",
             Name = "Get Bolt Material",
             Section = "BoltTension",
-            Endpoint = "BoltTension/getBoltMaterial",
+            Endpoint = "BoltTension/getBoltMaterial/{plantid}/{pcs}/",
             TableName = "bolt_tension_bolt_material",
             HttpMethod = "GET",
             Parameters = new()
@@ -1224,28 +1232,32 @@ public static class EndpointRegistry
                     Name = "PLANTID",
                     DisplayName = "Plant ID",
                     IsRequired = true,
-                    Type = "text"
+                    Type = "text",
+                    ParameterLocation = "path"
                 },
                 new EndpointParameter
                 {
                     Name = "PCS",
                     DisplayName = "PCS",
                     IsRequired = true,
-                    Type = "text"
+                    Type = "text",
+                    ParameterLocation = "path"
                 },
                 new EndpointParameter
                 {
                     Name = "FlangeTypeId",
                     DisplayName = "Flange Type ID",
                     IsRequired = true,
-                    Type = "int"
+                    Type = "int",
+                    ParameterLocation = "query"
                 },
                 new EndpointParameter
                 {
                     Name = "LubricantId",
                     DisplayName = "Lubricant ID",
                     IsRequired = true,
-                    Type = "int"
+                    Type = "int",
+                    ParameterLocation = "query"
                 }
             },
             Description = "Retrieve bolt material information for bolt tension calculations",
@@ -1261,7 +1273,7 @@ public static class EndpointRegistry
             Key = "bolt_tension_tension_forces",
             Name = "Get Tension Forces",
             Section = "BoltTension",
-            Endpoint = "BoltTension/getTensionForces",
+            Endpoint = "BoltTension/getTensionForces/{plantid}/{pcs}/",
             TableName = "bolt_tension_tension_forces",
             HttpMethod = "GET",
             Parameters = new()
@@ -1271,56 +1283,64 @@ public static class EndpointRegistry
                     Name = "PLANTID",
                     DisplayName = "Plant ID",
                     IsRequired = true,
-                    Type = "text"
+                    Type = "text",
+                    ParameterLocation = "path"
                 },
                 new EndpointParameter
                 {
                     Name = "PCS",
                     DisplayName = "PCS",
                     IsRequired = true,
-                    Type = "text"
+                    Type = "text",
+                    ParameterLocation = "path"
                 },
                 new EndpointParameter
                 {
                     Name = "FlangeTypeId",
                     DisplayName = "Flange Type ID",
                     IsRequired = true,
-                    Type = "int"
+                    Type = "int",
+                    ParameterLocation = "query"
                 },
                 new EndpointParameter
                 {
                     Name = "GasketTypeId",
                     DisplayName = "Gasket Type ID",
                     IsRequired = true,
-                    Type = "int"
+                    Type = "int",
+                    ParameterLocation = "query"
                 },
                 new EndpointParameter
                 {
                     Name = "BoltMaterialId",
                     DisplayName = "Bolt Material ID",
                     IsRequired = true,
-                    Type = "int"
+                    Type = "int",
+                    ParameterLocation = "query"
                 },
                 new EndpointParameter
                 {
                     Name = "FlangeSize",
                     DisplayName = "Flange Size",
                     IsRequired = true,
-                    Type = "text"
+                    Type = "text",
+                    ParameterLocation = "query"
                 },
                 new EndpointParameter
                 {
                     Name = "ComponentType",
                     DisplayName = "Component Type",
                     IsRequired = true,
-                    Type = "text"
+                    Type = "text",
+                    ParameterLocation = "query"
                 },
                 new EndpointParameter
                 {
                     Name = "LubricantId",
                     DisplayName = "Lubricant ID",
                     IsRequired = true,
-                    Type = "int"
+                    Type = "int",
+                    ParameterLocation = "query"
                 }
             },
             Description = "Calculate tension forces for bolt tension",
@@ -1340,7 +1360,7 @@ public static class EndpointRegistry
             Key = "bolt_tension_tool",
             Name = "Get Tool",
             Section = "BoltTension",
-            Endpoint = "BoltTension/getTool",
+            Endpoint = "BoltTension/getTool/{plantid}/",
             TableName = "bolt_tension_tool",
             HttpMethod = "GET",
             Parameters = new()
@@ -1350,14 +1370,16 @@ public static class EndpointRegistry
                     Name = "PLANTID",
                     DisplayName = "Plant ID",
                     IsRequired = true,
-                    Type = "text"
+                    Type = "text",
+                    ParameterLocation = "path"
                 },
                 new EndpointParameter
                 {
                     Name = "BoltDim",
                     DisplayName = "Bolt Dimension",
                     IsRequired = true,
-                    Type = "text"
+                    Type = "text",
+                    ParameterLocation = "query"
                 }
             },
             Description = "Retrieve tool information for bolt tension",
@@ -1374,7 +1396,7 @@ public static class EndpointRegistry
             Key = "bolt_tension_tool_pressure",
             Name = "Get Tool Pressure",
             Section = "BoltTension",
-            Endpoint = "BoltTension/getToolPressure",
+            Endpoint = "BoltTension/getToolPressure/",
             TableName = "bolt_tension_tool_pressure",
             HttpMethod = "GET",
             Parameters = new()
@@ -1384,28 +1406,32 @@ public static class EndpointRegistry
                     Name = "ToolId",
                     DisplayName = "Tool ID",
                     IsRequired = true,
-                    Type = "int"
+                    Type = "int",
+                    ParameterLocation = "query"
                 },
                 new EndpointParameter
                 {
                     Name = "BoltForceKN",
                     DisplayName = "Bolt Force (kN)",
                     IsRequired = true,
-                    Type = "int"
+                    Type = "int",
+                    ParameterLocation = "query"
                 },
                 new EndpointParameter
                 {
                     Name = "TorqueNM",
                     DisplayName = "Torque (Nm)",
                     IsRequired = true,
-                    Type = "int"
+                    Type = "int",
+                    ParameterLocation = "query"
                 },
                 new EndpointParameter
                 {
                     Name = "FlangeOrMechjoint",
                     DisplayName = "Flange or Mech Joint",
                     IsRequired = true,
-                    Type = "text"
+                    Type = "text",
+                    ParameterLocation = "query"
                 }
             },
             Description = "Calculate tool pressure for bolt tension",
@@ -1422,7 +1448,7 @@ public static class EndpointRegistry
             Key = "bolt_tension_plant_info",
             Name = "Get Plant Info",
             Section = "BoltTension",
-            Endpoint = "BoltTension/getPlantInfo/{plantid}",
+            Endpoint = "BoltTension/getPlantInfo/{plantid}/",
             TableName = "bolt_tension_plant_info",
             HttpMethod = "GET",
             Parameters = new()
@@ -1432,7 +1458,8 @@ public static class EndpointRegistry
                     Name = "PLANTID",
                     DisplayName = "Plant ID",
                     IsRequired = true,
-                    Type = "text"
+                    Type = "text",
+                    ParameterLocation = "path"
                 }
             },
             Description = "Retrieve plant information for bolt tension",
@@ -1449,7 +1476,7 @@ public static class EndpointRegistry
             Key = "bolt_tension_lubricant",
             Name = "Get Lubricant",
             Section = "BoltTension",
-            Endpoint = "BoltTension/getLubricant/{plantid}",
+            Endpoint = "BoltTension/getLubricant/{plantid}/",
             TableName = "bolt_tension_lubricant",
             HttpMethod = "GET",
             Parameters = new()
@@ -1459,7 +1486,8 @@ public static class EndpointRegistry
                     Name = "PLANTID",
                     DisplayName = "Plant ID",
                     IsRequired = true,
-                    Type = "text"
+                    Type = "text",
+                    ParameterLocation = "path"
                 }
             },
             Description = "Retrieve lubricant information for bolt tension",

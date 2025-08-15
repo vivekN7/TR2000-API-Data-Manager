@@ -4,6 +4,7 @@
 @using TR2KBlazorLibrary.Logic.Services
 @using TR2KBlazorLibrary.Models
 @using System.Text
+@using System.Text.Json
 @inject TR2000ApiService ApiService
 @inject ApiResponseDeserializer Deserializer
 @inject IJSRuntime JS
@@ -700,26 +701,38 @@
                         StateHasChanged();
                         
                         var apiData = await ApiService.FetchDataAsync("plants");
-                        var deserializedData = Deserializer.DeserializeApiResponse(apiData, "plants");
                         
+                        // Parse the JSON response directly to handle the structure
+                        var jsonDoc = System.Text.Json.JsonDocument.Parse(apiData);
                         var plantCodeList = new List<dynamic>();
                         var addedCodes = new HashSet<string>(); // To avoid duplicates
                         
-                        foreach (var plant in deserializedData)
+                        if (jsonDoc.RootElement.TryGetProperty("getPlant", out var plantsArray))
                         {
-                            var codeField = plant.GetType().GetProperty("CommonLibPlantCode")?.GetValue(plant)?.ToString();
-                            if (!string.IsNullOrEmpty(codeField))
+                            foreach (var plant in plantsArray.EnumerateArray())
                             {
-                                // Split by semicolon if multiple codes exist
-                                var codes = codeField.Split(';', StringSplitOptions.RemoveEmptyEntries);
-                                foreach (var code in codes)
+                                if (plant.TryGetProperty("CommonLibPlantCode", out var codeElement))
                                 {
-                                    var trimmedCode = code.Trim();
-                                    if (!string.IsNullOrEmpty(trimmedCode) && addedCodes.Add(trimmedCode))
+                                    var codeField = codeElement.GetString();
+                                    if (!string.IsNullOrEmpty(codeField))
                                     {
                                         // Get plant name for display
-                                        var plantName = plant.GetType().GetProperty("LongDescription")?.GetValue(plant)?.ToString() ?? trimmedCode;
-                                        plantCodeList.Add(new { PlantCode = trimmedCode, Display = $"{trimmedCode} - {plantName}" });
+                                        var plantName = plant.TryGetProperty("LongDescription", out var nameElement) 
+                                            ? nameElement.GetString() : "";
+                                        
+                                        // Split by semicolon if multiple codes exist
+                                        var codes = codeField.Split(';', StringSplitOptions.RemoveEmptyEntries);
+                                        foreach (var code in codes)
+                                        {
+                                            var trimmedCode = code.Trim();
+                                            if (!string.IsNullOrEmpty(trimmedCode) && addedCodes.Add(trimmedCode))
+                                            {
+                                                plantCodeList.Add(new { 
+                                                    PlantCode = trimmedCode, 
+                                                    Display = $"{trimmedCode} - {plantName}" 
+                                                });
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -735,6 +748,7 @@
                     catch (Exception ex)
                     {
                         StatusMessage = $"⚠️ Warning: Could not load plant codes: {ex.Message}";
+                        Console.WriteLine($"Error loading plant codes: {ex}");
                         DropdownData[param.DropdownSource!] = new List<dynamic>();
                     }
                     continue;

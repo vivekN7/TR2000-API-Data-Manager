@@ -190,22 +190,22 @@
         <div class="col-12">
             <div class="card">
                 <div class="card-header">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h5>Imported Data from '@(SelectedEndpoint?.TableName)' 
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h5 class="mb-0">Imported Data from '@(SelectedEndpoint?.TableName)' 
                             @if (!IsLoading && ImportedData != null)
                             {
                                 <span>(@(FilteredData?.Count() ?? 0) filtered / @ImportedData.Count() total)</span>
                             }
                         </h5>
-                        <div class="d-flex gap-2">
-                            <input type="text" class="form-control form-control-sm" style="width: 250px;" 
-                                   placeholder="Search all columns..." 
-                                   @bind="SearchText" 
-                                   @bind:event="oninput"
-                                   @bind:after="ApplyFilter" 
-                                   disabled="@IsLoading" />
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="ClearFilter" disabled="@IsLoading">Clear</button>
-                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <input type="text" class="form-control form-control-sm" style="width: 250px;" 
+                               placeholder="Search all columns..." 
+                               @bind="SearchText" 
+                               @bind:event="oninput"
+                               @bind:after="ApplyFilter" 
+                               disabled="@IsLoading" />
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="ClearFilter" disabled="@IsLoading">Clear</button>
                     </div>
                 </div>
                 <div class="card-body">
@@ -893,13 +893,24 @@
                 // Filter PCS revisions by PCSID
                 else if (param.DropdownSource == "pcs" && param.DependsOn == "PCSID")
                 {
+                    Console.WriteLine($"Filtering PCS revisions by PCSID = {dependencyValue}");
+                    var plantId = GetParameterValue("PLANTID");
+                    Console.WriteLine($"PlantID = {plantId}");
+                    
                     dataToProcess = dataToProcess.Where(item =>
                     {
                         var pcsId = GetDropdownValue(item, "PCSName");
-                        var plantId = GetParameterValue("PLANTID");
                         var itemPlantId = GetDropdownValue(item, "PlantID");
-                        return pcsId == dependencyValue && itemPlantId == plantId;
+                        var matches = pcsId == dependencyValue && itemPlantId == plantId;
+                        if (matches)
+                        {
+                            var revision = GetDropdownValue(item, "Revision");
+                            Console.WriteLine($"Found matching PCS item with revision: {revision}");
+                        }
+                        return matches;
                     }).ToList();
+                    
+                    Console.WriteLine($"After filtering: {dataToProcess.Count()} PCS items with revisions for PCS {dependencyValue}");
                 }
             }
         }

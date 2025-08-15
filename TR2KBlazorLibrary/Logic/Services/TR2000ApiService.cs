@@ -1,5 +1,6 @@
 using System.Net.Http;
 using System.Text.Json;
+using System.Linq;
 using Microsoft.Extensions.Logging;
 
 namespace TR2KBlazorLibrary.Logic.Services;
@@ -82,7 +83,36 @@ public class TR2000ApiService
             // Handle wrapper objects with arrays
             if (root.ValueKind == JsonValueKind.Object)
             {
-                foreach (var property in root.EnumerateObject())
+                var properties = root.EnumerateObject().ToList();
+                
+                // Special handling for properties endpoint with nested arrays
+                // Check for success=true pattern FIRST (same logic as deserializer)
+                if (properties.Any(p => p.Name == "success" && p.Value.ValueKind == JsonValueKind.True))
+                {
+                    // Get all nested arrays that start with "get"
+                    var nestedArrays = properties.Where(p => 
+                        p.Value.ValueKind == JsonValueKind.Array && 
+                        p.Name.StartsWith("get")).ToList();
+                    
+                    // If there are multiple "get" arrays, count all items
+                    if (nestedArrays.Count > 1)
+                    {
+                        return nestedArrays.Sum(arr => arr.Value.GetArrayLength());
+                    }
+                    // If there's only one "get" array, return its count
+                    else if (nestedArrays.Count == 1)
+                    {
+                        return nestedArrays[0].Value.GetArrayLength();
+                    }
+                    else
+                    {
+                        // No nested arrays, count as single object
+                        return 1;
+                    }
+                }
+                
+                // Fallback: Look for any array property
+                foreach (var property in properties)
                 {
                     if (property.Value.ValueKind == JsonValueKind.Array)
                     {

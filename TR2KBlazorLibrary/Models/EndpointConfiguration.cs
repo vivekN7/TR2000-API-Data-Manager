@@ -771,9 +771,9 @@ public static class EndpointRegistry
         new EndpointConfiguration
         {
             Key = "pcs_temperature_pressure",
-            Name = "Get temperature and pressure (NOT AVAILABLE)",
+            Name = "Get temperature and pressure",
             Section = "PCS",
-            Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}/temperature-pressure",
+            Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}/temp-pressures",
             TableName = "pcs_temperature_pressure",
             HttpMethod = "GET",
             Parameters = new()
@@ -811,7 +811,7 @@ public static class EndpointRegistry
                     DependsOn = "PCSID"
                 }
             },
-            Description = "Temperature and pressure endpoint (returns 404 - not implemented)",
+            Description = "Temperature and pressure endpoint",
             ResponseFields = new()
             {
                 new ResponseField { Name = "Temperature", Type = "[String]" },

@@ -31,6 +31,57 @@ public class ApiResponseDeserializer
                 // Check if this looks like a TR2000 wrapper (has a single array property starting with "get")
                 var properties = root.EnumerateObject().ToList();
                 
+                // Special handling for properties endpoint with nested arrays
+                // Check for success=true pattern FIRST before other logic
+                if (properties.Any(p => p.Name == "success" && p.Value.ValueKind == JsonValueKind.True))
+                {
+                    // Get all nested arrays that start with "get"
+                    var nestedArrays = properties.Where(p => 
+                        p.Value.ValueKind == JsonValueKind.Array && 
+                        p.Name.StartsWith("get")).ToList();
+                    
+                    // If there are multiple "get" arrays, flatten them all
+                    if (nestedArrays.Count > 1)
+                    {
+                        var result = new List<Dictionary<string, object>>();
+                        
+                        // For each nested array, add its items with parent context
+                        foreach (var arrayProp in nestedArrays)
+                        {
+                            var arrayName = arrayProp.Name;
+                            foreach (var item in arrayProp.Value.EnumerateArray())
+                            {
+                                var flattenedItem = ParseObject(item);
+                                
+                                // Add parent object properties for context
+                                foreach (var prop in properties)
+                                {
+                                    if (prop.Value.ValueKind != JsonValueKind.Array && prop.Name != "success")
+                                    {
+                                        flattenedItem[$"Parent_{prop.Name}"] = ParseValue(prop.Value);
+                                    }
+                                }
+                                
+                                // Add array source name for clarity
+                                flattenedItem["_Source"] = arrayName;
+                                result.Add(flattenedItem);
+                            }
+                        }
+                        
+                        return result;
+                    }
+                    // If there's only one "get" array, just return it normally
+                    else if (nestedArrays.Count == 1)
+                    {
+                        return ParseArray(nestedArrays[0].Value);
+                    }
+                    else
+                    {
+                        // No nested arrays, return single object
+                        return new List<Dictionary<string, object>> { ParseObject(root) };
+                    }
+                }
+                
                 // Look for the main data array (usually starts with "get" like "getPCS", "getIssues", etc.)
                 var mainArrayProperty = properties.FirstOrDefault(p => 
                     p.Value.ValueKind == JsonValueKind.Array && 
@@ -39,12 +90,6 @@ public class ApiResponseDeserializer
                 if (mainArrayProperty.Value.ValueKind == JsonValueKind.Array)
                 {
                     return ParseArray(mainArrayProperty.Value);
-                }
-                
-                // If no main array found but has success=true, treat as single object response
-                if (properties.Any(p => p.Name == "success" && p.Value.ValueKind == JsonValueKind.True))
-                {
-                    return new List<Dictionary<string, object>> { ParseObject(root) };
                 }
                 
                 // Fallback: Look for any array property

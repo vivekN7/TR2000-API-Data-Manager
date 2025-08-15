@@ -48,9 +48,9 @@
                     <div class="mb-3">
                         <label class="form-label">2. Enter Parameters:</label>
                         <div class="row">
-                        @foreach (var param in SelectedEndpoint.Parameters)
+                        @foreach (var param in SelectedEndpoint.Parameters.Where(p => p.IsRequired))
                             {
-                                <div class="col-md-4">
+                                <div class="col-md-6">
                                     <label class="form-label small">
                                         @param.DisplayName
                                         @if (param.IsRequired)
@@ -138,14 +138,24 @@
                         <strong>Template:</strong> <code class="text-info small">/@SelectedEndpoint.Endpoint | @SelectedEndpoint.HttpMethod</code>
                     </div>
                     <div class="mb-1">
-                        <strong>API URL:</strong> <a href="@($"https://equinor.pipespec-api.presight.com/{SelectedEndpoint.Endpoint}")" target="_blank" class="text-decoration-none">
-                            <code class="text-success small">https://equinor.pipespec-api.presight.com/@SelectedEndpoint.Endpoint</code>
-                        </a>
+                        <strong>API URL:</strong> <code class="text-success small">https://equinor.pipespec-api.presight.com/@SelectedEndpoint.Endpoint</code>
                     </div>
                     @if (SelectedEndpoint.Parameters.Any())
                     {
                         <div class="mb-1">
-                            <strong>Generated:</strong> <code class="text-primary small">https://equinor.pipespec-api.presight.com/@GetFinalEndpoint()</code>
+                            <strong>Generated:</strong> 
+                            <a href="@($"https://equinor.pipespec-api.presight.com/{GetFinalEndpoint()}")" target="_blank" class="text-decoration-none">
+                                <code class="text-primary small">https://equinor.pipespec-api.presight.com/@GetFinalEndpoint()</code>
+                            </a>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mb-1">
+                            <strong>Generated:</strong> 
+                            <a href="@($"https://equinor.pipespec-api.presight.com/{SelectedEndpoint.Endpoint}")" target="_blank" class="text-decoration-none">
+                                <code class="text-primary small">https://equinor.pipespec-api.presight.com/@SelectedEndpoint.Endpoint</code>
+                            </a>
                         </div>
                     }
                     <div class="row mb-1">

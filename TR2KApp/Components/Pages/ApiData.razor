@@ -1,5 +1,6 @@
 @page "/api-data"
 @rendermode InteractiveServer
+@using TR2KApp.Components.Shared
 @using TR2KBlazorLibrary.Logic.Services
 @using TR2KBlazorLibrary.Models
 @using TR2KBlazorLibrary.Models.DatabaseModels
@@ -52,20 +53,19 @@
                                     </label>
                                     @if (param.Type == "dropdown" && param.DropdownSource != null)
                                     {
-                                        <select class="form-select form-select-sm" 
-                                                value="@GetParameterValue(param.Name)"
-                                                @onchange="@(async e => await SetParameterValue(param.Name, e.Value?.ToString() ?? ""))"
-                                                disabled="@(IsLoading || !DropdownData.ContainsKey(param.DropdownSource) || (param.DependsOn != null && string.IsNullOrEmpty(GetParameterValue(param.DependsOn))))">
-                                            <option value="">Choose...</option>
-                                            @if (DropdownData.ContainsKey(param.DropdownSource))
-                                            {
-                                                var items = GetUniqueAndSortedDropdownItems(param);
-                                                @foreach (var item in items)
-                                                {
-                                                    <option value="@item.Value">@item.Display</option>
-                                                }
-                                            }
-                                        </select>
+                                        var items = DropdownData.ContainsKey(param.DropdownSource) 
+                                            ? GetUniqueAndSortedDropdownItems(param) 
+                                            : new List<(string, string)>();
+                                        var isDisabled = IsLoading || 
+                                                        !DropdownData.ContainsKey(param.DropdownSource) || 
+                                                        (param.DependsOn != null && string.IsNullOrEmpty(GetParameterValue(param.DependsOn)));
+                                        
+                                        <SearchableDropdown 
+                                            Value="@GetParameterValue(param.Name)"
+                                            ValueChanged="@(async (value) => await SetParameterValue(param.Name, value))"
+                                            Items="@items"
+                                            Placeholder="Type to search..."
+                                            Disabled="@isDisabled" />
                                     }
                                     else if (param.Type == "int")
                                     {

@@ -1,0 +1,204 @@
+@using Microsoft.AspNetCore.Components.Web
+@inherits ComponentBase
+
+<div class="searchable-dropdown" @onclick:stopPropagation="true">
+    <div class="input-group">
+        <input type="text" 
+               class="form-control form-control-sm" 
+               placeholder="@Placeholder"
+               value="@searchText"
+               @oninput="OnSearchInput"
+               @onfocus="OnFocus"
+               @onblur="OnBlur"
+               disabled="@Disabled" />
+        <button class="btn btn-outline-secondary btn-sm" 
+                type="button"
+                @onclick="ToggleDropdown"
+                disabled="@Disabled">
+            <span class="dropdown-toggle-icon">▼</span>
+        </button>
+    </div>
+    
+    @if (isOpen && filteredItems.Any())
+    {
+        <div class="dropdown-menu show" style="max-height: 300px; overflow-y: auto; width: 100%;">
+            @foreach (var item in filteredItems)
+            {
+                <button class="dropdown-item @(item.Value == Value ? "active" : "")" 
+                        type="button"
+                        @onclick="@(() => SelectItem(item))"
+                        @onmousedown:preventDefault="true">
+                    @item.Display
+                </button>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .searchable-dropdown {
+        position: relative;
+    }
+    
+    .searchable-dropdown .dropdown-menu {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        z-index: 1050;
+        display: block;
+        margin-top: 0.125rem;
+        font-size: 0.875rem;
+        background-color: #fff;
+        border: 1px solid rgba(0,0,0,.15);
+        border-radius: 0.25rem;
+        box-shadow: 0 0.5rem 1rem rgba(0,0,0,.175);
+    }
+    
+    .searchable-dropdown .dropdown-item {
+        display: block;
+        width: 100%;
+        padding: 0.25rem 1rem;
+        clear: both;
+        font-weight: 400;
+        color: #212529;
+        text-align: inherit;
+        white-space: nowrap;
+        background-color: transparent;
+        border: 0;
+        cursor: pointer;
+    }
+    
+    .searchable-dropdown .dropdown-item:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .searchable-dropdown .dropdown-item.active {
+        background-color: #0d6efd;
+        color: #fff;
+    }
+    
+    .dropdown-toggle-icon {
+        font-size: 0.7rem;
+    }
+</style>
+
+@code {
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public List<(string Value, string Display)> Items { get; set; } = new();
+    [Parameter] public string Placeholder { get; set; } = "Type to search...";
+    [Parameter] public bool Disabled { get; set; }
+    
+    private string searchText = "";
+    private bool isOpen = false;
+    private List<(string Value, string Display)> filteredItems = new();
+    private System.Timers.Timer? blurTimer;
+    
+    protected override void OnInitialized()
+    {
+        filteredItems = Items;
+        UpdateSearchText();
+    }
+    
+    protected override void OnParametersSet()
+    {
+        UpdateSearchText();
+        if (!isOpen)
+        {
+            filteredItems = Items;
+        }
+    }
+    
+    private void UpdateSearchText()
+    {
+        // Show the selected item's display text when not searching
+        if (!string.IsNullOrEmpty(Value))
+        {
+            var selectedItem = Items.FirstOrDefault(i => i.Value == Value);
+            if (selectedItem != default)
+            {
+                searchText = selectedItem.Display;
+            }
+        }
+        else
+        {
+            searchText = "";
+        }
+    }
+    
+    private void OnSearchInput(ChangeEventArgs e)
+    {
+        searchText = e.Value?.ToString() ?? "";
+        FilterItems();
+        isOpen = true;
+    }
+    
+    private void FilterItems()
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+        {
+            filteredItems = Items;
+        }
+        else
+        {
+            // Case-insensitive search
+            var searchLower = searchText.ToLower();
+            filteredItems = Items
+                .Where(i => i.Display.ToLower().Contains(searchLower) || 
+                           i.Value.ToLower().Contains(searchLower))
+                .ToList();
+        }
+    }
+    
+    private void OnFocus()
+    {
+        isOpen = true;
+        searchText = ""; // Clear text to show all options
+        FilterItems();
+    }
+    
+    private void OnBlur()
+    {
+        // Delay closing to allow click events to fire
+        blurTimer?.Stop();
+        blurTimer = new System.Timers.Timer(200);
+        blurTimer.Elapsed += (s, e) =>
+        {
+            InvokeAsync(() =>
+            {
+                isOpen = false;
+                UpdateSearchText(); // Restore selected item text
+                StateHasChanged();
+            });
+            blurTimer?.Dispose();
+        };
+        blurTimer.Start();
+    }
+    
+    private void ToggleDropdown()
+    {
+        isOpen = !isOpen;
+        if (isOpen)
+        {
+            searchText = "";
+            FilterItems();
+        }
+        else
+        {
+            UpdateSearchText();
+        }
+    }
+    
+    private async Task SelectItem((string Value, string Display) item)
+    {
+        Value = item.Value;
+        searchText = item.Display;
+        isOpen = false;
+        await ValueChanged.InvokeAsync(item.Value);
+    }
+    
+    public void Dispose()
+    {
+        blurTimer?.Dispose();
+    }
+}

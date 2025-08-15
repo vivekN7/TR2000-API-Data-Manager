@@ -38,7 +38,7 @@ cd /workspace/TR2000/TR2K/TR2KApp
 # Access at: http://localhost:5003/api-data
 ```
 
-## Latest Updates (2025-08-14 - End of Day Session 2)
+## Latest Updates (2025-08-15 - Session 3)
 
 ### Major Improvements Completed Today:
 1. **✅ Fixed pipe_element_references table schema**
@@ -68,18 +68,27 @@ cd /workspace/TR2000/TR2K/TR2KApp
      - PCS ID selection (filtered by selected plant)
      - Revision selection (filtered by selected PCS)
 
-### Latest Fixes (2025-08-15):
-1. **✅ Fixed PCS Dropdown Population**:
-   - PCS dropdowns now populate correctly when plant is selected
-   - Fixed field name mismatch (PCS vs PCSName) between API and database
-   - Dropdowns clear when parent selection changes for better UX
-   - Removed loading flag that was disabling all dropdowns
+### Latest Fixes (2025-08-15 - Session 3):
+1. **✅ Fixed All PCS Detail Endpoints**:
+   - Corrected endpoint URLs to match actual API patterns
+   - Properties: `/properties`
+   - Pipe sizes: `/pipe-sizes`
+   - Pipe elements: `/pipe-elements`
+   - Valve elements: `/valve-elements`
+   - Embedded notes: `/embedded-notes`
+   - Temperature/pressure: `/temp-pressures` (not `/temperature-pressure`)
+   - Removed all "NOT AVAILABLE" and "404 not implemented" labels
 
-### Known Issue - PCS Detail Endpoints:
-- **API Endpoints Not Verified**: The PCS detail endpoints (header, temperature, pressure, etc.) return 404
-- Current URLs are estimates: `plants/{plantid}/pcs/{pcsid}/rev/{revision}/header`
-- Need to verify correct API endpoint patterns with TR2000 API documentation
-- All PCS detail endpoints marked as "ENDPOINT NOT VERIFIED" in UI
+2. **✅ Fixed Properties Endpoint Deserialization**:
+   - Properties endpoint returns nested arrays (getPCSMapping, getPCSManufacturers)
+   - Updated deserializer to flatten multiple nested arrays into separate table rows
+   - Each nested array item now shows as individual row with parent context
+   - Test Connection button now correctly counts all nested items
+
+3. **✅ Fixed Test Connection Button**:
+   - Now properly counts records for endpoints with nested arrays
+   - Uses same logic as deserializer for consistency
+   - Shows accurate record count for all endpoint types
 
 ## Latest Fixes (2025-08-14 - Earlier Sessions)
 1. **✅ Reference Table Columns**: Fixed to match API response structure
@@ -225,17 +234,13 @@ cd /workspace/TR2000/TR2K/TR2KApp
 
 ## Next Steps / Remaining Work
 
-### IMMEDIATE PRIORITY (Next Session):
-1. **Fix PCS Dropdown Population Issue**:
-   - Investigate why PCS ID dropdown isn't loading when Plant is selected
-   - Check if it's related to how the ApiData.razor loads dependent dropdowns
-   - May need to update the LoadDropdownData method to handle PCS table properly
-   - Test with existing working dropdowns (Issues section) for comparison
-
-2. **Verify PCS API Endpoints**:
-   - Current URLs are estimates: `plants/{plantid}/pcs/{pcsid}/rev/{revision}/...`
-   - Need to test actual API endpoints to confirm correct URL patterns
-   - Update EndpointConfiguration.cs with correct URLs once verified
+### IMMEDIATE PRIORITY (Next Session - Section 4: VDS):
+1. **Add VDS Endpoints**:
+   - Get VDS list
+   - Get subsegments and properties
+   - Need to determine correct API endpoint patterns for VDS
+   - Create corresponding database tables
+   - Configure endpoints in EndpointConfiguration.cs
 
 ### Future Work:
 1. **Add Remaining API Sections**:
@@ -339,21 +344,27 @@ curl -s "https://equinor.pipespec-api.presight.com/plants/34/issues/rev/1/pcs" |
    - Verify PCS data exists in database after importing "Get PCS list"
 
 ---
-Last Updated: 2025-08-15
+Last Updated: 2025-08-15 (Session 3)
 ## Summary of Recent Major Fixes:
+- ✅ FIXED: All PCS detail endpoint URLs corrected to match actual API patterns
+- ✅ FIXED: Properties endpoint deserializer now handles multiple nested arrays
+- ✅ FIXED: Test Connection button correctly counts records in nested arrays
+- ✅ FIXED: Temperature/pressure endpoint uses correct URL (/temp-pressures)
 - ✅ FIXED: PCS dropdown population issue - dropdowns now work correctly
 - ✅ FIXED: All reference table column mismatches resolved  
 - ✅ FIXED: PlantID now supports alphanumeric values (e.g., "JSV")
 - ✅ FIXED: Endpoint parameter types corrected in UI display (PLANTID=[String], ISSUEREV=[String])
 - ✅ FIXED: Data import now clears tables to mirror API responses exactly
 - ✅ All reference endpoints (PCS, SC, VSM, VDS, EDS, MDS, VSK, ESK) working perfectly
+- ✅ All PCS detail endpoints (properties, pipe-sizes, pipe-elements, valve-elements, embedded-notes, temp-pressures) working perfectly
 - ✅ Database schema updated to support TEXT for PlantID
-- ✅ Latest changes committed locally (commit 37c5c76) - NOT pushed to GitHub
+- ✅ Latest changes committed and pushed to GitHub (commit 9ab06bd)
 
 ## Application Status:
 - **Functionality**: ~98% complete
 - **All major features working**
-- **Ready for production testing**
+- **PCS Section**: Fully operational with all 7 endpoints
+- **Ready for Section 4: VDS implementation**
 
 ## Important Notes for Next Session:
 1. **DO NOT push to GitHub without permission**

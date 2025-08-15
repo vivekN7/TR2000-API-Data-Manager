@@ -89,7 +89,26 @@ public class ApiResponseDeserializer
                 
                 if (mainArrayProperty.Value.ValueKind == JsonValueKind.Array)
                 {
-                    return ParseArray(mainArrayProperty.Value);
+                    var result = ParseArray(mainArrayProperty.Value);
+                    
+                    // Add common header fields to each row
+                    var headerFields = properties.Where(p => 
+                        p.Value.ValueKind != JsonValueKind.Array && 
+                        p.Name != "success").ToList();
+                    
+                    if (headerFields.Any() && result.Any())
+                    {
+                        foreach (var item in result)
+                        {
+                            foreach (var headerField in headerFields)
+                            {
+                                // Add header fields to each row
+                                item[headerField.Name] = ParseValue(headerField.Value);
+                            }
+                        }
+                    }
+                    
+                    return result;
                 }
                 
                 // Fallback: Look for any array property

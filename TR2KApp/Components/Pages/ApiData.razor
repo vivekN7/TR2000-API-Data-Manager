@@ -590,26 +590,50 @@
     
     private IEnumerable<string> GetTableColumns()
     {
-        if (ImportedData == null || !ImportedData.Any()) return Enumerable.Empty<string>();
+        var columns = new List<string>();
         
-        var firstItem = ImportedData.First();
-        if (firstItem is IDictionary<string, object> dict)
+        // First add the input parameters as columns (for database primary keys)
+        if (SelectedEndpoint != null)
         {
-            return dict.Keys.Where(k => k != "Id" && k != "CreatedDate" && k != "ModifiedDate");
+            foreach (var param in SelectedEndpoint.Parameters.Where(p => p.IsRequired))
+            {
+                columns.Add($"[Input] {param.Name}");
+            }
         }
         
-        // Cast to object first to avoid dynamic issues
-        object obj = firstItem;
-        var properties = obj.GetType().GetProperties();
-        return properties
-            .Where(p => p.Name != "Id" && p.Name != "CreatedDate" && p.Name != "ModifiedDate")
-            .Select(p => p.Name);
+        // Then add the data columns
+        if (ImportedData != null && ImportedData.Any())
+        {
+            var firstItem = ImportedData.First();
+            if (firstItem is IDictionary<string, object> dict)
+            {
+                columns.AddRange(dict.Keys.Where(k => k != "Id" && k != "CreatedDate" && k != "ModifiedDate"));
+            }
+            else
+            {
+                // Cast to object first to avoid dynamic issues
+                object obj = firstItem;
+                var properties = obj.GetType().GetProperties();
+                columns.AddRange(properties
+                    .Where(p => p.Name != "Id" && p.Name != "CreatedDate" && p.Name != "ModifiedDate")
+                    .Select(p => p.Name));
+            }
+        }
+        
+        return columns;
     }
     
     private object GetCellValue(dynamic row, string columnName)
     {
         try
         {
+            // Handle input parameter columns
+            if (columnName.StartsWith("[Input] "))
+            {
+                var paramName = columnName.Replace("[Input] ", "");
+                return ParameterValues.ContainsKey(paramName) ? ParameterValues[paramName] : "";
+            }
+            
             if (row is IDictionary<string, object> dict)
             {
                 return dict.ContainsKey(columnName) ? dict[columnName]?.ToString() ?? "" : "";
@@ -1031,10 +1055,10 @@
                     }).ToList();
                     Console.WriteLine($"After filtering: {dataToProcess.Count()} PCS items for plant {dependencyValue}");
                 }
-                // Filter PCS revisions by PCSID
-                else if (param.DropdownSource == "pcs" && param.DependsOn == "PCSID")
+                // Filter PCS revisions by PCSNAME
+                else if (param.DropdownSource == "pcs" && param.DependsOn == "PCSNAME")
                 {
-                    Console.WriteLine($"Filtering PCS revisions by PCSID = {dependencyValue}");
+                    Console.WriteLine($"Filtering PCS revisions by PCSNAME = {dependencyValue}");
                     var plantId = GetParameterValue("PLANTID");
                     Console.WriteLine($"PlantID = {plantId}");
                     

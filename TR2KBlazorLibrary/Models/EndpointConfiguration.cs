@@ -48,7 +48,7 @@ public static class EndpointRegistry
             TableName = "operators",
             HttpMethod = "GET",
             Parameters = new(),
-            Description = "Retrieve all operators",
+            Description = "Retrieve all operators - Missing API URL in endpoint details",
             ResponseFields = new()
             {
                 new ResponseField { Name = "OperatorID", Type = "[Int32]" },
@@ -102,7 +102,7 @@ public static class EndpointRegistry
             TableName = "plants",
             HttpMethod = "GET",
             Parameters = new(),
-            Description = "Retrieve all plants across all operators",
+            Description = "Retrieve all plants across all operators - Missing API URL in endpoint details",
             ResponseFields = new()
             {
                 new ResponseField { Name = "OperatorID", Type = "[Int32]" },
@@ -136,7 +136,7 @@ public static class EndpointRegistry
                     Type = "dropdown",
                     DropdownSource = "plants",
                     ValueField = "PlantID",
-                    DisplayField = "PlantID"
+                    DisplayField = "LongDescription"
                 }
             },
             Description = "Retrieve a specific plant by ID",
@@ -151,7 +151,21 @@ public static class EndpointRegistry
                 new ResponseField { Name = "CommonLibPlantCode", Type = "[String]" },
                 new ResponseField { Name = "InitialRevision", Type = "[String]" },
                 new ResponseField { Name = "AreaID", Type = "[Int32]" },
-                new ResponseField { Name = "Area", Type = "[String]" }
+                new ResponseField { Name = "Area", Type = "[String]" },
+                new ResponseField { Name = "EnableEmbeddedNote", Type = "[String]" },
+                new ResponseField { Name = "CategoryID", Type = "[String]" },
+                new ResponseField { Name = "Category", Type = "[String]" },
+                new ResponseField { Name = "DocumentSpaceLink", Type = "[String]" },
+                new ResponseField { Name = "EnableCopyPCSFromPlant", Type = "[String]" },
+                new ResponseField { Name = "OverLength", Type = "[String]" },
+                new ResponseField { Name = "PCSQA", Type = "[String]" },
+                new ResponseField { Name = "EDSMJ", Type = "[String]" },
+                new ResponseField { Name = "CelsiusBar", Type = "[String]" },
+                new ResponseField { Name = "WebInfoText", Type = "[String]" },
+                new ResponseField { Name = "BoltTensionText", Type = "[String]" },
+                new ResponseField { Name = "Visible", Type = "[String]" },
+                new ResponseField { Name = "WindowsRemarkText", Type = "[String]" },
+                new ResponseField { Name = "UserProtected", Type = "[String]" }
             }
         },
         
@@ -174,7 +188,7 @@ public static class EndpointRegistry
                     Type = "dropdown",
                     DropdownSource = "plants",
                     ValueField = "PlantID",
-                    DisplayField = "ShortDescription"
+                    DisplayField = "LongDescription"
                 }
             },
             Description = "Retrieve issue revisions for a specific plant",
@@ -201,7 +215,10 @@ public static class EndpointRegistry
                 new ResponseField { Name = "SCRevision", Type = "[String]" },
                 new ResponseField { Name = "SCRevDate", Type = "[String]" },
                 new ResponseField { Name = "VSMRevision", Type = "[String]" },
-                new ResponseField { Name = "VSMRevDate", Type = "[String]" }
+                new ResponseField { Name = "VSMRevDate", Type = "[String]" },
+                new ResponseField { Name = "UserName", Type = "[String]" },
+                new ResponseField { Name = "UserEntryTime", Type = "[String]" },
+                new ResponseField { Name = "UserProtected", Type = "[String]" }
             }
         },
         
@@ -224,7 +241,7 @@ public static class EndpointRegistry
                     Type = "dropdown",
                     DropdownSource = "plants",
                     ValueField = "PlantID",
-                    DisplayField = "ShortDescription"
+                    DisplayField = "LongDescription"
                 },
                 new EndpointParameter
                 {
@@ -274,7 +291,7 @@ public static class EndpointRegistry
                     Type = "dropdown",
                     DropdownSource = "plants",
                     ValueField = "PlantID",
-                    DisplayField = "ShortDescription"
+                    DisplayField = "LongDescription"
                 },
                 new EndpointParameter
                 {
@@ -320,7 +337,7 @@ public static class EndpointRegistry
                     Type = "dropdown",
                     DropdownSource = "plants",
                     ValueField = "PlantID",
-                    DisplayField = "ShortDescription"
+                    DisplayField = "LongDescription"
                 },
                 new EndpointParameter
                 {
@@ -366,7 +383,7 @@ public static class EndpointRegistry
                     Type = "dropdown",
                     DropdownSource = "plants",
                     ValueField = "PlantID",
-                    DisplayField = "ShortDescription"
+                    DisplayField = "LongDescription"
                 },
                 new EndpointParameter
                 {
@@ -412,7 +429,7 @@ public static class EndpointRegistry
                     Type = "dropdown",
                     DropdownSource = "plants",
                     ValueField = "PlantID",
-                    DisplayField = "ShortDescription"
+                    DisplayField = "LongDescription"
                 },
                 new EndpointParameter
                 {
@@ -458,7 +475,7 @@ public static class EndpointRegistry
                     Type = "dropdown",
                     DropdownSource = "plants",
                     ValueField = "PlantID",
-                    DisplayField = "ShortDescription"
+                    DisplayField = "LongDescription"
                 },
                 new EndpointParameter
                 {
@@ -505,7 +522,7 @@ public static class EndpointRegistry
                     Type = "dropdown",
                     DropdownSource = "plants",
                     ValueField = "PlantID",
-                    DisplayField = "ShortDescription"
+                    DisplayField = "LongDescription"
                 },
                 new EndpointParameter
                 {
@@ -549,7 +566,7 @@ public static class EndpointRegistry
                     Type = "dropdown",
                     DropdownSource = "plants",
                     ValueField = "PlantID",
-                    DisplayField = "ShortDescription"
+                    DisplayField = "LongDescription"
                 },
                 new EndpointParameter
                 {
@@ -593,7 +610,7 @@ public static class EndpointRegistry
                     Type = "dropdown",
                     DropdownSource = "plants",
                     ValueField = "PlantID",
-                    DisplayField = "ShortDescription"
+                    DisplayField = "LongDescription"
                 },
                 new EndpointParameter
                 {
@@ -610,12 +627,18 @@ public static class EndpointRegistry
             Description = "Retrieve pipe element references for an issue",
             ResponseFields = new()
             {
-                new ResponseField { Name = "ElementType", Type = "[String]" },
-                new ResponseField { Name = "ElementCode", Type = "[String]" },
-                new ResponseField { Name = "Description", Type = "[String]" },
-                new ResponseField { Name = "Reference", Type = "[String]" },
-                new ResponseField { Name = "Standard", Type = "[String]" },
-                new ResponseField { Name = "Material", Type = "[String]" }
+                new ResponseField { Name = "ElementGroup", Type = "[String]" },
+                new ResponseField { Name = "DimensionStandard", Type = "[String]" },
+                new ResponseField { Name = "ProductForm", Type = "[String]" },
+                new ResponseField { Name = "MaterialGrade", Type = "[String]" },
+                new ResponseField { Name = "MDS", Type = "[String]" },
+                new ResponseField { Name = "MDSRevision", Type = "[String]" },
+                new ResponseField { Name = "Area", Type = "[String]" },
+                new ResponseField { Name = "ElementID", Type = "[Int32]" },
+                new ResponseField { Name = "Revision", Type = "[String]" },
+                new ResponseField { Name = "RevDate", Type = "[String]" },
+                new ResponseField { Name = "Status", Type = "[String]" },
+                new ResponseField { Name = "Delta", Type = "[String]" }
             }
         },
         
@@ -639,7 +662,47 @@ public static class EndpointRegistry
                     Type = "dropdown",
                     DropdownSource = "plants",
                     ValueField = "PlantID",
-                    DisplayField = "ShortDescription"
+                    DisplayField = "LongDescription"
+                },
+                new EndpointParameter 
+                { 
+                    Name = "NAMEFILTER", 
+                    DisplayName = "Name Filter", 
+                    IsRequired = false, 
+                    Type = "string",
+                    ParameterLocation = "query"
+                },
+                new EndpointParameter 
+                { 
+                    Name = "STATUSFILTER", 
+                    DisplayName = "Status Filter", 
+                    IsRequired = false, 
+                    Type = "string",
+                    ParameterLocation = "query"
+                },
+                new EndpointParameter 
+                { 
+                    Name = "NOTEID", 
+                    DisplayName = "Note ID", 
+                    IsRequired = false, 
+                    Type = "int",
+                    ParameterLocation = "query"
+                },
+                new EndpointParameter 
+                { 
+                    Name = "VDS", 
+                    DisplayName = "VDS", 
+                    IsRequired = false, 
+                    Type = "string",
+                    ParameterLocation = "query"
+                },
+                new EndpointParameter 
+                { 
+                    Name = "ELEMENTID", 
+                    DisplayName = "Element ID", 
+                    IsRequired = false, 
+                    Type = "int",
+                    ParameterLocation = "query"
                 }
             },
             Description = "Retrieve PCS list for a specific plant",
@@ -667,9 +730,9 @@ public static class EndpointRegistry
         new EndpointConfiguration
         {
             Key = "pcs_details",
-            Name = "Get PCS details",
+            Name = "Get header and properties",
             Section = "PCS",
-            Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}",
+            Endpoint = "plants/{plantid}/pcs/{pcsname}/rev/{revision}",
             TableName = "pcs_details",
             HttpMethod = "GET",
             Parameters = new()
@@ -682,12 +745,12 @@ public static class EndpointRegistry
                     Type = "dropdown",
                     DropdownSource = "plants",
                     ValueField = "PlantID",
-                    DisplayField = "ShortDescription"
+                    DisplayField = "LongDescription"
                 },
                 new EndpointParameter 
                 { 
-                    Name = "PCSID", 
-                    DisplayName = "Select PCS", 
+                    Name = "PCSNAME", 
+                    DisplayName = "PCS Name", 
                     IsRequired = true, 
                     Type = "dropdown",
                     DropdownSource = "pcs",
@@ -722,7 +785,7 @@ public static class EndpointRegistry
             Key = "pcs_properties",
             Name = "Get PCS properties",
             Section = "PCS",
-            Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}/properties",
+            Endpoint = "plants/{plantid}/pcs/{pcsname}/rev/{revision}/properties",
             TableName = "pcs_properties",
             HttpMethod = "GET",
             Parameters = new()
@@ -735,12 +798,12 @@ public static class EndpointRegistry
                     Type = "dropdown",
                     DropdownSource = "plants",
                     ValueField = "PlantID",
-                    DisplayField = "ShortDescription"
+                    DisplayField = "LongDescription"
                 },
                 new EndpointParameter 
                 { 
-                    Name = "PCSID", 
-                    DisplayName = "Select PCS", 
+                    Name = "PCSNAME", 
+                    DisplayName = "PCS Name", 
                     IsRequired = true, 
                     Type = "dropdown",
                     DropdownSource = "pcs",
@@ -774,7 +837,7 @@ public static class EndpointRegistry
             Key = "pcs_temperature_pressure",
             Name = "Get temperature and pressure",
             Section = "PCS",
-            Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}/temp-pressures",
+            Endpoint = "plants/{plantid}/pcs/{pcsname}/rev/{revision}/temp-pressures",
             TableName = "pcs_temperature_pressure",
             HttpMethod = "GET",
             Parameters = new()
@@ -787,12 +850,12 @@ public static class EndpointRegistry
                     Type = "dropdown",
                     DropdownSource = "plants",
                     ValueField = "PlantID",
-                    DisplayField = "ShortDescription"
+                    DisplayField = "LongDescription"
                 },
                 new EndpointParameter 
                 { 
-                    Name = "PCSID", 
-                    DisplayName = "Select PCS", 
+                    Name = "PCSNAME", 
+                    DisplayName = "PCS Name", 
                     IsRequired = true, 
                     Type = "dropdown",
                     DropdownSource = "pcs",
@@ -827,7 +890,7 @@ public static class EndpointRegistry
             Key = "pcs_pipe_size",
             Name = "Get pipe sizes",
             Section = "PCS",
-            Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}/pipe-sizes",
+            Endpoint = "plants/{plantid}/pcs/{pcsname}/rev/{revision}/pipe-sizes",
             TableName = "pcs_pipe_size",
             HttpMethod = "GET",
             Parameters = new()
@@ -840,12 +903,12 @@ public static class EndpointRegistry
                     Type = "dropdown",
                     DropdownSource = "plants",
                     ValueField = "PlantID",
-                    DisplayField = "ShortDescription"
+                    DisplayField = "LongDescription"
                 },
                 new EndpointParameter 
                 { 
-                    Name = "PCSID", 
-                    DisplayName = "Select PCS", 
+                    Name = "PCSNAME", 
+                    DisplayName = "PCS Name", 
                     IsRequired = true, 
                     Type = "dropdown",
                     DropdownSource = "pcs",
@@ -880,7 +943,7 @@ public static class EndpointRegistry
             Key = "pcs_pipe_element",
             Name = "Get pipe elements",
             Section = "PCS",
-            Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}/pipe-elements",
+            Endpoint = "plants/{plantid}/pcs/{pcsname}/rev/{revision}/pipe-elements",
             TableName = "pcs_pipe_element",
             HttpMethod = "GET",
             Parameters = new()
@@ -893,12 +956,12 @@ public static class EndpointRegistry
                     Type = "dropdown",
                     DropdownSource = "plants",
                     ValueField = "PlantID",
-                    DisplayField = "ShortDescription"
+                    DisplayField = "LongDescription"
                 },
                 new EndpointParameter 
                 { 
-                    Name = "PCSID", 
-                    DisplayName = "Select PCS", 
+                    Name = "PCSNAME", 
+                    DisplayName = "PCS Name", 
                     IsRequired = true, 
                     Type = "dropdown",
                     DropdownSource = "pcs",
@@ -933,7 +996,7 @@ public static class EndpointRegistry
             Key = "pcs_valve_element",
             Name = "Get valve elements",
             Section = "PCS",
-            Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}/valve-elements",
+            Endpoint = "plants/{plantid}/pcs/{pcsname}/rev/{revision}/valve-elements",
             TableName = "pcs_valve_element",
             HttpMethod = "GET",
             Parameters = new()
@@ -946,12 +1009,12 @@ public static class EndpointRegistry
                     Type = "dropdown",
                     DropdownSource = "plants",
                     ValueField = "PlantID",
-                    DisplayField = "ShortDescription"
+                    DisplayField = "LongDescription"
                 },
                 new EndpointParameter 
                 { 
-                    Name = "PCSID", 
-                    DisplayName = "Select PCS", 
+                    Name = "PCSNAME", 
+                    DisplayName = "PCS Name", 
                     IsRequired = true, 
                     Type = "dropdown",
                     DropdownSource = "pcs",
@@ -986,7 +1049,7 @@ public static class EndpointRegistry
             Key = "pcs_embedded_note",
             Name = "Get embedded notes",
             Section = "PCS",
-            Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}/embedded-notes",
+            Endpoint = "plants/{plantid}/pcs/{pcsname}/rev/{revision}/embedded-notes",
             TableName = "pcs_embedded_note",
             HttpMethod = "GET",
             Parameters = new()
@@ -999,12 +1062,12 @@ public static class EndpointRegistry
                     Type = "dropdown",
                     DropdownSource = "plants",
                     ValueField = "PlantID",
-                    DisplayField = "ShortDescription"
+                    DisplayField = "LongDescription"
                 },
                 new EndpointParameter 
                 { 
-                    Name = "PCSID", 
-                    DisplayName = "Select PCS", 
+                    Name = "PCSNAME", 
+                    DisplayName = "PCS Name", 
                     IsRequired = true, 
                     Type = "dropdown",
                     DropdownSource = "pcs",

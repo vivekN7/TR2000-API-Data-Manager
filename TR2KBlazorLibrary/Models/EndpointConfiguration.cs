@@ -663,7 +663,8 @@ public static class EndpointRegistry
         },
         
         // Additional PCS endpoints
-        // PCS detail endpoints - returns more detailed information for a specific PCS revision
+        // PCS detail endpoints - all use the same API endpoint but represent different test scenarios
+        // Each one can be tested independently to verify the API returns PCS details
         new EndpointConfiguration
         {
             Key = "pcs_header",
@@ -719,7 +720,7 @@ public static class EndpointRegistry
         new EndpointConfiguration
         {
             Key = "pcs_temperature_pressure",
-            Name = "Get temperature and pressure (REMOVED - Use Get PCS details)",
+            Name = "Get temperature and pressure",
             Section = "PCS",
             Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}",
             TableName = "pcs_temperature_pressure",
@@ -759,7 +760,7 @@ public static class EndpointRegistry
                     DependsOn = "PCSID"
                 }
             },
-            Description = "Retrieve temperature and pressure data for a specific PCS",
+            Description = "Test temperature and pressure data retrieval for a specific PCS",
             ResponseFields = new()
             {
                 new ResponseField { Name = "Temperature", Type = "[String]" },
@@ -772,7 +773,7 @@ public static class EndpointRegistry
         new EndpointConfiguration
         {
             Key = "pcs_pipe_size",
-            Name = "Get pipe size (REMOVED - Use Get PCS details)",
+            Name = "Get pipe size",
             Section = "PCS",
             Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}",
             TableName = "pcs_pipe_size",
@@ -812,7 +813,7 @@ public static class EndpointRegistry
                     DependsOn = "PCSID"
                 }
             },
-            Description = "Retrieve pipe size data for a specific PCS",
+            Description = "Test pipe size data retrieval for a specific PCS",
             ResponseFields = new()
             {
                 new ResponseField { Name = "NominalSize", Type = "[String]" },
@@ -825,7 +826,7 @@ public static class EndpointRegistry
         new EndpointConfiguration
         {
             Key = "pcs_pipe_element",
-            Name = "Get pipe element (REMOVED - Use Get PCS details)",
+            Name = "Get pipe element",
             Section = "PCS",
             Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}",
             TableName = "pcs_pipe_element",
@@ -865,7 +866,7 @@ public static class EndpointRegistry
                     DependsOn = "PCSID"
                 }
             },
-            Description = "Retrieve pipe element data for a specific PCS",
+            Description = "Test pipe element data retrieval for a specific PCS",
             ResponseFields = new()
             {
                 new ResponseField { Name = "ElementID", Type = "[String]" },
@@ -878,7 +879,7 @@ public static class EndpointRegistry
         new EndpointConfiguration
         {
             Key = "pcs_valve_element",
-            Name = "Get valve element (REMOVED - Use Get PCS details)",
+            Name = "Get valve element",
             Section = "PCS",
             Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}",
             TableName = "pcs_valve_element",
@@ -918,7 +919,7 @@ public static class EndpointRegistry
                     DependsOn = "PCSID"
                 }
             },
-            Description = "Retrieve valve element data for a specific PCS",
+            Description = "Test valve element data retrieval for a specific PCS",
             ResponseFields = new()
             {
                 new ResponseField { Name = "ValveType", Type = "[String]" },
@@ -931,7 +932,7 @@ public static class EndpointRegistry
         new EndpointConfiguration
         {
             Key = "pcs_embedded_note",
-            Name = "Get embedded note (REMOVED - Use Get PCS details)",
+            Name = "Get embedded note",
             Section = "PCS",
             Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}",
             TableName = "pcs_embedded_note",
@@ -971,7 +972,7 @@ public static class EndpointRegistry
                     DependsOn = "PCSID"
                 }
             },
-            Description = "Retrieve embedded notes for a specific PCS",
+            Description = "Test embedded notes retrieval for a specific PCS",
             ResponseFields = new()
             {
                 new ResponseField { Name = "NoteID", Type = "[String]" },

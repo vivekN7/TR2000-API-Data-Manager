@@ -70,10 +70,29 @@ public class ApiResponseDeserializer
                         
                         return result;
                     }
-                    // If there's only one "get" array, just return it normally
+                    // If there's only one "get" array, parse it and add header fields
                     else if (nestedArrays.Count == 1)
                     {
-                        return ParseArray(nestedArrays[0].Value);
+                        var result = ParseArray(nestedArrays[0].Value);
+                        
+                        // Add common header fields to each row
+                        var headerFields = properties.Where(p => 
+                            p.Value.ValueKind != JsonValueKind.Array && 
+                            p.Name != "success").ToList();
+                        
+                        if (headerFields.Any() && result.Any())
+                        {
+                            _logger.LogInformation($"Adding {headerFields.Count} header fields to {result.Count} rows: {string.Join(", ", headerFields.Select(h => h.Name))}");
+                            foreach (var item in result)
+                            {
+                                foreach (var headerField in headerFields)
+                                {
+                                    item[headerField.Name] = ParseValue(headerField.Value);
+                                }
+                            }
+                        }
+                        
+                        return result;
                     }
                     else
                     {

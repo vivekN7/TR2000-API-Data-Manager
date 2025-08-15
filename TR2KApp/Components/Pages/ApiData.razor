@@ -5,7 +5,6 @@
 @using TR2KBlazorLibrary.Models.DatabaseModels
 @using System.Text
 @inject TR2000ApiService ApiService
-@inject DataImportService ImportService
 @inject ApiResponseDeserializer Deserializer
 @inject IJSRuntime JS
 
@@ -357,17 +356,25 @@
         
         try
         {
-            var result = await ImportService.ImportDataAsync(endpoint, overwriteExisting: true);
-            if (result.Success)
+            // Fetch data directly from API
+            var apiData = await ApiService.FetchDataAsync(endpoint);
+            var deserializedData = Deserializer.DeserializeApiResponse(apiData, endpoint);
+            
+            // Convert to list for display
+            var dataList = new List<dynamic>();
+            foreach (var item in deserializedData)
             {
-                StatusMessage = $"✅ Imported {result.RecordsImported} records successfully into '{SelectedEndpoint?.TableName}' table!";
-                ShowViewData = true;
-                await LoadImportedData();
+                dataList.Add(item);
             }
-            else
-            {
-                StatusMessage = $"❌ Import failed: {result.ErrorMessage}";
-            }
+            
+            ImportedData = dataList;
+            FilteredData = ImportedData;
+            ShowViewData = true;
+            
+            StatusMessage = $"✅ Fetched {dataList.Count} records from API!";
+            SearchText = ""; // Clear search
+            SortColumn = ""; // Clear sort
+            CurrentPage = 1; // Reset to first page
         }
         catch (Exception ex)
         {
@@ -433,30 +440,6 @@
         }
     }
     
-    private async Task LoadImportedData()
-    {
-        if (SelectedEndpoint == null) return;
-        
-        try
-        {
-            LoadingMessage = "Loading data from database...";
-            StateHasChanged();
-            
-            ImportedData = await ImportService.GetImportedDataAsync(SelectedEndpoint.TableName);
-            FilteredData = ImportedData; // Initialize filtered data
-            SearchText = ""; // Clear search
-            SortColumn = ""; // Clear sort
-            CurrentPage = 1; // Reset to first page when loading new data
-            StateHasChanged();
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = $"❌ Error loading data: {ex.Message}";
-            ImportedData = null;
-            FilteredData = null;
-            StateHasChanged();
-        }
-    }
     
     private IEnumerable<dynamic> GetPagedData()
     {

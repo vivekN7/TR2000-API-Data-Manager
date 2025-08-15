@@ -115,6 +115,20 @@
                     }
                 </div>
                 
+                @* VDS-specific warnings *@
+                @if (SelectedEndpointKey == "vds")
+                {
+                    <div class="alert alert-warning mt-3" role="alert">
+                        <strong>⚠️ Warning:</strong> The VDS list endpoint returns over 44,000 items (31MB+ of data) and may take 30+ seconds to load. Please be patient.
+                    </div>
+                }
+                @if (SelectedEndpointKey == "vds/{vdsname}/rev/{revision}")
+                {
+                    <div class="alert alert-info mt-3" role="alert">
+                        <strong>ℹ️ Note:</strong> Currently using text input fields for VDS name and revision. Once a database caching solution is implemented and all VDS data has been loaded, these text fields will be replaced with searchable dropdown boxes for better usability.
+                    </div>
+                }
+                
                 @if (!string.IsNullOrEmpty(StatusMessage))
                 {
                     <div class="alert @GetAlertClass()" role="alert">

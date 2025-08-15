@@ -1043,7 +1043,7 @@ public static class EndpointRegistry
             TableName = "vds_list",
             HttpMethod = "GET",
             Parameters = new(),
-            Description = "Retrieve complete list of all VDS (Valve Datasheet) items",
+            Description = "⚠️ WARNING: This endpoint returns 44,000+ items (31MB) and takes ~30 seconds to load. Retrieve complete list of all VDS (Valve Datasheet) items",
             ResponseFields = new()
             {
                 new ResponseField { Name = "VDS", Type = "[String]" },
@@ -1092,7 +1092,7 @@ public static class EndpointRegistry
                     Type = "text"
                 }
             },
-            Description = "Retrieve VDS content details and subsegment information for a specific VDS and revision",
+            Description = "Retrieve VDS content details and subsegment information for a specific VDS and revision. NOTE: Text fields will be replaced with dropdowns once database caching is implemented (loading all VDS for dropdowns would take too long)",
             ResponseFields = new()
             {
                 new ResponseField { Name = "ValveTypeID", Type = "[Int32]" },

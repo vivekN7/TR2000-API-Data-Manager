@@ -1031,6 +1031,91 @@ public static class EndpointRegistry
                 new ResponseField { Name = "CreatedDate", Type = "[String]" },
                 new ResponseField { Name = "CreatedBy", Type = "[String]" }
             }
+        },
+        
+        // Section 4: VDS (Valve Datasheet)
+        new EndpointConfiguration
+        {
+            Key = "vds_list",
+            Name = "Get VDS list",
+            Section = "VDS",
+            Endpoint = "vds",
+            TableName = "vds_list",
+            HttpMethod = "GET",
+            Parameters = new(),
+            Description = "Retrieve complete list of all VDS (Valve Datasheet) items",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "VDS", Type = "[String]" },
+                new ResponseField { Name = "Revision", Type = "[String]" },
+                new ResponseField { Name = "Status", Type = "[String]" },
+                new ResponseField { Name = "RevDate", Type = "[String]" },
+                new ResponseField { Name = "LastUpdate", Type = "[String]" },
+                new ResponseField { Name = "LastUpdateBy", Type = "[String]" },
+                new ResponseField { Name = "Description", Type = "[String]" },
+                new ResponseField { Name = "Notepad", Type = "[String]" },
+                new ResponseField { Name = "SpecialReqID", Type = "[Int32]" },
+                new ResponseField { Name = "ValveTypeID", Type = "[Int32]" },
+                new ResponseField { Name = "RatingClassID", Type = "[Int32]" },
+                new ResponseField { Name = "MaterialGroupID", Type = "[Int32]" },
+                new ResponseField { Name = "EndConnectionID", Type = "[Int32]" },
+                new ResponseField { Name = "BoreID", Type = "[Int32]" },
+                new ResponseField { Name = "VDSSizeID", Type = "[Int32]" },
+                new ResponseField { Name = "SizeRange", Type = "[String]" },
+                new ResponseField { Name = "CustomName", Type = "[String]" },
+                new ResponseField { Name = "SubsegmentList", Type = "[String]" }
+            }
+        },
+        
+        new EndpointConfiguration
+        {
+            Key = "vds_subsegments",
+            Name = "Get subsegments and properties",
+            Section = "VDS",
+            Endpoint = "vds/{vdsname}/rev/{revision}",
+            TableName = "vds_subsegments",
+            HttpMethod = "GET",
+            Parameters = new()
+            {
+                new EndpointParameter 
+                { 
+                    Name = "VDSNAME", 
+                    DisplayName = "VDS Name", 
+                    IsRequired = true, 
+                    Type = "text"
+                },
+                new EndpointParameter
+                {
+                    Name = "REVISION",
+                    DisplayName = "Revision",
+                    IsRequired = true,
+                    Type = "text"
+                }
+            },
+            Description = "Retrieve VDS content details and subsegment information for a specific VDS and revision",
+            ResponseFields = new()
+            {
+                new ResponseField { Name = "ValveTypeID", Type = "[Int32]" },
+                new ResponseField { Name = "RatingClassID", Type = "[Int32]" },
+                new ResponseField { Name = "MaterialTypeID", Type = "[Int32]" },
+                new ResponseField { Name = "EndConnectionID", Type = "[Int32]" },
+                new ResponseField { Name = "FullReducedBoreIndicator", Type = "[String]" },
+                new ResponseField { Name = "BoreID", Type = "[Int32]" },
+                new ResponseField { Name = "VDSSizeID", Type = "[Int32]" },
+                new ResponseField { Name = "HousingDesignIndicator", Type = "[String]" },
+                new ResponseField { Name = "HousingDesignID", Type = "[Int32]" },
+                new ResponseField { Name = "SpecialReqID", Type = "[Int32]" },
+                new ResponseField { Name = "MinOperatingTemperature", Type = "[Int32]" },
+                new ResponseField { Name = "MaxOperatingTemperature", Type = "[Int32]" },
+                new ResponseField { Name = "VDSDescription", Type = "[String]" },
+                new ResponseField { Name = "Notepad", Type = "[String]" },
+                new ResponseField { Name = "RevDate", Type = "[String]" },
+                new ResponseField { Name = "LastUpdate", Type = "[String]" },
+                new ResponseField { Name = "LastUpdateBy", Type = "[String]" },
+                new ResponseField { Name = "SubsegmentID", Type = "[Int32]" },
+                new ResponseField { Name = "SubsegmentName", Type = "[String]" },
+                new ResponseField { Name = "Sequence", Type = "[Int32]" }
+            }
         }
     };
 }

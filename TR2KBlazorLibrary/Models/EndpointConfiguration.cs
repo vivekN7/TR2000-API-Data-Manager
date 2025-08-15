@@ -663,15 +663,14 @@ public static class EndpointRegistry
         },
         
         // Additional PCS endpoints
-        // NOTE: PCS detail endpoints below DO NOT EXIST in the API - they return 404
-        // The PCS list endpoint (plants/{plantid}/pcs) already contains all PCS information
+        // PCS detail endpoints - returns more detailed information for a specific PCS revision
         new EndpointConfiguration
         {
             Key = "pcs_header",
-            Name = "Get header and properties (NOT AVAILABLE - 404)",
+            Name = "Get PCS details",
             Section = "PCS",
-            Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}/header",
-            TableName = "pcs_header",
+            Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}",
+            TableName = "pcs_details",
             HttpMethod = "GET",
             Parameters = new()
             {
@@ -708,7 +707,7 @@ public static class EndpointRegistry
                     DependsOn = "PCSID"
                 }
             },
-            Description = "Retrieve header and properties for a specific PCS",
+            Description = "Retrieve detailed information for a specific PCS revision",
             ResponseFields = new()
             {
                 new ResponseField { Name = "PCS", Type = "[String]" },
@@ -720,9 +719,9 @@ public static class EndpointRegistry
         new EndpointConfiguration
         {
             Key = "pcs_temperature_pressure",
-            Name = "Get temperature and pressure (NOT AVAILABLE - 404)",
+            Name = "Get temperature and pressure (REMOVED - Use Get PCS details)",
             Section = "PCS",
-            Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}/temperature-pressure",
+            Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}",
             TableName = "pcs_temperature_pressure",
             HttpMethod = "GET",
             Parameters = new()
@@ -773,9 +772,9 @@ public static class EndpointRegistry
         new EndpointConfiguration
         {
             Key = "pcs_pipe_size",
-            Name = "Get pipe size (NOT AVAILABLE - 404)",
+            Name = "Get pipe size (REMOVED - Use Get PCS details)",
             Section = "PCS",
-            Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}/pipe-size",
+            Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}",
             TableName = "pcs_pipe_size",
             HttpMethod = "GET",
             Parameters = new()
@@ -826,9 +825,9 @@ public static class EndpointRegistry
         new EndpointConfiguration
         {
             Key = "pcs_pipe_element",
-            Name = "Get pipe element (NOT AVAILABLE - 404)",
+            Name = "Get pipe element (REMOVED - Use Get PCS details)",
             Section = "PCS",
-            Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}/pipe-element",
+            Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}",
             TableName = "pcs_pipe_element",
             HttpMethod = "GET",
             Parameters = new()
@@ -879,9 +878,9 @@ public static class EndpointRegistry
         new EndpointConfiguration
         {
             Key = "pcs_valve_element",
-            Name = "Get valve element (NOT AVAILABLE - 404)",
+            Name = "Get valve element (REMOVED - Use Get PCS details)",
             Section = "PCS",
-            Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}/valve-element",
+            Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}",
             TableName = "pcs_valve_element",
             HttpMethod = "GET",
             Parameters = new()
@@ -932,9 +931,9 @@ public static class EndpointRegistry
         new EndpointConfiguration
         {
             Key = "pcs_embedded_note",
-            Name = "Get embedded note (NOT AVAILABLE - 404)",
+            Name = "Get embedded note (REMOVED - Use Get PCS details)",
             Section = "PCS",
-            Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}/embedded-note",
+            Endpoint = "plants/{plantid}/pcs/{pcsid}/rev/{revision}",
             TableName = "pcs_embedded_note",
             HttpMethod = "GET",
             Parameters = new()

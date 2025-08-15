@@ -691,6 +691,55 @@
                     continue;
                 }
                 
+                if (param.DropdownSource == "plant_codes")
+                {
+                    // Load plants and extract CommonLibPlantCode values
+                    try
+                    {
+                        StatusMessage = $"📥 Loading plant codes from API...";
+                        StateHasChanged();
+                        
+                        var apiData = await ApiService.FetchDataAsync("plants");
+                        var deserializedData = Deserializer.DeserializeApiResponse(apiData, "plants");
+                        
+                        var plantCodeList = new List<dynamic>();
+                        var addedCodes = new HashSet<string>(); // To avoid duplicates
+                        
+                        foreach (var plant in deserializedData)
+                        {
+                            var codeField = plant.GetType().GetProperty("CommonLibPlantCode")?.GetValue(plant)?.ToString();
+                            if (!string.IsNullOrEmpty(codeField))
+                            {
+                                // Split by semicolon if multiple codes exist
+                                var codes = codeField.Split(';', StringSplitOptions.RemoveEmptyEntries);
+                                foreach (var code in codes)
+                                {
+                                    var trimmedCode = code.Trim();
+                                    if (!string.IsNullOrEmpty(trimmedCode) && addedCodes.Add(trimmedCode))
+                                    {
+                                        // Get plant name for display
+                                        var plantName = plant.GetType().GetProperty("LongDescription")?.GetValue(plant)?.ToString() ?? trimmedCode;
+                                        plantCodeList.Add(new { PlantCode = trimmedCode, Display = $"{trimmedCode} - {plantName}" });
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Sort by code
+                        plantCodeList = plantCodeList.OrderBy(p => ((dynamic)p).PlantCode).ToList();
+                        
+                        DropdownData[param.DropdownSource!] = plantCodeList;
+                        StatusMessage = $"✅ Loaded {plantCodeList.Count} plant codes";
+                        Console.WriteLine($"Loaded {plantCodeList.Count} plant codes");
+                    }
+                    catch (Exception ex)
+                    {
+                        StatusMessage = $"⚠️ Warning: Could not load plant codes: {ex.Message}";
+                        DropdownData[param.DropdownSource!] = new List<dynamic>();
+                    }
+                    continue;
+                }
+                
                 IsLoadingDropdowns = true;
                 LoadingMessage = $"Loading {param.DropdownSource} data...";
                 StateHasChanged();

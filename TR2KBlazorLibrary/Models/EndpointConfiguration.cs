@@ -1133,13 +1133,13 @@ public static class EndpointRegistry
                 new EndpointParameter
                 {
                     Name = "PLANTID",
-                    DisplayName = "Plant ID",
+                    DisplayName = "Plant Code",
                     IsRequired = true,
                     Type = "dropdown",
                     ParameterLocation = "path",
-                    DropdownSource = "plants",
-                    ValueField = "PlantID",
-                    DisplayField = "LongDescription"
+                    DropdownSource = "plant_codes",
+                    ValueField = "PlantCode",
+                    DisplayField = "Display"
                 },
                 new EndpointParameter
                 {
@@ -1189,13 +1189,13 @@ public static class EndpointRegistry
                 new EndpointParameter
                 {
                     Name = "PLANTID",
-                    DisplayName = "Plant ID",
+                    DisplayName = "Plant Code",
                     IsRequired = true,
                     Type = "dropdown",
                     ParameterLocation = "path",
-                    DropdownSource = "plants",
-                    ValueField = "PlantID",
-                    DisplayField = "LongDescription"
+                    DropdownSource = "plant_codes",
+                    ValueField = "PlantCode",
+                    DisplayField = "Display"
                 },
                 new EndpointParameter
                 {
@@ -1250,13 +1250,13 @@ public static class EndpointRegistry
                 new EndpointParameter
                 {
                     Name = "PLANTID",
-                    DisplayName = "Plant ID",
+                    DisplayName = "Plant Code",
                     IsRequired = true,
                     Type = "dropdown",
                     ParameterLocation = "path",
-                    DropdownSource = "plants",
-                    ValueField = "PlantID",
-                    DisplayField = "LongDescription"
+                    DropdownSource = "plant_codes",
+                    ValueField = "PlantCode",
+                    DisplayField = "Display"
                 },
                 new EndpointParameter
                 {
@@ -1308,13 +1308,13 @@ public static class EndpointRegistry
                 new EndpointParameter
                 {
                     Name = "PLANTID",
-                    DisplayName = "Plant ID",
+                    DisplayName = "Plant Code",
                     IsRequired = true,
                     Type = "dropdown",
                     ParameterLocation = "path",
-                    DropdownSource = "plants",
-                    ValueField = "PlantID",
-                    DisplayField = "LongDescription"
+                    DropdownSource = "plant_codes",
+                    ValueField = "PlantCode",
+                    DisplayField = "Display"
                 },
                 new EndpointParameter
                 {
@@ -1405,13 +1405,13 @@ public static class EndpointRegistry
                 new EndpointParameter
                 {
                     Name = "PLANTID",
-                    DisplayName = "Plant ID",
+                    DisplayName = "Plant Code",
                     IsRequired = true,
                     Type = "dropdown",
                     ParameterLocation = "path",
-                    DropdownSource = "plants",
-                    ValueField = "PlantID",
-                    DisplayField = "LongDescription"
+                    DropdownSource = "plant_codes",
+                    ValueField = "PlantCode",
+                    DisplayField = "Display"
                 },
                 new EndpointParameter
                 {
@@ -1496,13 +1496,13 @@ public static class EndpointRegistry
                 new EndpointParameter
                 {
                     Name = "PLANTID",
-                    DisplayName = "Plant ID",
+                    DisplayName = "Plant Code",
                     IsRequired = true,
                     Type = "dropdown",
                     ParameterLocation = "path",
-                    DropdownSource = "plants",
-                    ValueField = "PlantID",
-                    DisplayField = "LongDescription"
+                    DropdownSource = "plant_codes",
+                    ValueField = "PlantCode",
+                    DisplayField = "Display"
                 }
             },
             Description = "Retrieve plant information for bolt tension",
@@ -1527,13 +1527,13 @@ public static class EndpointRegistry
                 new EndpointParameter
                 {
                     Name = "PLANTID",
-                    DisplayName = "Plant ID",
+                    DisplayName = "Plant Code",
                     IsRequired = true,
                     Type = "dropdown",
                     ParameterLocation = "path",
-                    DropdownSource = "plants",
-                    ValueField = "PlantID",
-                    DisplayField = "LongDescription"
+                    DropdownSource = "plant_codes",
+                    ValueField = "PlantCode",
+                    DisplayField = "Display"
                 }
             },
             Description = "Retrieve lubricant information for bolt tension",

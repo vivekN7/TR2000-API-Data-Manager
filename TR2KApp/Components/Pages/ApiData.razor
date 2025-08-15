@@ -666,7 +666,7 @@
                 
                 if (!alreadyExists)
                 {
-                    columns.Add($"[Input] {param.Name}");
+                    columns.Add(param.Name);
                     addedColumns.Add(param.Name);
                 }
             }
@@ -688,11 +688,19 @@
     {
         try
         {
-            // Handle input parameter columns
-            if (columnName.StartsWith("[Input] "))
+            // Check if this is an input parameter column (not in data)
+            if (SelectedEndpoint != null && ParameterValues.ContainsKey(columnName))
             {
-                var paramName = columnName.Replace("[Input] ", "");
-                return ParameterValues.ContainsKey(paramName) ? ParameterValues[paramName] : "";
+                // Check if this column is from input parameters
+                var isInputParam = SelectedEndpoint.Parameters.Any(p => p.Name == columnName && p.IsRequired);
+                if (isInputParam)
+                {
+                    // Check if data doesn't contain this column
+                    if (row is IDictionary<string, object> rowDict && !rowDict.ContainsKey(columnName))
+                    {
+                        return ParameterValues[columnName];
+                    }
+                }
             }
             
             if (row is IDictionary<string, object> dict)

@@ -1135,24 +1135,34 @@ public static class EndpointRegistry
                     Name = "PLANTID",
                     DisplayName = "Plant ID",
                     IsRequired = true,
-                    Type = "text",
-                    ParameterLocation = "path"
+                    Type = "dropdown",
+                    ParameterLocation = "path",
+                    DropdownSource = "plants",
+                    ValueField = "PlantID",
+                    DisplayField = "LongDescription"
                 },
                 new EndpointParameter
                 {
                     Name = "PCS",
                     DisplayName = "PCS",
                     IsRequired = true,
-                    Type = "text",
-                    ParameterLocation = "path"
+                    Type = "dropdown",
+                    ParameterLocation = "path",
+                    DropdownSource = "pcs",
+                    ValueField = "PCS",
+                    DisplayField = "PCS",
+                    DependsOn = "PLANTID"
                 },
                 new EndpointParameter
                 {
                     Name = "FlangeSize",
                     DisplayName = "Flange Size",
                     IsRequired = true,
-                    Type = "int",
-                    ParameterLocation = "query"
+                    Type = "dropdown",
+                    ParameterLocation = "query",
+                    DropdownSource = "flange_sizes",  // Special dropdown source for 1-100
+                    ValueField = "FlangeSize",
+                    DisplayField = "Display"
                 }
             },
             Description = "Retrieve flange type information for bolt tension calculations",
@@ -1181,16 +1191,23 @@ public static class EndpointRegistry
                     Name = "PLANTID",
                     DisplayName = "Plant ID",
                     IsRequired = true,
-                    Type = "text",
-                    ParameterLocation = "path"
+                    Type = "dropdown",
+                    ParameterLocation = "path",
+                    DropdownSource = "plants",
+                    ValueField = "PlantID",
+                    DisplayField = "LongDescription"
                 },
                 new EndpointParameter
                 {
                     Name = "PCS",
                     DisplayName = "PCS",
                     IsRequired = true,
-                    Type = "text",
-                    ParameterLocation = "path"
+                    Type = "dropdown",
+                    ParameterLocation = "path",
+                    DropdownSource = "pcs",
+                    ValueField = "PCS",
+                    DisplayField = "PCS",
+                    DependsOn = "PLANTID"
                 },
                 new EndpointParameter
                 {
@@ -1205,8 +1222,11 @@ public static class EndpointRegistry
                     Name = "FlangeSize",
                     DisplayName = "Flange Size",
                     IsRequired = true,
-                    Type = "text",
-                    ParameterLocation = "query"
+                    Type = "dropdown",
+                    ParameterLocation = "query",
+                    DropdownSource = "flange_sizes",
+                    ValueField = "FlangeSize",
+                    DisplayField = "Display"
                 }
             },
             Description = "Retrieve gasket type information for bolt tension calculations",
@@ -1232,16 +1252,23 @@ public static class EndpointRegistry
                     Name = "PLANTID",
                     DisplayName = "Plant ID",
                     IsRequired = true,
-                    Type = "text",
-                    ParameterLocation = "path"
+                    Type = "dropdown",
+                    ParameterLocation = "path",
+                    DropdownSource = "plants",
+                    ValueField = "PlantID",
+                    DisplayField = "LongDescription"
                 },
                 new EndpointParameter
                 {
                     Name = "PCS",
                     DisplayName = "PCS",
                     IsRequired = true,
-                    Type = "text",
-                    ParameterLocation = "path"
+                    Type = "dropdown",
+                    ParameterLocation = "path",
+                    DropdownSource = "pcs",
+                    ValueField = "PCS",
+                    DisplayField = "PCS",
+                    DependsOn = "PLANTID"
                 },
                 new EndpointParameter
                 {
@@ -1283,16 +1310,23 @@ public static class EndpointRegistry
                     Name = "PLANTID",
                     DisplayName = "Plant ID",
                     IsRequired = true,
-                    Type = "text",
-                    ParameterLocation = "path"
+                    Type = "dropdown",
+                    ParameterLocation = "path",
+                    DropdownSource = "plants",
+                    ValueField = "PlantID",
+                    DisplayField = "LongDescription"
                 },
                 new EndpointParameter
                 {
                     Name = "PCS",
                     DisplayName = "PCS",
                     IsRequired = true,
-                    Type = "text",
-                    ParameterLocation = "path"
+                    Type = "dropdown",
+                    ParameterLocation = "path",
+                    DropdownSource = "pcs",
+                    ValueField = "PCS",
+                    DisplayField = "PCS",
+                    DependsOn = "PLANTID"
                 },
                 new EndpointParameter
                 {
@@ -1323,8 +1357,11 @@ public static class EndpointRegistry
                     Name = "FlangeSize",
                     DisplayName = "Flange Size",
                     IsRequired = true,
-                    Type = "text",
-                    ParameterLocation = "query"
+                    Type = "dropdown",
+                    ParameterLocation = "query",
+                    DropdownSource = "flange_sizes",
+                    ValueField = "FlangeSize",
+                    DisplayField = "Display"
                 },
                 new EndpointParameter
                 {
@@ -1370,8 +1407,11 @@ public static class EndpointRegistry
                     Name = "PLANTID",
                     DisplayName = "Plant ID",
                     IsRequired = true,
-                    Type = "text",
-                    ParameterLocation = "path"
+                    Type = "dropdown",
+                    ParameterLocation = "path",
+                    DropdownSource = "plants",
+                    ValueField = "PlantID",
+                    DisplayField = "LongDescription"
                 },
                 new EndpointParameter
                 {
@@ -1458,8 +1498,11 @@ public static class EndpointRegistry
                     Name = "PLANTID",
                     DisplayName = "Plant ID",
                     IsRequired = true,
-                    Type = "text",
-                    ParameterLocation = "path"
+                    Type = "dropdown",
+                    ParameterLocation = "path",
+                    DropdownSource = "plants",
+                    ValueField = "PlantID",
+                    DisplayField = "LongDescription"
                 }
             },
             Description = "Retrieve plant information for bolt tension",
@@ -1486,8 +1529,11 @@ public static class EndpointRegistry
                     Name = "PLANTID",
                     DisplayName = "Plant ID",
                     IsRequired = true,
-                    Type = "text",
-                    ParameterLocation = "path"
+                    Type = "dropdown",
+                    ParameterLocation = "path",
+                    DropdownSource = "plants",
+                    ValueField = "PlantID",
+                    DisplayField = "LongDescription"
                 }
             },
             Description = "Retrieve lubricant information for bolt tension",

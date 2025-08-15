@@ -676,6 +676,21 @@
                 
             if (!DropdownData.ContainsKey(param.DropdownSource!))
             {
+                // Handle special dropdown sources
+                if (param.DropdownSource == "flange_sizes")
+                {
+                    // Generate flange sizes 1-100
+                    var flangeList = new List<dynamic>();
+                    for (int i = 1; i <= 100; i++)
+                    {
+                        flangeList.Add(new { FlangeSize = i, Display = i.ToString() });
+                    }
+                    DropdownData[param.DropdownSource!] = flangeList;
+                    StatusMessage = $"✅ Generated flange sizes 1-100";
+                    Console.WriteLine($"Generated {flangeList.Count} flange sizes");
+                    continue;
+                }
+                
                 IsLoadingDropdowns = true;
                 LoadingMessage = $"Loading {param.DropdownSource} data...";
                 StateHasChanged();

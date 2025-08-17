@@ -9,11 +9,15 @@
    - It provides URL templates, input params with types, return params with types
    - It includes example URLs and JSON raw output examples
    - We must match our implementation exactly with this help page
-5. **DDL SCRIPT POLICY**: Always update Oracle_DDL_Complete_V4.sql to completely DROP and RECREATE all tables
-   - This ensures we have a fully tested, production-ready DDL script
+5. **DDL SCRIPT POLICY - CRITICAL**: 
+   - **ALWAYS update the main DDL script (Oracle_DDL_SCD2_Native_Hash.sql)**
+   - **NEVER create separate upgrade/patch scripts**
+   - The script must completely DROP and RECREATE all database objects
+   - This ensures we have ONE source of truth for the database schema
    - The script handles non-existent objects gracefully (won't fail if tables don't exist)
-   - Never add incremental changes - always regenerate the complete script
-   - Current version: Oracle_DDL_Complete_V4.sql in /Ops/ folder
+   - When changes are needed: Update the main DDL, then DROP ALL and recreate
+   - Current main DDL: Oracle_DDL_SCD2_Native_Hash.sql in /Ops/ folder
+   - **This is NON-NEGOTIABLE - maintain ONE complete DDL script!**
 
 ## 🛡️ DATA INTEGRITY & TRANSACTION SAFETY REQUIREMENTS
 **ALL database operations MUST use transactions to ensure data integrity:**
@@ -579,6 +583,29 @@ When starting fresh Claude Code session:
    - Add plants you want to work with
    - Test reference table loading with selected plants only
 7. **Remember to update** `/Ops/TR2K_PROGRESS.md` after any major changes!
+
+## ✅ SCD2 IMPLEMENTATION - FINAL DESIGN COMPLETE!
+
+### CURRENT STATUS (Session 10 - 2025-01-17):
+**CONSENSUS REACHED**: Production-ready SCD2 design finalized after extensive review
+
+**KEY DECISIONS MADE**:
+1. ✅ **Oracle-Centric Architecture** - All logic in database
+2. ✅ **Complete SCD2 Coverage** - INSERT, UPDATE, DELETE, REACTIVATE
+3. ✅ **Production Safety** - Atomic transactions, error logging
+4. ✅ **Performance Optimized** - Set-based operations only
+5. ✅ **Minimal RAW_JSON** - With compression and 30-day retention
+
+**READY TO IMPLEMENT**:
+- `SCD2_FINAL_DECISION.md` - Complete implementation guide
+- `Oracle_DDL_SCD2_FINAL.sql` - Production DDL (to be created)
+- `Test_SCD2_Complete_Scenarios.sql` - Test suite ready
+
+**NEXT STEPS**:
+1. Create final consolidated DDL with all improvements
+2. Update C# service to use new procedures
+3. Deploy and test with real data
+4. Monitor performance metrics
 
 ## 🔴 CRITICAL FOR NEXT SESSION - What's Ready to Use:
 

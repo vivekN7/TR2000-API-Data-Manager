@@ -410,23 +410,17 @@ namespace TR2KBlazorLibrary.Logic.Services
                     // STEP 5: Insert new records
                     string insertSql = @"
                         INSERT INTO PLANTS 
-                        (PLANT_ID, OPERATOR_ID, OPERATOR_NAME, SHORT_DESCRIPTION, PROJECT, 
-                         LONG_DESCRIPTION, COMMON_LIB_PLANT_CODE, INITIAL_REVISION, 
-                         AREA_ID, AREA, ETL_RUN_ID, IS_CURRENT)
-                        VALUES (:plantId, :operatorId, :operatorName, :shortDesc, :project,
-                                :longDesc, :commonLib, :initRev, :areaId, :area, :etlRunId, 'Y')";
+                        (PLANT_ID, PLANT_NAME, LONG_DESCRIPTION, OPERATOR_ID, 
+                         COMMON_LIB_PLANT_CODE, ETL_RUN_ID, IS_CURRENT)
+                        VALUES (:plantId, :plantName, :longDesc, :operatorId,
+                                :commonLib, :etlRunId, 'Y')";
 
                     sqlStatements.Add("\n-- Step 3: Insert new plant data from API (within same transaction)");
                     sqlStatements.Add(insertSql.Replace(":plantId", "<PLANT_ID>")
-                        .Replace(":operatorId", "<OPERATOR_ID>")
-                        .Replace(":operatorName", "<OPERATOR_NAME>")
-                        .Replace(":shortDesc", "<SHORT_DESC>")
-                        .Replace(":project", "<PROJECT>")
+                        .Replace(":plantName", "<PLANT_NAME>")
                         .Replace(":longDesc", "<LONG_DESC>")
+                        .Replace(":operatorId", "<OPERATOR_ID>")
                         .Replace(":commonLib", "<COMMON_LIB>")
-                        .Replace(":initRev", "<INITIAL_REV>")
-                        .Replace(":areaId", "<AREA_ID>")
-                        .Replace(":area", "<AREA>")
                         .Replace(":etlRunId", etlRunId.ToString()));
 
                     int recordsLoaded = 0;
@@ -435,15 +429,11 @@ namespace TR2KBlazorLibrary.Logic.Services
                         using var cmd = new OracleCommand(insertSql, connection);
                         cmd.Transaction = transaction;
                         cmd.Parameters.Add(new OracleParameter("plantId", row.GetValueOrDefault("PlantID", DBNull.Value)));
-                        cmd.Parameters.Add(new OracleParameter("operatorId", row.GetValueOrDefault("OperatorID", DBNull.Value)));
-                        cmd.Parameters.Add(new OracleParameter("operatorName", row.GetValueOrDefault("OperatorName", DBNull.Value)));
-                        cmd.Parameters.Add(new OracleParameter("shortDesc", row.GetValueOrDefault("ShortDescription", DBNull.Value)));
-                        cmd.Parameters.Add(new OracleParameter("project", row.GetValueOrDefault("Project", DBNull.Value)));
+                        // Use ShortDescription as PLANT_NAME since that's what we have
+                        cmd.Parameters.Add(new OracleParameter("plantName", row.GetValueOrDefault("ShortDescription", DBNull.Value)));
                         cmd.Parameters.Add(new OracleParameter("longDesc", row.GetValueOrDefault("LongDescription", DBNull.Value)));
+                        cmd.Parameters.Add(new OracleParameter("operatorId", row.GetValueOrDefault("OperatorID", DBNull.Value)));
                         cmd.Parameters.Add(new OracleParameter("commonLib", row.GetValueOrDefault("CommonLibPlantCode", DBNull.Value)));
-                        cmd.Parameters.Add(new OracleParameter("initRev", row.GetValueOrDefault("InitialRevision", DBNull.Value)));
-                        cmd.Parameters.Add(new OracleParameter("areaId", row.GetValueOrDefault("AreaID", DBNull.Value)));
-                        cmd.Parameters.Add(new OracleParameter("area", row.GetValueOrDefault("Area", DBNull.Value)));
                         cmd.Parameters.Add(new OracleParameter("etlRunId", etlRunId));
                         
                         await cmd.ExecuteNonQueryAsync();
@@ -1712,7 +1702,7 @@ VALUES (:plantId, :issueRevision, :userName, :userEntryTime,
                             
                             // Get last load time
                             string lastLoadSql = $@"
-                                SELECT MAX(EXTRACTION_DATE) 
+                                SELECT MAX(VALID_FROM) 
                                 FROM {tableName} 
                                 WHERE IS_CURRENT = 'Y'";
                             
@@ -1748,7 +1738,7 @@ VALUES (:plantId, :issueRevision, :userName, :userEntryTime,
                 await connection.OpenAsync();
                 
                 string sql = @"
-                    SELECT ETL_RUN_ID, RUN_DATE, RUN_TYPE, STATUS, 
+                    SELECT ETL_RUN_ID, START_TIME, RUN_TYPE, STATUS, 
                            RECORDS_LOADED, ERROR_COUNT, COMMENTS
                     FROM ETL_CONTROL
                     ORDER BY ETL_RUN_ID DESC
@@ -1763,9 +1753,9 @@ VALUES (:plantId, :issueRevision, :userName, :userEntryTime,
                     history.Add(new ETLRunHistory
                     {
                         RunId = reader.GetInt32(0),
-                        RunDate = reader.GetDateTime(1),
-                        RunType = reader.GetString(2),
-                        Status = reader.GetString(3),
+                        RunDate = reader.IsDBNull(1) ? DateTime.Now : reader.GetDateTime(1),
+                        RunType = reader.IsDBNull(2) ? "" : reader.GetString(2),
+                        Status = reader.IsDBNull(3) ? "" : reader.GetString(3),
                         RecordsLoaded = reader.IsDBNull(4) ? 0 : reader.GetInt32(4),
                         ErrorCount = reader.IsDBNull(5) ? 0 : reader.GetInt32(5),
                         Comments = reader.IsDBNull(6) ? null : reader.GetString(6)
@@ -1990,21 +1980,734 @@ WHERE IS_CURRENT = 'Y'"
                         Title = "Insert New Plant Records",
                         Description = "Inserts complete plant information including areas and project details",
                         SqlStatement = @"INSERT INTO PLANTS 
-(PLANT_ID, OPERATOR_ID, OPERATOR_NAME, SHORT_DESCRIPTION, PROJECT, 
- LONG_DESCRIPTION, COMMON_LIB_PLANT_CODE, INITIAL_REVISION, 
- AREA_ID, AREA, ETL_RUN_ID, IS_CURRENT, EXTRACTION_DATE)
-VALUES (:plantId, :operatorId, :operatorName, :shortDesc, :project,
-        :longDesc, :commonLib, :initRev, :areaId, :area, 
-        :etlRunId, 'Y', SYSDATE)
+(PLANT_ID, PLANT_NAME, LONG_DESCRIPTION, OPERATOR_ID, 
+ COMMON_LIB_PLANT_CODE, ETL_RUN_ID, IS_CURRENT, EXTRACTION_DATE)
+VALUES (:plantId, :plantName, :longDesc, :operatorId,
+        :commonLib, :etlRunId, 'Y', SYSDATE)
 
 -- Example with actual values:
 -- INSERT INTO PLANTS 
--- VALUES ('34', 1, 'Equinor Europe', 'Gullfaks', 'GFA',
---         'Gullfaks A', 'GFA', '0', 1, 'North Sea',
---         123, 'Y', '2025-08-16 10:30:00')"
+-- VALUES ('34', 'Gullfaks', 'Gullfaks A', 1,
+--         'GFA', 123, 'Y', '2025-08-16 10:30:00')"
                     }
                 }
             };
+        }
+
+        // =====================================================
+        // SCD TYPE 2 IMPLEMENTATION METHODS
+        // =====================================================
+
+        public async Task<string> SimulateDataChange()
+        {
+            try
+            {
+                using var connection = new OracleConnection(_connectionString);
+                await connection.OpenAsync();
+                
+                var results = new System.Text.StringBuilder();
+                
+                // Step 1: Check current state
+                string checkSql = @"
+                    SELECT OPERATOR_ID, OPERATOR_NAME 
+                    FROM OPERATORS 
+                    WHERE OPERATOR_ID = 1 AND IS_CURRENT = 'Y'";
+                
+                string originalName = "";
+                using (var checkCmd = new OracleCommand(checkSql, connection))
+                {
+                    using var reader = await checkCmd.ExecuteReaderAsync();
+                    if (await reader.ReadAsync())
+                    {
+                        originalName = reader.GetString(1);
+                        results.AppendLine($"Current Operator 1: {originalName}");
+                    }
+                }
+                
+                // Step 2: Modify the actual data to simulate manual database change
+                // With the improved stored procedure, this will be detected even though hash isn't updated
+                string updateSql = @"
+                    UPDATE OPERATORS 
+                    SET OPERATOR_NAME = CASE 
+                        WHEN OPERATOR_NAME LIKE '%(MANUAL CHANGE)' THEN REPLACE(OPERATOR_NAME, ' (MANUAL CHANGE)', '')
+                        ELSE OPERATOR_NAME || ' (MANUAL CHANGE)'
+                    END
+                    WHERE OPERATOR_ID = 1 AND IS_CURRENT = 'Y'";
+                
+                using (var updateCmd = new OracleCommand(updateSql, connection))
+                {
+                    int affected = await updateCmd.ExecuteNonQueryAsync();
+                    if (affected > 0)
+                    {
+                        results.AppendLine($"Simulated manual database change - modified Operator 1 name");
+                        results.AppendLine($"NOTE: Hash was NOT updated (simulating corruption/manual edit)");
+                    }
+                }
+                
+                // Step 3: Show what will happen
+                string hashCheckSql = @"
+                    SELECT 
+                        OPERATOR_NAME,
+                        SRC_HASH as OLD_HASH
+                    FROM OPERATORS 
+                    WHERE OPERATOR_ID = 1 AND IS_CURRENT = 'Y'";
+                
+                using (var hashCmd = new OracleCommand(hashCheckSql, connection))
+                {
+                    using var reader = await hashCmd.ExecuteReaderAsync();
+                    if (await reader.ReadAsync())
+                    {
+                        var modifiedName = reader.GetString(0);
+                        results.AppendLine($"Changed to: {modifiedName}");
+                        results.AppendLine($"");
+                        results.AppendLine($"✅ Now reload Operators - it should detect 1 CHANGED record!");
+                        results.AppendLine($"The improved stored procedure will detect this manual change");
+                        results.AppendLine($"and automatically correct it back to the API value!");
+                    }
+                }
+                
+                return results.ToString();
+            }
+            catch (Exception ex)
+            {
+                return $"Error simulating change: {ex.Message}";
+            }
+        }
+
+        public async Task<string> TestOracleHashSupport()
+        {
+            try
+            {
+                using var connection = new OracleConnection(_connectionString);
+                await connection.OpenAsync();
+                
+                var results = new System.Text.StringBuilder();
+                
+                // Test 1: Check Oracle version
+                using (var versionCmd = new OracleCommand("SELECT BANNER FROM V$VERSION WHERE ROWNUM = 1", connection))
+                {
+                    var version = await versionCmd.ExecuteScalarAsync();
+                    results.AppendLine($"Oracle Version: {version}");
+                }
+                
+                // Test 2: Try STANDARD_HASH
+                try
+                {
+                    using (var hashCmd = new OracleCommand("SELECT STANDARD_HASH('test', 'SHA256') FROM DUAL", connection))
+                    {
+                        var hash = await hashCmd.ExecuteScalarAsync();
+                        if (hash is byte[] bytes)
+                        {
+                            var hexString = BitConverter.ToString(bytes).Replace("-", "");
+                            results.AppendLine($"STANDARD_HASH works! SHA256 hash: {hexString}");
+                        }
+                        else
+                        {
+                            results.AppendLine($"STANDARD_HASH works! Result type: {hash?.GetType().Name}");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    results.AppendLine($"STANDARD_HASH failed: {ex.Message}");
+                }
+                
+                // Test 2b: Try STANDARD_HASH with concatenated values (like our ETL)
+                try
+                {
+                    using (var hashCmd = new OracleCommand(@"
+                        SELECT STANDARD_HASH(
+                            '123' || '|' || 'plant name' || '|' || 'long desc' || '|' || '5' || '|' || 'code',
+                            'SHA256'
+                        ) FROM DUAL", connection))
+                    {
+                        var hash = await hashCmd.ExecuteScalarAsync();
+                        if (hash is byte[] bytes)
+                        {
+                            var hexString = BitConverter.ToString(bytes).Replace("-", "");
+                            results.AppendLine($"STANDARD_HASH with concatenation works! Hash: {hexString.Substring(0, 16)}...");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    results.AppendLine($"STANDARD_HASH with concatenation failed: {ex.Message}");
+                }
+                
+                // Test 3: Try ORA_HASH
+                try
+                {
+                    using (var hashCmd = new OracleCommand("SELECT ORA_HASH('test') FROM DUAL", connection))
+                    {
+                        var hash = await hashCmd.ExecuteScalarAsync();
+                        results.AppendLine($"ORA_HASH works! Result: {hash}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    results.AppendLine($"ORA_HASH failed: {ex.Message}");
+                }
+                
+                return results.ToString();
+            }
+            catch (Exception ex)
+            {
+                return $"Error testing hash support: {ex.Message}";
+            }
+        }
+
+        private string ComputeHash(params string[] values)
+        {
+            var input = string.Join("|", values.Select(v => (v ?? "~").ToLower().Trim()));
+            using (var sha256 = System.Security.Cryptography.SHA256.Create())
+            {
+                var bytes = sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(input));
+                return BitConverter.ToString(bytes).Replace("-", "");
+            }
+        }
+
+        public async Task<ETLResult> LoadOperatorsSCD2Native()
+        {
+            var result = new ETLResult { StartTime = DateTime.Now, EndpointName = "operators_scd2_native" };
+            int etlRunId = 0;
+            
+            try
+            {
+                // STEP 1: Fetch data from API (outside transaction)
+                _logger.LogInformation("SCD2 Native: Fetching operators data from API...");
+                var apiResponse = await _apiService.FetchDataAsync("operators");
+                var apiOperators = _deserializer.DeserializeApiResponse(apiResponse, "operators");
+                
+                result.ApiCallCount = 1;
+                
+                if (apiOperators == null || !apiOperators.Any())
+                {
+                    result.Status = "NO_DATA";
+                    result.Message = "No operator data returned from API";
+                    return result;
+                }
+                
+                _logger.LogInformation($"SCD2 Native: Fetched {apiOperators.Count} operators from API");
+
+                // STEP 2: Process with transaction
+                using var connection = new OracleConnection(_connectionString);
+                await connection.OpenAsync();
+                using var transaction = connection.BeginTransaction();
+                
+                try
+                {
+                    // Create ETL run record
+                    string createRunSql = @"
+                        INSERT INTO ETL_CONTROL (RUN_TYPE, STATUS, START_TIME, API_CALL_COUNT)
+                        VALUES ('OPERATORS_SCD2', 'RUNNING', SYSDATE, :apiCalls)
+                        RETURNING ETL_RUN_ID INTO :runId";
+                    
+                    using (var runCmd = new OracleCommand(createRunSql, connection))
+                    {
+                        runCmd.Transaction = transaction;
+                        runCmd.Parameters.Add(new OracleParameter("apiCalls", result.ApiCallCount));
+                        var runIdParam = new OracleParameter("runId", OracleDbType.Decimal) { Direction = ParameterDirection.Output };
+                        runCmd.Parameters.Add(runIdParam);
+                        await runCmd.ExecuteNonQueryAsync();
+                        
+                        // Handle OracleDecimal conversion
+                        if (runIdParam.Value is Oracle.ManagedDataAccess.Types.OracleDecimal oracleDecimal)
+                        {
+                            etlRunId = oracleDecimal.ToInt32();
+                        }
+                        else
+                        {
+                            etlRunId = Convert.ToInt32(runIdParam.Value);
+                        }
+                    }
+                    
+                    // Clear staging table
+                    using (var clearCmd = new OracleCommand("DELETE FROM STG_OPERATORS", connection))
+                    {
+                        clearCmd.Transaction = transaction;
+                        await clearCmd.ExecuteNonQueryAsync();
+                    }
+                    
+                    // Load data into staging (let Oracle compute the hash)
+                    string stagingSql = @"
+                        INSERT INTO STG_OPERATORS (
+                            OPERATOR_ID, OPERATOR_NAME, ETL_RUN_ID
+                        ) VALUES (
+                            :operatorId, :operatorName, :etlRunId
+                        )";
+                    
+                    foreach (var op in apiOperators)
+                    {
+                        using var stageCmd = new OracleCommand(stagingSql, connection);
+                        stageCmd.Transaction = transaction;
+                        stageCmd.Parameters.Add("operatorId", Convert.ToInt32(op.GetValueOrDefault("OperatorID", 0)));
+                        stageCmd.Parameters.Add("operatorName", op.GetValueOrDefault("OperatorName", "")?.ToString() ?? "");
+                        stageCmd.Parameters.Add("etlRunId", etlRunId);
+                        await stageCmd.ExecuteNonQueryAsync();
+                    }
+                    
+                    result.RecordsLoaded = apiOperators.Count;
+                    
+                    // Call stored procedure to process SCD2 logic
+                    using (var procCmd = new OracleCommand("SP_PROCESS_OPERATORS_SCD2", connection))
+                    {
+                        procCmd.CommandType = CommandType.StoredProcedure;
+                        procCmd.Transaction = transaction;
+                        procCmd.Parameters.Add("p_etl_run_id", etlRunId);
+                        await procCmd.ExecuteNonQueryAsync();
+                    }
+                    
+                    // Get results from ETL_CONTROL
+                    string getResultsSql = @"
+                        SELECT RECORDS_LOADED, RECORDS_UPDATED, RECORDS_UNCHANGED
+                        FROM ETL_CONTROL WHERE ETL_RUN_ID = :runId";
+                    
+                    using (var resultsCmd = new OracleCommand(getResultsSql, connection))
+                    {
+                        resultsCmd.Transaction = transaction;
+                        resultsCmd.Parameters.Add("runId", etlRunId);
+                        using var reader = await resultsCmd.ExecuteReaderAsync();
+                        if (await reader.ReadAsync())
+                        {
+                            result.RecordsLoaded = reader.GetInt32(0);
+                            result.RecordsUpdated = reader.GetInt32(1);
+                            result.RecordsUnchanged = reader.GetInt32(2);
+                        }
+                    }
+                    
+                    // Update ETL run as complete
+                    string updateRunSql = @"
+                        UPDATE ETL_CONTROL 
+                        SET STATUS = 'COMPLETED', END_TIME = SYSDATE
+                        WHERE ETL_RUN_ID = :runId";
+                    
+                    using (var updateCmd = new OracleCommand(updateRunSql, connection))
+                    {
+                        updateCmd.Transaction = transaction;
+                        updateCmd.Parameters.Add("runId", etlRunId);
+                        await updateCmd.ExecuteNonQueryAsync();
+                    }
+                    
+                    await transaction.CommitAsync();
+                    
+                    result.Status = "SUCCESS";
+                    result.Message = $"SCD2 Processing Complete: {result.RecordsLoaded} new, {result.RecordsUpdated} updated, {result.RecordsUnchanged} unchanged";
+                    result.EndTime = DateTime.Now;
+                    
+                    _logger.LogInformation(result.Message);
+                    
+                    return result;
+                }
+                catch (Exception ex)
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in LoadOperatorsSCD2Native");
+                result.Status = "ERROR";
+                result.Message = ex.Message;
+                result.EndTime = DateTime.Now;
+                
+                if (etlRunId > 0)
+                {
+                    // Log error (LogETLError method needs to be updated)
+                }
+                
+                return result;
+            }
+        }
+
+        public async Task<ETLResult> LoadPlantsSCD2Native(int? operatorId = null)
+        {
+            var result = new ETLResult { StartTime = DateTime.Now, EndpointName = "plants_scd2_native" };
+            int etlRunId = 0;
+            
+            try
+            {
+                // STEP 1: Fetch data from API (outside transaction)
+                _logger.LogInformation("SCD2 Native: Fetching plants data from API...");
+                List<Dictionary<string, object>> apiPlants = new List<Dictionary<string, object>>();
+                
+                if (operatorId.HasValue)
+                {
+                    var apiResponse = await _apiService.FetchDataAsync($"operators/{operatorId}/plants");
+                    var apiData = _deserializer.DeserializeApiResponse(apiResponse, $"operators/{operatorId}/plants");
+                    if (apiData != null) apiPlants.AddRange(apiData);
+                }
+                else
+                {
+                    var apiResponse = await _apiService.FetchDataAsync("plants");
+                    var apiData = _deserializer.DeserializeApiResponse(apiResponse, "plants");
+                    if (apiData != null) apiPlants.AddRange(apiData);
+                }
+                
+                result.ApiCallCount = 1;
+                
+                if (!apiPlants.Any())
+                {
+                    result.Status = "NO_DATA";
+                    result.Message = "No plant data returned from API";
+                    return result;
+                }
+                
+                _logger.LogInformation($"SCD2 Native: Fetched {apiPlants.Count} plants from API");
+
+                // STEP 2: Process with transaction
+                using var connection = new OracleConnection(_connectionString);
+                await connection.OpenAsync();
+                using var transaction = connection.BeginTransaction();
+                
+                try
+                {
+                    // Create ETL run record
+                    string createRunSql = @"
+                        INSERT INTO ETL_CONTROL (RUN_TYPE, STATUS, START_TIME, API_CALL_COUNT)
+                        VALUES ('PLANTS_SCD2', 'RUNNING', SYSDATE, :apiCalls)
+                        RETURNING ETL_RUN_ID INTO :runId";
+                    
+                    using (var runCmd = new OracleCommand(createRunSql, connection))
+                    {
+                        runCmd.Transaction = transaction;
+                        runCmd.Parameters.Add(new OracleParameter("apiCalls", result.ApiCallCount));
+                        var runIdParam = new OracleParameter("runId", OracleDbType.Decimal) { Direction = ParameterDirection.Output };
+                        runCmd.Parameters.Add(runIdParam);
+                        await runCmd.ExecuteNonQueryAsync();
+                        
+                        // Handle OracleDecimal conversion
+                        if (runIdParam.Value is Oracle.ManagedDataAccess.Types.OracleDecimal oracleDecimal)
+                        {
+                            etlRunId = oracleDecimal.ToInt32();
+                        }
+                        else
+                        {
+                            etlRunId = Convert.ToInt32(runIdParam.Value);
+                        }
+                    }
+                    
+                    // Clear staging table
+                    using (var clearCmd = new OracleCommand("DELETE FROM STG_PLANTS", connection))
+                    {
+                        clearCmd.Transaction = transaction;
+                        await clearCmd.ExecuteNonQueryAsync();
+                    }
+                    
+                    // Load data into staging (let Oracle compute the hash)
+                    string stagingSql = @"
+                        INSERT INTO STG_PLANTS (
+                            PLANT_ID, PLANT_NAME, LONG_DESCRIPTION, 
+                            OPERATOR_ID, COMMON_LIB_PLANT_CODE, ETL_RUN_ID
+                        ) VALUES (
+                            :plantId, :plantName, :longDesc, 
+                            :operatorId, :commonLib, :etlRunId
+                        )";
+                    
+                    foreach (var plant in apiPlants)
+                    {
+                        using var stageCmd = new OracleCommand(stagingSql, connection);
+                        stageCmd.Transaction = transaction;
+                        stageCmd.Parameters.Add("plantId", plant.GetValueOrDefault("PlantID", "")?.ToString() ?? "");
+                        stageCmd.Parameters.Add("plantName", plant.GetValueOrDefault("ShortDescription", "")?.ToString() ?? "");
+                        stageCmd.Parameters.Add("longDesc", plant.GetValueOrDefault("LongDescription", "")?.ToString() ?? "");
+                        stageCmd.Parameters.Add("operatorId", Convert.ToInt32(plant.GetValueOrDefault("OperatorID", 0)));
+                        stageCmd.Parameters.Add("commonLib", plant.GetValueOrDefault("CommonLibPlantCode", "")?.ToString() ?? "");
+                        stageCmd.Parameters.Add("etlRunId", etlRunId);
+                        await stageCmd.ExecuteNonQueryAsync();
+                    }
+                    
+                    result.RecordsLoaded = apiPlants.Count;
+                    
+                    // Call stored procedure to process SCD2 logic
+                    using (var procCmd = new OracleCommand("SP_PROCESS_PLANTS_SCD2", connection))
+                    {
+                        procCmd.CommandType = CommandType.StoredProcedure;
+                        procCmd.Transaction = transaction;
+                        procCmd.Parameters.Add("p_etl_run_id", etlRunId);
+                        await procCmd.ExecuteNonQueryAsync();
+                    }
+                    
+                    // Get results from ETL_CONTROL
+                    string getResultsSql = @"
+                        SELECT RECORDS_LOADED, RECORDS_UPDATED, RECORDS_UNCHANGED
+                        FROM ETL_CONTROL WHERE ETL_RUN_ID = :runId";
+                    
+                    using (var resultsCmd = new OracleCommand(getResultsSql, connection))
+                    {
+                        resultsCmd.Transaction = transaction;
+                        resultsCmd.Parameters.Add("runId", etlRunId);
+                        using var reader = await resultsCmd.ExecuteReaderAsync();
+                        if (await reader.ReadAsync())
+                        {
+                            result.RecordsLoaded = reader.GetInt32(0);
+                            result.RecordsUpdated = reader.GetInt32(1);
+                            result.RecordsUnchanged = reader.GetInt32(2);
+                        }
+                    }
+                    
+                    // Update ETL run as complete
+                    string updateRunSql = @"
+                        UPDATE ETL_CONTROL 
+                        SET STATUS = 'COMPLETED', END_TIME = SYSDATE
+                        WHERE ETL_RUN_ID = :runId";
+                    
+                    using (var updateCmd = new OracleCommand(updateRunSql, connection))
+                    {
+                        updateCmd.Transaction = transaction;
+                        updateCmd.Parameters.Add("runId", etlRunId);
+                        await updateCmd.ExecuteNonQueryAsync();
+                    }
+                    
+                    await transaction.CommitAsync();
+                    
+                    result.Status = "SUCCESS";
+                    result.Message = $"SCD2 Processing Complete: {result.RecordsLoaded} new, {result.RecordsUpdated} updated, {result.RecordsUnchanged} unchanged";
+                    result.EndTime = DateTime.Now;
+                    
+                    _logger.LogInformation(result.Message);
+                    
+                    return result;
+                }
+                catch (Exception ex)
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in LoadPlantsSCD2Native");
+                result.Status = "ERROR";
+                result.Message = ex.Message;
+                result.EndTime = DateTime.Now;
+                
+                if (etlRunId > 0)
+                {
+                    // Log error (LogETLError method needs to be updated)
+                }
+                
+                return result;
+            }
+        }
+
+        public async Task<ETLResult> LoadPlantsSCD2(int? operatorId = null)
+        {
+            var result = new ETLResult { StartTime = DateTime.Now, EndpointName = "plants_scd2" };
+            var sqlStatements = new List<string>();
+            int etlRunId = 0;
+            
+            try
+            {
+                // STEP 1: Fetch data from API
+                _logger.LogInformation("SCD2: Fetching plants data from API...");
+                List<Dictionary<string, object>> apiPlants = new List<Dictionary<string, object>>();
+                
+                if (operatorId.HasValue)
+                {
+                    var apiResponse = await _apiService.FetchDataAsync($"operators/{operatorId}/plants");
+                    var apiData = _deserializer.DeserializeApiResponse(apiResponse, $"operators/{operatorId}/plants");
+                    if (apiData != null) apiPlants.AddRange(apiData);
+                }
+                else
+                {
+                    var apiResponse = await _apiService.FetchDataAsync("plants");
+                    var apiData = _deserializer.DeserializeApiResponse(apiResponse, "plants");
+                    if (apiData != null) apiPlants.AddRange(apiData);
+                }
+                
+                result.ApiCallCount = 1;
+                
+                if (!apiPlants.Any())
+                {
+                    result.Status = "NO_DATA";
+                    result.Message = "No plant data returned from API";
+                    return result;
+                }
+                
+                _logger.LogInformation($"SCD2: Fetched {apiPlants.Count} plants from API");
+
+                // STEP 2: Open connection with transaction
+                using var connection = new OracleConnection(_connectionString);
+                await connection.OpenAsync();
+                using var transaction = connection.BeginTransaction();
+                
+                try
+                {
+                    // STEP 3: Start ETL run
+                    etlRunId = await StartETLRun("INCREMENTAL", "plants_scd2", connection, transaction);
+                    
+                    // STEP 4: Clear staging table
+                    string clearStagingSql = "DELETE FROM STG_PLANTS";
+                    using (var clearCmd = new OracleCommand(clearStagingSql, connection))
+                    {
+                        clearCmd.Transaction = transaction;
+                        await clearCmd.ExecuteNonQueryAsync();
+                    }
+                    
+                    // STEP 5: Load data into staging with hashes
+                    string stagingSql = @"
+                        INSERT INTO STG_PLANTS (
+                            PLANT_ID, PLANT_NAME, LONG_DESCRIPTION, 
+                            OPERATOR_ID, COMMON_LIB_PLANT_CODE, SRC_HASH, ETL_RUN_ID
+                        ) VALUES (
+                            :plantId, :plantName, :longDesc, 
+                            :operatorId, :commonLib, :srcHash, :etlRunId
+                        )";
+                    
+                    foreach (var plant in apiPlants)
+                    {
+                        var plantId = plant.GetValueOrDefault("PlantID", "")?.ToString() ?? "";
+                        var plantName = plant.GetValueOrDefault("ShortDescription", "")?.ToString() ?? "";
+                        var longDesc = plant.GetValueOrDefault("LongDescription", "")?.ToString() ?? "";
+                        var opId = plant.GetValueOrDefault("OperatorID", "0")?.ToString() ?? "0";
+                        var commonLib = plant.GetValueOrDefault("CommonLibPlantCode", "")?.ToString() ?? "";
+                        
+                        var hash = ComputeHash(plantId, plantName, longDesc, opId, commonLib);
+                        
+                        using var stageCmd = new OracleCommand(stagingSql, connection);
+                        stageCmd.Transaction = transaction;
+                        stageCmd.Parameters.Add(new OracleParameter("plantId", plantId));
+                        stageCmd.Parameters.Add(new OracleParameter("plantName", plantName));
+                        stageCmd.Parameters.Add(new OracleParameter("longDesc", longDesc));
+                        stageCmd.Parameters.Add(new OracleParameter("operatorId", int.Parse(opId)));
+                        stageCmd.Parameters.Add(new OracleParameter("commonLib", commonLib));
+                        stageCmd.Parameters.Add(new OracleParameter("srcHash", hash));
+                        stageCmd.Parameters.Add(new OracleParameter("etlRunId", etlRunId));
+                        await stageCmd.ExecuteNonQueryAsync();
+                    }
+                    
+                    // STEP 6: Identify changes
+                    // Count unchanged records
+                    string unchangedSql = @"
+                        SELECT COUNT(*) FROM STG_PLANTS s
+                        INNER JOIN PLANTS p ON p.PLANT_ID = s.PLANT_ID
+                        WHERE p.IS_CURRENT = 'Y' AND p.SRC_HASH = s.SRC_HASH";
+                    
+                    int unchangedCount = 0;
+                    using (var countCmd = new OracleCommand(unchangedSql, connection))
+                    {
+                        countCmd.Transaction = transaction;
+                        var countResult = await countCmd.ExecuteScalarAsync();
+                        unchangedCount = Convert.ToInt32(countResult ?? 0);
+                    }
+                    
+                    // STEP 7: Process changed records - expire old versions
+                    string expireSql = @"
+                        UPDATE PLANTS p
+                        SET p.VALID_TO = SYSDATE, p.IS_CURRENT = 'N'
+                        WHERE p.IS_CURRENT = 'Y'
+                          AND EXISTS (
+                            SELECT 1 FROM STG_PLANTS s
+                            WHERE s.PLANT_ID = p.PLANT_ID
+                              AND s.SRC_HASH != p.SRC_HASH
+                          )";
+                    
+                    int changedCount = 0;
+                    using (var expireCmd = new OracleCommand(expireSql, connection))
+                    {
+                        expireCmd.Transaction = transaction;
+                        changedCount = await expireCmd.ExecuteNonQueryAsync();
+                    }
+                    
+                    // STEP 8: Insert new versions for changed records
+                    if (changedCount > 0)
+                    {
+                        string insertChangedSql = @"
+                            INSERT INTO PLANTS (
+                                PLANT_ID, PLANT_NAME, LONG_DESCRIPTION, OPERATOR_ID,
+                                COMMON_LIB_PLANT_CODE, SRC_HASH, VALID_FROM, IS_CURRENT, ETL_RUN_ID
+                            )
+                            SELECT s.PLANT_ID, s.PLANT_NAME, s.LONG_DESCRIPTION, s.OPERATOR_ID,
+                                   s.COMMON_LIB_PLANT_CODE, s.SRC_HASH, SYSDATE, 'Y', s.ETL_RUN_ID
+                            FROM STG_PLANTS s
+                            WHERE EXISTS (
+                                SELECT 1 FROM PLANTS p
+                                WHERE p.PLANT_ID = s.PLANT_ID
+                                  AND p.VALID_TO = SYSDATE
+                            )";
+                        
+                        using var insertChangedCmd = new OracleCommand(insertChangedSql, connection);
+                        insertChangedCmd.Transaction = transaction;
+                        await insertChangedCmd.ExecuteNonQueryAsync();
+                    }
+                    
+                    // STEP 9: Insert completely new records
+                    string insertNewSql = @"
+                        INSERT INTO PLANTS (
+                            PLANT_ID, PLANT_NAME, LONG_DESCRIPTION, OPERATOR_ID,
+                            COMMON_LIB_PLANT_CODE, SRC_HASH, VALID_FROM, IS_CURRENT, ETL_RUN_ID
+                        )
+                        SELECT s.PLANT_ID, s.PLANT_NAME, s.LONG_DESCRIPTION, s.OPERATOR_ID,
+                               s.COMMON_LIB_PLANT_CODE, s.SRC_HASH, SYSDATE, 'Y', s.ETL_RUN_ID
+                        FROM STG_PLANTS s
+                        WHERE NOT EXISTS (
+                            SELECT 1 FROM PLANTS p
+                            WHERE p.PLANT_ID = s.PLANT_ID
+                        )";
+                    
+                    int newCount = 0;
+                    using (var insertNewCmd = new OracleCommand(insertNewSql, connection))
+                    {
+                        insertNewCmd.Transaction = transaction;
+                        newCount = await insertNewCmd.ExecuteNonQueryAsync();
+                    }
+                    
+                    // STEP 10: Update ETL control with statistics
+                    string updateControlSql = @"
+                        UPDATE ETL_CONTROL
+                        SET RECORDS_LOADED = :newCount,
+                            RECORDS_UPDATED = :changedCount,
+                            RECORDS_UNCHANGED = :unchangedCount,
+                            STATUS = 'SUCCESS',
+                            END_TIME = SYSDATE
+                        WHERE ETL_RUN_ID = :etlRunId";
+                    
+                    using (var updateCmd = new OracleCommand(updateControlSql, connection))
+                    {
+                        updateCmd.Transaction = transaction;
+                        updateCmd.Parameters.Add(new OracleParameter("newCount", newCount));
+                        updateCmd.Parameters.Add(new OracleParameter("changedCount", changedCount));
+                        updateCmd.Parameters.Add(new OracleParameter("unchangedCount", unchangedCount));
+                        updateCmd.Parameters.Add(new OracleParameter("etlRunId", etlRunId));
+                        await updateCmd.ExecuteNonQueryAsync();
+                    }
+                    
+                    // STEP 11: Commit transaction
+                    await transaction.CommitAsync();
+                    
+                    // Set result
+                    result.Status = "SUCCESS";
+                    result.RecordsLoaded = newCount;
+                    result.RecordsUpdated = changedCount;
+                    result.RecordsUnchanged = unchangedCount;
+                    result.EndTime = DateTime.Now;
+                    result.Message = $"SCD2 Complete: {newCount} new, {changedCount} changed, {unchangedCount} unchanged";
+                    
+                    _logger.LogInformation($"SCD2 ETL completed: {result.Message}");
+                }
+                catch
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "SCD2 ETL failed");
+                result.Status = "FAILED";
+                result.Message = $"Error: {ex.Message}";
+                result.ErrorCount = 1;
+                
+                // Log error to ETL_ERROR_LOG
+                if (etlRunId > 0)
+                {
+                    await LogETLError(etlRunId, ex, "LoadPlantsSCD2");
+                }
+            }
+            
+            result.SqlStatements = sqlStatements;
+            return result;
         }
 
         public async Task<bool> DropAllTables()
@@ -2055,6 +2758,8 @@ VALUES (:plantId, :operatorId, :operatorName, :shortDesc, :project,
         public string Status { get; set; } = string.Empty;
         public string Message { get; set; } = string.Empty;
         public int RecordsLoaded { get; set; }
+        public int RecordsUpdated { get; set; }  // New for SCD2
+        public int RecordsUnchanged { get; set; }  // New for SCD2
         public int ErrorCount { get; set; }
         public DateTime StartTime { get; set; }
         public DateTime EndTime { get; set; }

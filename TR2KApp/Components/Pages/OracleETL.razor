@@ -69,6 +69,12 @@
                     <button class="btn btn-info ms-2" @onclick="RefreshTableStatuses" disabled="@(!isConnected || isLoading)">
                         <i class="bi bi-arrow-clockwise"></i> Verify Schema
                     </button>
+                    <button class="btn btn-warning ms-2" @onclick="TestHashSupport" disabled="@(!isConnected || isLoading)">
+                        <i class="bi bi-hash"></i> Test Hash Functions
+                    </button>
+                    <button class="btn btn-danger ms-2" @onclick="SimulateDataChange" disabled="@(!isConnected || isLoading)">
+                        <i class="bi bi-pencil-square"></i> Simulate Change
+                    </button>
                 </div>
             </div>
             @if (!string.IsNullOrEmpty(connectionMessage))
@@ -127,8 +133,8 @@
                             }
                         </td>
                         <td>
-                            <button class="btn btn-sm btn-primary" @onclick="LoadOperators" disabled="@(!isConnected || isLoading)">
-                                @if (loadingTable == "operators")
+                            <button class="btn btn-sm btn-primary" @onclick="LoadOperatorsSCD2Native" disabled="@(!isConnected || isLoading)">
+                                @if (loadingTable == "operators_scd2_native")
                                 {
                                     <span class="spinner-border spinner-border-sm" role="status"></span>
                                     <span> Loading...</span>
@@ -171,15 +177,15 @@
                             }
                         </td>
                         <td>
-                            <button class="btn btn-sm btn-primary" @onclick="LoadPlants" disabled="@(!isConnected || isLoading)">
-                                @if (loadingTable == "plants")
+                            <button class="btn btn-sm btn-primary" @onclick="LoadPlantsSCD2Native" disabled="@(!isConnected || isLoading)">
+                                @if (loadingTable == "plants_scd2_native")
                                 {
                                     <span class="spinner-border spinner-border-sm" role="status"></span>
                                     <span> Loading...</span>
                                 }
                                 else
                                 {
-                                    <span>Load All</span>
+                                    <span>Load</span>
                                 }
                             </button>
                             <button class="btn btn-sm btn-info" @onclick="@(() => ShowSqlPreview("plants"))" disabled="@(!isConnected)">
@@ -311,34 +317,49 @@
             </div>
             <div class="card-body">
                 <div class="row mb-3">
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <strong>Status:</strong> <span class="badge @(lastETLResult.Status == "SUCCESS" ? "bg-success" : "bg-danger")">@lastETLResult.Status</span>
                     </div>
-                    <div class="col-md-3">
-                        <strong>Records Loaded:</strong> @lastETLResult.RecordsLoaded
+                    <div class="col-md-2">
+                        <strong>Records:</strong> <span class="badge bg-dark">@lastETLResult.RecordsLoaded</span>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
+                        <strong>API Calls:</strong> <span class="badge bg-info">@(lastETLResult.ApiCallCount > 0 ? lastETLResult.ApiCallCount : 1)</span>
+                    </div>
+                    <div class="col-md-2">
                         <strong>Duration:</strong> @lastETLResult.FormattedDuration
                     </div>
-                    <div class="col-md-3">
-                        <strong>Records/Second:</strong> @lastETLResult.RecordsPerSecond.ToString("F2")
+                    <div class="col-md-2">
+                        <strong>Speed:</strong> @lastETLResult.RecordsPerSecond.ToString("F1") rec/s
+                    </div>
+                    <div class="col-md-2">
+                        <strong>Efficiency:</strong> <span class="badge bg-success">@((lastETLResult.RecordsLoaded / (double)Math.Max(lastETLResult.ApiCallCount, 1)).ToString("F1")) rec/API</span>
                     </div>
                 </div>
                 
-                @if (lastETLResult.ApiCallCount > 0)
+                @if (lastETLResult.PlantIterations > 0 || lastETLResult.IssueIterations > 0)
                 {
                     <div class="row mb-3">
-                        <div class="col-md-3">
-                            <strong>API Calls:</strong> @lastETLResult.ApiCallCount
+                        <div class="col-md-6">
+                            <strong>Plants Processed:</strong> <span class="badge bg-primary">@lastETLResult.PlantIterations</span>
                         </div>
-                        <div class="col-md-3">
-                            <strong>Plants Processed:</strong> @lastETLResult.PlantIterations
+                        <div class="col-md-6">
+                            <strong>Issues Processed:</strong> <span class="badge bg-secondary">@lastETLResult.IssueIterations</span>
                         </div>
-                        <div class="col-md-3">
-                            <strong>Issues Processed:</strong> @lastETLResult.IssueIterations
+                    </div>
+                }
+                
+                @if (lastETLResult.RecordsUpdated > 0 || lastETLResult.RecordsUnchanged > 0)
+                {
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <strong>New Records:</strong> <span class="badge bg-success">@lastETLResult.RecordsLoaded</span>
                         </div>
-                        <div class="col-md-3">
-                            <strong>Efficiency:</strong> @((lastETLResult.RecordsLoaded / (double)lastETLResult.ApiCallCount).ToString("F2")) records/API call
+                        <div class="col-md-4">
+                            <strong>Updated:</strong> <span class="badge bg-warning text-dark">@lastETLResult.RecordsUpdated</span>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Unchanged:</strong> <span class="badge bg-secondary">@lastETLResult.RecordsUnchanged</span>
                         </div>
                     </div>
                 }
@@ -433,7 +454,7 @@
                                     <td>
                                         <button class="btn btn-sm btn-danger" @onclick="@(() => RemovePlantFromLoader(config.PlantId))" 
                                                 disabled="@(!isConnected || isLoading)">
-                                            <i class="bi bi-trash"></i>
+                                            Delete
                                         </button>
                                     </td>
                                 </tr>
@@ -638,6 +659,52 @@
             connectionMessage = isConnected 
                 ? "Successfully connected to Oracle database!" 
                 : "Failed to connect to Oracle database. Check connection settings.";
+        }
+        catch (Exception ex)
+        {
+            connectionMessage = $"Error: {ex.Message}";
+            Logger.LogError(ex, "Failed to test connection");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+    
+    private async Task TestHashSupport()
+    {
+        isLoading = true;
+        connectionMessage = "";
+        StateHasChanged();
+        
+        try
+        {
+            var result = await OracleService.TestOracleHashSupport();
+            connectionMessage = result;
+        }
+        catch (Exception ex)
+        {
+            connectionMessage = $"Error: {ex.Message}";
+            Logger.LogError(ex, "Failed to test hash support");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+    
+    private async Task SimulateDataChange()
+    {
+        isLoading = true;
+        connectionMessage = "";
+        StateHasChanged();
+        
+        try
+        {
+            var result = await OracleService.SimulateDataChange();
+            connectionMessage = result;
                 
             if (isConnected)
             {
@@ -749,22 +816,22 @@
         StateHasChanged();
     }
     
-    private async Task LoadOperators()
+    private async Task LoadOperatorsSCD2Native()
     {
         isLoading = true;
-        loadingTable = "operators";
+        loadingTable = "operators_scd2_native";
         loadMessage = "";
         showSqlPreview = false;
         StateHasChanged();
         
         try
         {
-            var result = await OracleService.LoadOperators();
+            var result = await OracleService.LoadOperatorsSCD2Native();
             lastETLResult = result;
             
             if (result.Status == "SUCCESS")
             {
-                loadMessage = $"Successfully loaded {result.RecordsLoaded} operators!";
+                loadMessage = $"SCD2 Processing Complete: {result.RecordsLoaded} new, {result.RecordsUpdated} updated, {result.RecordsUnchanged} unchanged";
                 await RefreshTableStatuses();
                 await RefreshETLHistory();
             }
@@ -785,24 +852,25 @@
         }
     }
     
-    private async Task LoadPlants()
+    private async Task LoadPlantsSCD2Native()
     {
         isLoading = true;
-        loadingTable = "plants";
+        loadingTable = "plants_scd2_native";
         loadMessage = "";
         showSqlPreview = false;
         StateHasChanged();
         
         try
         {
-            var result = await OracleService.LoadPlants();
+            var result = await OracleService.LoadPlantsSCD2Native();
             lastETLResult = result;
             
             if (result.Status == "SUCCESS")
             {
-                loadMessage = $"Successfully loaded {result.RecordsLoaded} plants!";
+                loadMessage = $"SCD2 Processing Complete: {result.RecordsLoaded} new, {result.RecordsUpdated} updated, {result.RecordsUnchanged} unchanged";
                 await RefreshTableStatuses();
                 await RefreshETLHistory();
+                await LoadAvailablePlants(); // Refresh available plants dropdown
             }
             else
             {
@@ -1081,9 +1149,9 @@
             
             availablePlants = allPlantsData.Select(p => new PlantInfo
             {
-                PlantId = p["PlantId"]?.ToString() ?? "",
-                PlantName = p["PlantName"]?.ToString() ?? "",
-                LongDescription = p["LongDescription"]?.ToString() ?? ""
+                PlantId = p["PLANT_ID"]?.ToString() ?? "",
+                PlantName = p["PLANT_NAME"]?.ToString() ?? "",
+                LongDescription = p["LONG_DESCRIPTION"]?.ToString() ?? ""
             }).ToList();
             
             // Remove plants that are already in the loader

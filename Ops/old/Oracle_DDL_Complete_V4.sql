@@ -440,10 +440,15 @@ ORDER BY L.LOAD_PRIORITY, L.PLANT_ID;
 -- =====================================================
 
 -- Insert some initial plants for testing (adjust as needed)
-INSERT INTO ETL_PLANT_LOADER (PLANT_ID, PLANT_NAME, LOAD_PRIORITY, NOTES) VALUES 
-    ('34', 'Gullfaks A', 10, 'High priority - active project'),
-    ('47', 'Oseberg Øst', 20, 'Active development'),
-    ('92', 'Åsgard B', 30, 'Regular updates needed');
+-- Oracle requires separate INSERT statements or INSERT ALL syntax
+INSERT INTO ETL_PLANT_LOADER (PLANT_ID, PLANT_NAME, LOAD_PRIORITY, NOTES) 
+VALUES ('34', 'Gullfaks A', 10, 'High priority - active project');
+
+INSERT INTO ETL_PLANT_LOADER (PLANT_ID, PLANT_NAME, LOAD_PRIORITY, NOTES) 
+VALUES ('47', 'Oseberg Øst', 20, 'Active development');
+
+INSERT INTO ETL_PLANT_LOADER (PLANT_ID, PLANT_NAME, LOAD_PRIORITY, NOTES) 
+VALUES ('92', 'Åsgard B', 30, 'Regular updates needed');
 
 COMMIT;
 
@@ -464,14 +469,24 @@ SELECT index_name, table_name FROM user_indexes ORDER BY table_name, index_name;
 SELECT view_name FROM user_views ORDER BY view_name;
 
 -- Display completion message
+DECLARE
+    v_table_count NUMBER;
+    v_view_count NUMBER;
+    v_index_count NUMBER;
+    v_sequence_count NUMBER;
 BEGIN
+    SELECT COUNT(*) INTO v_table_count FROM user_tables;
+    SELECT COUNT(*) INTO v_view_count FROM user_views;
+    SELECT COUNT(*) INTO v_index_count FROM user_indexes;
+    SELECT COUNT(*) INTO v_sequence_count FROM user_sequences;
+    
     DBMS_OUTPUT.PUT_LINE('===============================================');
     DBMS_OUTPUT.PUT_LINE('TR2000 STAGING DATABASE CREATION COMPLETE');
     DBMS_OUTPUT.PUT_LINE('===============================================');
-    DBMS_OUTPUT.PUT_LINE('Tables created: ' || (SELECT COUNT(*) FROM user_tables));
-    DBMS_OUTPUT.PUT_LINE('Views created: ' || (SELECT COUNT(*) FROM user_views));
-    DBMS_OUTPUT.PUT_LINE('Indexes created: ' || (SELECT COUNT(*) FROM user_indexes));
-    DBMS_OUTPUT.PUT_LINE('Sequences created: ' || (SELECT COUNT(*) FROM user_sequences));
+    DBMS_OUTPUT.PUT_LINE('Tables created: ' || v_table_count);
+    DBMS_OUTPUT.PUT_LINE('Views created: ' || v_view_count);
+    DBMS_OUTPUT.PUT_LINE('Indexes created: ' || v_index_count);
+    DBMS_OUTPUT.PUT_LINE('Sequences created: ' || v_sequence_count);
     DBMS_OUTPUT.PUT_LINE('===============================================');
 END;
 /

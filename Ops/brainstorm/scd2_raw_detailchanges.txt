@@ -1,0 +1,389 @@
+what is the industry standard when it comes to handling the detailed changes. for example:
+1) What happens when someone manually changes a value in the table. In this case the hash key doesnt change and think its ok, and so most likely corrupt data will continue to live after next exports
+2) What happens if source data deletes a row, would that row get set to "iscurrent = N"?
+3) what happens if source data has duplicate rows?
+4) what happens if source data keeps everything the same but changes the main primary key (like "operatorID"
+5) many other options that im not thinking of right now but could happen....
+ChatGPT said:
+Thought for 10s
+
+Great questions, Vivek. Here’s how teams typically handle each of those “messy reality” cases with an SCD2-style warehouse. I’ll keep it practical and opinionated so you can implement it.
+
+Ground rules (industry standard)
+
+Only the ETL writes. Human DML on staging/warehouse tables is blocked.
+
+Append-only semantics. Changes create new versions; old rows are never edited except to close them (VALID_TO, IS_CURRENT='N').
+
+Staging first. Land source data into STG_* tables exactly as received (after minimal typing), then validate/clean/dedupe before touching dimensions.
+
+Quarantine bad data. Rows that fail rules go to REJECT_* (with reason) and do not enter the model.
+
+Full audit trail. Keep RAW_JSON, ETL_LOG, and LOAD_BATCH_ID everywhere.
+
+1) “What if someone manually changes a value in the table?”
+
+Don’t allow it. This is a process control issue, not an SCD design issue.
+
+Controls:
+
+RBAC: Only role TR2000_ETL gets INSERT/UPDATE/DELETE; users get TR2000_READ (SELECT only).
+
+DB trigger (belt-and-braces) to reject DML unless SYS_CONTEXT('USERENV','SESSION_USER') is the ETL account (or a trusted app user).
+
+Daily reconciliation job comparing current dimension snapshot vs source snapshot (counts + hashes). Any drift ⇒ alert.
+
+Example reject trigger (pattern):
+
+CREATE OR REPLACE TRIGGER dim_plant_block_manual_dml
+  BEFORE INSERT OR UPDATE OR DELETE ON DIM_PLANT
+BEGIN
+  IF SYS_CONTEXT('USERENV','SESSION_USER') <> 'TR2000_ETL_USER' THEN
+    RAISE_APPLICATION_ERROR(-20001, 'Direct DML is not allowed. Use ETL.');
+  END IF;
+END;
+/
+
+2) “What if source deletes a row?”
+
+Standard policy is soft-delete as a new version:
+
+Detect keys that were present yesterday but not today (anti-join STG vs current DIM).
+
+Close the current row: VALID_TO = now, IS_CURRENT='N', and set DELETED_FLAG='Y' (add this column).
+
+Do not physically delete; history remains.
+
+Anti-join pattern:
+
+-- Keys that disappeared in today’s snapshot:
+SELECT d.PLANT_ID
+FROM DIM_PLANT d
+LEFT JOIN STG_PLANT s ON s.PLANT_ID = d.PLANT_ID
+WHERE d.IS_CURRENT = 'Y' AND s.PLANT_ID IS NULL;
+
+-- Mark them deleted (Type 2 close)
+UPDATE DIM_PLANT d
+SET VALID_TO = SYSTIMESTAMP, IS_CURRENT = 'N', DELETED_FLAG='Y'
+WHERE d.IS_CURRENT='Y'
+  AND NOT EXISTS (SELECT 1 FROM STG_PLANT s WHERE s.PLANT_ID = d.PLANT_ID);
+
+3) “What if source has duplicate rows?”
+
+Never load duplicates into dimensions. Decide a rule and enforce it in staging:
+
+Common rules:
+
+Latest-wins (by source timestamp or revision).
+
+Highest-priority wins (if there’s a status or quality flag).
+
+Quarantine if duplicates disagree on critical fields.
+
+Dedupe in staging (example latest-wins):
+
+-- Keep one row per business key by latest source_ts
+CREATE TABLE STG_PLANT_DEDUP AS
+SELECT *
+FROM (
+  SELECT s.*,
+         ROW_NUMBER() OVER (PARTITION BY PLANT_ID ORDER BY SOURCE_TS DESC) rn
+  FROM STG_PLANT s
+)
+WHERE rn = 1;
+
+
+Then use STG_PLANT_DEDUP for SCD2 compare.
+
+4) “What if source keeps everything the same but changes the main primary key (e.g., OperatorID)?”
+
+This is the hardest class of problem. Best practice:
+
+Prefer a stable business key. If the source offers an immutable ID (GUID), use that as the natural key.
+
+If the natural key changes (renumbering), treat it as a Type 2 change that introduces a new natural key. You do not rewrite history.
+
+Maintain a crosswalk table to link old and new keys for reporting joins:
+
+OPERATOR_KEY_XWALK
+-------------------
+OPERATOR_KEY   -- surrogate (FK from DIM_OPERATOR)
+OLD_OPERATOR_ID
+NEW_OPERATOR_ID
+CHANGED_AT
+
+
+ETL step:
+
+Detect “same entity, new ID” (source usually provides a parent GUID or an explicit “rekey” event; if not, you may need fuzzy logic + manual approval).
+
+Close old row, insert new dimension row with the new OperatorID.
+
+Record mapping in *_XWALK. Facts continue to point to the same surrogate OPERATOR_KEY.
+
+Key idea: Facts should join to dimension surrogate keys (identity columns). Natural key changes do not force you to rewrite facts.
+
+5) Other common cases & standard handling
+a) Partial attribute updates (some fields null/missing)
+
+Don’t overwrite with nulls unless source explicitly signals a cleared value.
+
+Use a merge that only updates provided fields; otherwise carry forward previous values (business-approved).
+
+b) Late-arriving dimensions / early-arriving facts
+
+Use “Unknown” members (e.g., OPERATOR_KEY=0) then backfill once the true dimension arrives.
+
+Keep a job that attempts backfill for recent facts.
+
+c) Out-of-order updates (older snapshot arrives late)
+
+If the snapshot’s as-of timestamp is older than your current version, either:
+
+Quarantine (default), or
+
+Insert it as historical if it cleanly fits between two versions (advanced).
+
+d) JSON drift (schema changes in source)
+
+Keep RAW_JSON always.
+
+Parser layer uses tolerant extraction (NVL defaults).
+
+Add new columns via migrations as fields stabilize; backfill from RAW_JSON where feasible.
+
+e) Performance & idempotency
+
+Build SRC_HASH in staging from only the business fields that define a change (ignore volatile fields like lastSeen).
+
+Use MERGE or the “expire+insert” two-step in a single transaction per batch.
+
+Array bind DML; index (BUSINESS_KEY, IS_CURRENT) and (BUSINESS_KEY, VALID_FROM).
+
+Quick policy checklist you can adopt
+
+Access control
+
+Read-only role for analysts.
+
+ETL role for writes; block manual DML with triggers.
+
+Staging discipline
+
+Land → Deduplicate → Validate → Hash → Compare → Load.
+
+Change logic
+
+No change: do nothing.
+
+Change: close old (Type 2), insert new.
+
+Delete: soft-delete (Type 2 close + DELETED_FLAG='Y').
+
+Data quality
+
+Unique constraint on (BusinessKey, VALID_TO) to prevent overlapping currents.
+
+REJECT_* tables with reason codes.
+
+Daily reconciliation report (row counts & hash totals per entity).
+
+Key stability
+
+Use surrogate keys in facts.
+
+Maintain crosswalks for natural key changes.
+
+If you want, I can turn this into a ready-to-run SQL + PL/SQL “SCD2 toolkit” for one of your tables (say DIM_PLANT) with:
+
+Staging table & dedupe view,
+
+Hash calc,
+
+Merge/expire/insert logic,
+
+Soft-delete handling,
+
+Triggers for write-protection, and
+
+A reconciliation report query.
+
+You said:
+you mentioned raw_json. In this particular case, there are many-to-many and 1-to-many relationships. Meaning table 7 data is generated from iterating table 3,4,5 which also depend on table 1,2, and we also dont need every single plant or issue or spec since we only want the info relevant for current projects. how do you then handle it with the raw_json and etl method?
+ChatGPT said:
+
+Great question, Vivek. Here’s a clean way to do selective, dependency-aware ETL with RAW_JSON when relationships are 1-to-many and many-to-many, and when you only want current-project scope.
+
+The idea in 30 seconds
+
+Land everything you touch as RAW JSON, but only for in-scope items.
+
+Drive scope from your projects (a small “whitelist”), not from the source’s entire universe.
+
+Process in dependency order (parents → children) and fan-out from RAW_JSON using JSON_TABLE.
+
+Use surrogate keys + link tables for M:N, and SCD2 (or SCD1 if chosen) for parents.
+
+Idempotent batches: detect changes via hashes at the raw level and again at the relational level.
+
+1) Define project scope (the whitelist)
+
+Create tiny control tables that state what you care about right now:
+
+-- What we actively track
+CREATE TABLE SCOPE_PLANT      (PLANT_ID VARCHAR2(64) PRIMARY KEY);
+CREATE TABLE SCOPE_PCS        (PLANT_ID VARCHAR2(64), PCS_NAME VARCHAR2(128), PRIMARY KEY(PLANT_ID, PCS_NAME));
+CREATE TABLE SCOPE_VDS        (VDS_NAME VARCHAR2(128) PRIMARY KEY);
+CREATE TABLE SCOPE_ISSUE      (PLANT_ID VARCHAR2(64), ISSUE_REV VARCHAR2(64), PRIMARY KEY(PLANT_ID, ISSUE_REV));
+
+
+Populate these from your project list (TR numbers, current brownfield mods, etc.).
+Every fetch uses these tables to filter what you pull and what you keep.
+
+2) Land raw data per endpoint (scoped)
+
+One RAW_JSON row per endpoint + natural key, only for in-scope keys:
+
+-- Example: fetch PCS header for plants in scope
+-- Pseudocode (PL/SQL): for each (PLANT_ID, PCS_NAME) in SCOPE_PCS call API:
+INSERT INTO RAW_JSON (ENDPOINT, KEY_FINGERPRINT, PAYLOAD, BATCH_ID)
+VALUES ('/pcs/header',
+        STANDARD_HASH(:plant_id||'|'||:pcs_name,'SHA256'),
+        :response_clob,
+        :batch_id);
+
+
+Don’t store the entire world. Do store everything you need for fan-out for those scope keys (e.g., if PCS header links to VDS names you care about, fetch those VDS in the same batch and land their RAW too).
+
+3) Process in dependency order
+
+Think of a simple DAG:
+
+Operator → Plant → Issue → (PCS header) → PCS children (TempPress, PipeSize, Elements, Notes)
+                                   └→ VDS list → VDS detail → VDS subsegments
+
+
+Create one transform step per node (procedure or MERGE) that:
+
+Reads relevant RAW_JSON rows for that endpoint,
+
+Uses JSON_TABLE to extract columns,
+
+Upserts into the target table (SCD2 or SCD1),
+
+Writes child link worklists (more below).
+
+4) Fan-out with JSON_TABLE (example)
+
+From RAW to relational, only for in-scope parents:
+
+-- Example: extract PCS header from RAW to PCS_HDR
+WITH raw AS (
+  SELECT r.PAYLOAD
+  FROM RAW_JSON r
+  JOIN SCOPE_PCS s
+    ON r.ENDPOINT = '/pcs/header'
+   AND r.KEY_FINGERPRINT = STANDARD_HASH(s.PLANT_ID||'|'||s.PCS_NAME,'SHA256')
+)
+INSERT /*+ APPEND */ INTO PCS_HDR (PLANT_KEY, PCS_NAME, REVISION, STATUS, HEADER_JSON, SRC_HASH, VALID_FROM, IS_CURRENT, LOAD_BATCH_ID)
+SELECT p.PLANT_KEY,
+       jt.PCS_NAME,
+       jt.REVISION,
+       jt.STATUS,
+       jt.HEADER_JSON,
+       STANDARD_HASH(jt.PCS_NAME||'|'||jt.REVISION||'|'||jt.STATUS, 'SHA256'),
+       SYSTIMESTAMP, 'Y', :batch_id
+FROM raw,
+     JSON_TABLE(raw.PAYLOAD, '$'
+       COLUMNS (
+         PCS_NAME     VARCHAR2(128) PATH '$.pcsName',
+         REVISION     VARCHAR2(64)  PATH '$.revision',
+         STATUS       VARCHAR2(64)  PATH '$.status',
+         HEADER_JSON  CLOB FORMAT JSON PATH '$'
+       )
+     ) jt
+JOIN DIM_PLANT p ON p.PLANT_ID = :plant_id AND p.IS_CURRENT='Y'
+WHERE /* compare to current row’s SRC_HASH to decide SCD2 */ 1=1;
+
+
+Children (like PCS_TEMP_PRESS) use a similar pattern but with JSON_TABLE on an array path, e.g. '$..tempPress[*]'.
+
+5) Many-to-many: use link tables and worklists
+
+When an entity references many children (or vice-versa), you:
+
+Extract the list of child keys from the parent’s JSON and store it in a worklist table (staging).
+
+Fetch RAW for any child not yet landed (respecting scope or extending it if business allows).
+
+Populate link tables between parent and child using their surrogate keys.
+
+Example worklist and link:
+
+CREATE TABLE STG_PCS_VDS_KEYS (
+  PLANT_ID  VARCHAR2(64),
+  PCS_NAME  VARCHAR2(128),
+  VDS_NAME  VARCHAR2(128),
+  BATCH_ID  VARCHAR2(64)
+);
+
+CREATE TABLE LINK_PCS_VDS (
+  PCS_KEY   NUMBER NOT NULL REFERENCES PCS_HDR(PCS_KEY),
+  VDS_KEY   NUMBER NOT NULL REFERENCES VDS_LIST(VDS_LIST_KEY),
+  PRIMARY KEY (PCS_KEY, VDS_KEY)
+);
+
+
+Flow:
+
+From PCS_HDR JSON, extract VDS_NAMEs → insert into STG_PCS_VDS_KEYS.
+
+Optionally filter to SCOPE_VDS; if business wants new VDS brought in automatically, insert them into SCOPE_VDS and fetch.
+
+Transform VDS RAW → VDS_LIST / VDS_DETAIL.
+
+Build LINK_PCS_VDS by joining PCS_HDR (by PLANT+PCS+REV) to VDS_LIST (by VDS_NAME) via surrogate keys.
+
+6) Only “current projects” (partial universe)
+
+You already pull by scope. Also prune by scope:
+
+When a key falls out of scope (project closed), soft-close the current rows (IS_CURRENT='N', DELETED_FLAG='Y' or OUT_OF_SCOPE='Y') via an anti-join between DIM current rows and scope tables.
+
+Keep history for audit; views like V_*_CURRENT can filter OUT_OF_SCOPE='N' if you want your app to ignore them by default.
+
+7) Deletions, duplicates, and renumbering (quick policies)
+
+Source delete: Type-2 close + DELETED_FLAG='Y' (don’t hard delete).
+
+Source duplicates: Deduplicate in staging (ROW_NUMBER() OVER (PARTITION BY key ORDER BY source_ts DESC) = 1).
+
+Key renumbering (e.g., OperatorID changes): treat as new natural key; keep facts on surrogate keys; maintain an *_XWALK mapping table if you need continuity.
+
+8) Idempotency & speed
+
+Compute a raw payload hash when landing (to skip reprocessing identical RAW).
+
+Compute a business hash when transforming (fields you care about) to decide SCD2 insert vs no-op.
+
+Index for “current” lookups: (BUSINESS_KEY, IS_CURRENT) or (BUSINESS_KEY, NVL(VALID_TO, DATE '9999-12-31')).
+
+Batch with array binds; the JSON parsing usually dominates time, not the compare.
+
+9) Putting it together (mini runbook)
+
+Seed scope tables from your project list.
+
+Fetch parents (Operator/Plant) for in-scope → RAW_JSON.
+
+Transform parents → DIM_OPERATOR, DIM_PLANT (SCD2).
+
+Fetch issues for SCOPE_ISSUE plants → RAW_JSON → FACT_ISSUE.
+
+Fetch PCS for SCOPE_PCS → RAW_JSON → PCS_HDR → fan-out to PCS_*.
+
+From PCS JSON, build worklists for VDS keys; fetch VDS on demand → RAW_JSON → VDS_*; build LINK tables.
+
+Soft-close rows for keys leaving scope or source-deleted.
+
+Reconcile report (counts + hashes) and log batch in ETL_LOG.

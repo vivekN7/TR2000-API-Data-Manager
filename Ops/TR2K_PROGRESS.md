@@ -60,7 +60,7 @@ Location: OracleETLV2.razor Section 4 (lines 464-589)
 - Build succeeded with 0 errors, 0 warnings
 - All 6 reference types loading data successfully
 - DDL script includes automatic recompilation
-- Application running at http://localhost:5003/oracle-etl-v2
+- Application running at http://localhost:5003/etl-operations
 
 ### 🔥 TESTED AND CONFIRMED WORKING:
 - ✅ VDS References loading with cascade deletion
@@ -134,7 +134,7 @@ Location: OracleETLV2.razor Section 4 (lines 464-589)
 
 #### 4. **Application Status**
 - **C# Build**: ✅ Successful (0 warnings, 0 errors)
-- **Application**: ✅ Running at http://localhost:5003/oracle-etl-v2
+- **Application**: ✅ Running at http://localhost:5003/etl-operations
 - **UI**: ✅ Section 4 VDS References ready for testing
 - **DDL**: ❌ Oracle compilation errors blocking testing
 
@@ -594,7 +594,7 @@ Based on GPT-5 feedback, implemented RAW_JSON audit trail with zero-privilege ap
 
 ### Core Application Files:
 - `/TR2KApp/Components/Pages/OracleETL.razor` - Main ETL UI page
-- `/TR2KBlazorLibrary/Logic/Services/OracleETLService.cs` - ETL service with all loading methods
+- `/TR2KBlazorLibrary/Logic/Services/OracleETLServiceV2.cs` - ETL service with all loading methods
 - `/TR2KBlazorLibrary/Logic/Services/TR2000ApiService.cs` - API communication layer
 
 ### Documentation:

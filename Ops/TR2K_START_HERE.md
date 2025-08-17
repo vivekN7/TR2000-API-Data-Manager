@@ -100,7 +100,7 @@ cd /workspace/TR2000/TR2K/TR2KApp
 /home/node/.dotnet/dotnet run --urls "http://0.0.0.0:5003"
 
 # 3. Access ETL page
-http://localhost:5003/oracle-etl-v2
+http://localhost:5003/etl-operations
 ```
 
 ## Previous State (2025-08-17 - Session 17 Complete) - ✅ VDS REFERENCES FULLY WORKING!
@@ -284,7 +284,7 @@ The TR2000 API Data Manager is a Blazor Server application (.NET 9.0) that inter
 - `/Ops/TR2K_PROGRESS.md` - NEW! Development progress tracking (UPDATE THIS!)
 - `/Ops/Oracle_DDL_Complete_V4.sql` - Complete DDL with DROP/RECREATE
 - `/Ops/ETL_Plant_Loader_DDL.sql` - Plant loader configuration table
-- `OracleETLService.cs` - Added plant loader methods and metrics
+- `OracleETLServiceV2.cs` - Added plant loader methods and metrics
 - `OracleETL.razor` - Enhanced UI with metrics and plant management 
 
 ### ✅ PHASE 1 - API COMPLIANCE (100% Complete)
@@ -773,7 +773,7 @@ When starting fresh Claude Code session:
 
 **WHAT'S RUNNING NOW**:
 1. ✅ **Application Running**: http://localhost:5003
-2. ✅ **Test Page**: http://localhost:5003/oracle-etl-v2
+2. ✅ **Test Page**: http://localhost:5003/etl-operations
 3. ✅ **DDL Deployed**: Oracle_DDL_SCD2_FINAL.sql (with all fixes)
 4. ✅ **C# Service**: OracleETLServiceV2.cs (thin data mover)
 5. ✅ **All Features Working**: INSERT, UPDATE, DELETE, REACTIVATE tracking
@@ -795,7 +795,7 @@ sqlplus user/pass@db
 @/workspace/TR2000/TR2K/Ops/Oracle_DDL_SCD2_FINAL.sql
 
 # 3. Access test page
-http://localhost:5003/oracle-etl-v2
+http://localhost:5003/etl-operations
 ```
 
 **KEY ACHIEVEMENTS**:
@@ -936,7 +936,7 @@ curl -s "https://equinor.pipespec-api.presight.com/plants/34/issues/rev/1/pcs" |
 
 ## 🔧 Technical Implementation Details:
 
-### OracleETLService Methods:
+### OracleETLServiceV2 Methods:
 - `TestConnection()` - Verifies Oracle connectivity
 - `CreateAllTables()` - Creates all ETL tables in Oracle
 - `DropAllTables()` - Drops all tables (for reset)
@@ -1014,7 +1014,7 @@ Last Updated: 2025-08-16 (Phase 3 Oracle ETL Implementation Complete)
   - `PHASE3_ORACLE_ETL_PLAN.md` - Complete implementation plan
   - `ETL_Error_Handling_Guide.md` - Transaction safety guide
 - **Key Implementation Files**:
-  - `TR2KBlazorLibrary/Logic/Services/OracleETLService.cs` - ETL service with transactions
+  - `TR2KBlazorLibrary/Logic/Services/OracleETLServiceV2.cs` - ETL service with transactions
   - `TR2KApp/Components/Pages/OracleETL.razor` - ETL management UI
 
 ## 🎯 Session Summary (2025-08-17):

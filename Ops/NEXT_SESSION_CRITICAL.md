@@ -113,7 +113,7 @@
 - **Clean UI**: No toggle buttons - presence in table = load references
 
 ### 📊 **Current Working State:**
-- **Application**: Running at http://localhost:5003/oracle-etl-v2
+- **Application**: Running at http://localhost:5003/etl-operations
 - **VDS References**: ✅ Fully functional with SCD2 and cascade deletion
 - **Issue Loader**: ✅ Simplified and working
 - **Plant Loader**: ✅ Controls scope for all downstream processing
@@ -173,7 +173,7 @@ cd /workspace/TR2000/TR2K/TR2KApp
 /home/node/.dotnet/dotnet run --urls "http://0.0.0.0:5003"
 
 # Access application
-http://localhost:5003/oracle-etl-v2
+http://localhost:5003/etl-operations
 
 # Deploy DDL if needed
 sqlplus TR2000_STAGING/piping@host.docker.internal:1521/XEPDB1

@@ -406,10 +406,10 @@ CREATE INDEX IX_PCS_REF_CURRENT ON PCS_REFERENCES(PLANT_ID, ISSUE_REVISION, IS_C
 CREATE INDEX IX_SC_REF_CURRENT ON SC_REFERENCES(PLANT_ID, ISSUE_REVISION, IS_CURRENT);
 CREATE INDEX IX_VSM_REF_CURRENT ON VSM_REFERENCES(PLANT_ID, ISSUE_REVISION, IS_CURRENT);
 
--- Temporal queries
-CREATE INDEX IX_OPERATORS_TEMPORAL ON OPERATORS(OPERATOR_ID, VALID_FROM);
-CREATE INDEX IX_PLANTS_TEMPORAL ON PLANTS(PLANT_ID, VALID_FROM);
-CREATE INDEX IX_ISSUES_TEMPORAL ON ISSUES(PLANT_ID, ISSUE_REVISION, VALID_FROM);
+-- Temporal queries (commented out as PK already includes these columns)
+-- CREATE INDEX IX_OPERATORS_TEMPORAL ON OPERATORS(OPERATOR_ID, VALID_FROM);
+-- CREATE INDEX IX_PLANTS_TEMPORAL ON PLANTS(PLANT_ID, VALID_FROM);
+-- CREATE INDEX IX_ISSUES_TEMPORAL ON ISSUES(PLANT_ID, ISSUE_REVISION, VALID_FROM);
 
 -- Audit queries
 CREATE INDEX IX_OPERATORS_CHANGE ON OPERATORS(CHANGE_TYPE, ETL_RUN_ID);
@@ -465,11 +465,11 @@ SELECT
 FROM ISSUES
 WHERE IS_CURRENT = 'Y';
 
--- Audit trail view
+-- Audit trail view (with consistent datatypes)
 CREATE OR REPLACE VIEW V_AUDIT_TRAIL AS
 SELECT 
     'OPERATORS' as TABLE_NAME,
-    OPERATOR_ID as PRIMARY_KEY,
+    TO_CHAR(OPERATOR_ID) as PRIMARY_KEY,  -- Convert NUMBER to VARCHAR
     CHANGE_TYPE,
     VALID_FROM,
     VALID_TO,
@@ -479,7 +479,7 @@ FROM OPERATORS
 UNION ALL
 SELECT 
     'PLANTS' as TABLE_NAME,
-    PLANT_ID as PRIMARY_KEY,
+    PLANT_ID as PRIMARY_KEY,  -- Already VARCHAR
     CHANGE_TYPE,
     VALID_FROM,
     VALID_TO,
@@ -1039,7 +1039,11 @@ BEGIN
     
     -- Step 5: Calculate processing time correctly
     v_end_time := SYSTIMESTAMP;
-    v_processing_seconds := (v_end_time - v_start_time) * 24 * 60 * 60;
+    -- Use EXTRACT to get total seconds from interval
+    v_processing_seconds := EXTRACT(DAY FROM (v_end_time - v_start_time)) * 86400 +
+                           EXTRACT(HOUR FROM (v_end_time - v_start_time)) * 3600 +
+                           EXTRACT(MINUTE FROM (v_end_time - v_start_time)) * 60 +
+                           EXTRACT(SECOND FROM (v_end_time - v_start_time));
     
     -- Update control
     UPDATE ETL_CONTROL

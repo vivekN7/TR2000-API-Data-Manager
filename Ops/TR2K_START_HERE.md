@@ -598,7 +598,7 @@ When starting fresh Claude Code session:
 
 **READY TO IMPLEMENT**:
 - `SCD2_FINAL_DECISION.md` - Complete implementation guide
-- `Oracle_DDL_SCD2_FINAL.sql` - Production DDL (to be created)
+- `Oracle_DDL_SCD2_FINAL.sql` - Production DDL (COMPLETE - USE THIS!)
 - `Test_SCD2_Complete_Scenarios.sql` - Test suite ready
 
 **NEXT STEPS**:

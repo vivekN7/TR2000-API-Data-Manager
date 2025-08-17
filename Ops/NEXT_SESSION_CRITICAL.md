@@ -44,7 +44,7 @@
 
 ### Key Files Ready:
 - **Decision Doc**: `SCD2_FINAL_DECISION.md` - Read this first!
-- **Current DDL**: `Oracle_DDL_SCD2_Complete_Optimized.sql` - Base to work from
+- **MAIN DDL**: `Oracle_DDL_SCD2_FINAL.sql` - USE THIS ONE! (Complete & Fixed)
 - **Test Suite**: `Test_SCD2_Complete_Scenarios.sql` - Validates all cases
 
 ### Implementation Checklist:

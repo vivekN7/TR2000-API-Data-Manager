@@ -725,6 +725,956 @@ VALUES (:plantId, :issueRevision, :userName, :userEntryTime,
             };
         }
 
+        // ===================== REFERENCE TABLE LOADING METHODS =====================
+        
+        public async Task<ETLResult> LoadPCSReferences()
+        {
+            var result = new ETLResult { StartTime = DateTime.Now };
+            var sqlStatements = new List<string>();
+            int etlRunId = 0;
+            
+            try
+            {
+                _logger.LogInformation("Step 1: Fetching PCS references data from API...");
+                
+                // Fetch all plants first
+                var plantsResponse = await _apiService.FetchDataAsync("plants");
+                var plantsData = _deserializer.DeserializeApiResponse(plantsResponse, "plants");
+                
+                if (plantsData == null || !plantsData.Any())
+                {
+                    result.Status = "NO_DATA";
+                    result.Message = "No plants found";
+                    return result;
+                }
+                
+                var allPCSReferences = new List<Dictionary<string, object>>();
+                
+                // For each plant, fetch its issues first to get issue revisions
+                foreach (var plant in plantsData)
+                {
+                    var plantId = plant.GetValueOrDefault("PlantID", "")?.ToString();
+                    if (string.IsNullOrEmpty(plantId)) continue;
+                    
+                    // Get issues for this plant
+                    var issuesResponse = await _apiService.FetchDataAsync($"plants/{plantId}/issues");
+                    var issuesData = _deserializer.DeserializeApiResponse(issuesResponse, $"plants/{plantId}/issues");
+                    
+                    if (issuesData == null) continue;
+                    
+                    // For each issue revision, get PCS references
+                    foreach (var issue in issuesData)
+                    {
+                        var issueRevision = issue.GetValueOrDefault("IssueRevision", "")?.ToString();
+                        if (string.IsNullOrEmpty(issueRevision)) continue;
+                        
+                        var pcsRefResponse = await _apiService.FetchDataAsync($"plants/{plantId}/issues/rev/{issueRevision}/pcs");
+                        var pcsRefData = _deserializer.DeserializeApiResponse(pcsRefResponse, $"plants/{plantId}/issues/rev/{issueRevision}/pcs");
+                        
+                        if (pcsRefData == null) continue;
+                        
+                        // Add PlantID and IssueRevision to each record
+                        foreach (var pcsRef in pcsRefData)
+                        {
+                            pcsRef["PlantID"] = plantId;
+                            pcsRef["IssueRevision"] = issueRevision;
+                            allPCSReferences.Add(pcsRef);
+                        }
+                    }
+                }
+                
+                if (!allPCSReferences.Any())
+                {
+                    result.Status = "NO_DATA";
+                    result.Message = "No PCS references found";
+                    return result;
+                }
+                
+                _logger.LogInformation($"Successfully fetched {allPCSReferences.Count} PCS references from API");
+                
+                using var connection = new OracleConnection(_connectionString);
+                await connection.OpenAsync();
+                using var transaction = connection.BeginTransaction();
+                
+                try
+                {
+                    // Start ETL run
+                    etlRunId = await StartETLRun("REFERENCE", "PCS_REFERENCES", connection, transaction);
+                    
+                    // Mark existing records as historical
+                    string updateSql = "UPDATE PCS_REFERENCES SET IS_CURRENT = 'N' WHERE IS_CURRENT = 'Y'";
+                    sqlStatements.Add(updateSql);
+                    
+                    using (var updateCmd = new OracleCommand(updateSql, connection))
+                    {
+                        updateCmd.Transaction = transaction;
+                        var updated = await updateCmd.ExecuteNonQueryAsync();
+                        _logger.LogInformation($"Marked {updated} existing PCS references as historical");
+                    }
+                    
+                    // Insert new records
+                    string insertSql = @"
+                        INSERT INTO PCS_REFERENCES (
+                            PLANT_ID, ISSUE_REVISION, PCS_NAME, PCS_REVISION,
+                            USER_NAME, USER_ENTRY_TIME, USER_PROTECTED,
+                            ETL_RUN_ID, IS_CURRENT, EXTRACTION_DATE
+                        ) VALUES (
+                            :plantId, :issueRevision, :pcsName, :pcsRevision,
+                            :userName, :userEntryTime, :userProtected,
+                            :etlRunId, 'Y', SYSDATE
+                        )";
+                    
+                    sqlStatements.Add(insertSql);
+                    
+                    int recordsLoaded = 0;
+                    foreach (var row in allPCSReferences)
+                    {
+                        using var cmd = new OracleCommand(insertSql, connection);
+                        cmd.Transaction = transaction;
+                        cmd.Parameters.Add(new OracleParameter("plantId", row.GetValueOrDefault("PlantID", DBNull.Value)));
+                        cmd.Parameters.Add(new OracleParameter("issueRevision", row.GetValueOrDefault("IssueRevision", DBNull.Value)));
+                        cmd.Parameters.Add(new OracleParameter("pcsName", row.GetValueOrDefault("PCSName", DBNull.Value)));
+                        cmd.Parameters.Add(new OracleParameter("pcsRevision", row.GetValueOrDefault("PCSRevision", DBNull.Value)));
+                        cmd.Parameters.Add(new OracleParameter("userName", row.GetValueOrDefault("UserName", DBNull.Value)));
+                        
+                        // Handle UserEntryTime as DateTime
+                        var userEntryTime = row.GetValueOrDefault("UserEntryTime", DBNull.Value);
+                        if (userEntryTime != DBNull.Value && userEntryTime != null)
+                        {
+                            if (DateTime.TryParse(userEntryTime.ToString(), out var dateTime))
+                            {
+                                cmd.Parameters.Add(new OracleParameter("userEntryTime", dateTime));
+                            }
+                            else
+                            {
+                                cmd.Parameters.Add(new OracleParameter("userEntryTime", DBNull.Value));
+                            }
+                        }
+                        else
+                        {
+                            cmd.Parameters.Add(new OracleParameter("userEntryTime", DBNull.Value));
+                        }
+                        
+                        cmd.Parameters.Add(new OracleParameter("userProtected", row.GetValueOrDefault("UserProtected", DBNull.Value)));
+                        cmd.Parameters.Add(new OracleParameter("etlRunId", etlRunId));
+                        
+                        await cmd.ExecuteNonQueryAsync();
+                        recordsLoaded++;
+                    }
+                    
+                    // Complete ETL run
+                    await CompleteETLRun(etlRunId, "SUCCESS", recordsLoaded, 0, connection, transaction);
+                    
+                    // Commit transaction
+                    await transaction.CommitAsync();
+                    _logger.LogInformation("Transaction committed successfully - all PCS references saved");
+                    
+                    result.Status = "SUCCESS";
+                    result.RecordsLoaded = recordsLoaded;
+                    result.EndTime = DateTime.Now;
+                    result.Message = $"Successfully loaded {recordsLoaded} PCS references";
+                    result.SqlStatements = sqlStatements;
+                    
+                    return result;
+                }
+                catch (Exception ex)
+                {
+                    await transaction.RollbackAsync();
+                    _logger.LogError(ex, "Error during PCS references ETL - transaction rolled back");
+                    
+                    if (etlRunId > 0)
+                    {
+                        await LogETLError(etlRunId, ex, "PCS_REFERENCES");
+                    }
+                    
+                    throw;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to load PCS references");
+                result.Status = "ERROR";
+                result.Message = $"Error: {ex.Message}. No data was modified - transaction was rolled back.";
+                result.EndTime = DateTime.Now;
+                return result;
+            }
+        }
+        
+        public async Task<ETLResult> LoadSCReferences()
+        {
+            var result = new ETLResult { StartTime = DateTime.Now };
+            var sqlStatements = new List<string>();
+            int etlRunId = 0;
+            
+            try
+            {
+                _logger.LogInformation("Step 1: Fetching SC references data from API...");
+                
+                // Fetch all plants first
+                var plantsResponse = await _apiService.FetchDataAsync("plants");
+                var plantsData = _deserializer.DeserializeApiResponse(plantsResponse, "plants");
+                
+                if (plantsData == null || !plantsData.Any())
+                {
+                    result.Status = "NO_DATA";
+                    result.Message = "No plants found";
+                    return result;
+                }
+                
+                var allSCReferences = new List<Dictionary<string, object>>();
+                
+                // For each plant, fetch its issues first to get issue revisions
+                foreach (var plant in plantsData)
+                {
+                    var plantId = plant.GetValueOrDefault("PlantID", "")?.ToString();
+                    if (string.IsNullOrEmpty(plantId)) continue;
+                    
+                    // Get issues for this plant
+                    var issuesResponse = await _apiService.FetchDataAsync($"plants/{plantId}/issues");
+                    var issuesData = _deserializer.DeserializeApiResponse(issuesResponse, $"plants/{plantId}/issues");
+                    
+                    if (issuesData == null) continue;
+                    
+                    // For each issue revision, get SC references
+                    foreach (var issue in issuesData)
+                    {
+                        var issueRevision = issue.GetValueOrDefault("IssueRevision", "")?.ToString();
+                        if (string.IsNullOrEmpty(issueRevision)) continue;
+                        
+                        var scRefResponse = await _apiService.FetchDataAsync($"plants/{plantId}/issues/rev/{issueRevision}/sc");
+                        var scRefData = _deserializer.DeserializeApiResponse(scRefResponse, $"plants/{plantId}/issues/rev/{issueRevision}/sc");
+                        
+                        if (scRefData == null) continue;
+                        
+                        // Add PlantID and IssueRevision to each record
+                        foreach (var scRef in scRefData)
+                        {
+                            scRef["PlantID"] = plantId;
+                            scRef["IssueRevision"] = issueRevision;
+                            allSCReferences.Add(scRef);
+                        }
+                    }
+                }
+                
+                if (!allSCReferences.Any())
+                {
+                    result.Status = "NO_DATA";
+                    result.Message = "No SC references found";
+                    return result;
+                }
+                
+                _logger.LogInformation($"Successfully fetched {allSCReferences.Count} SC references from API");
+                
+                using var connection = new OracleConnection(_connectionString);
+                await connection.OpenAsync();
+                using var transaction = connection.BeginTransaction();
+                
+                try
+                {
+                    // Start ETL run
+                    etlRunId = await StartETLRun("REFERENCE", "SC_REFERENCES", connection, transaction);
+                    
+                    // Mark existing records as historical
+                    string updateSql = "UPDATE SC_REFERENCES SET IS_CURRENT = 'N' WHERE IS_CURRENT = 'Y'";
+                    sqlStatements.Add(updateSql);
+                    
+                    using (var updateCmd = new OracleCommand(updateSql, connection))
+                    {
+                        updateCmd.Transaction = transaction;
+                        var updated = await updateCmd.ExecuteNonQueryAsync();
+                        _logger.LogInformation($"Marked {updated} existing SC references as historical");
+                    }
+                    
+                    // Insert new records
+                    string insertSql = @"
+                        INSERT INTO SC_REFERENCES (
+                            PLANT_ID, ISSUE_REVISION, SC_NAME, SC_REVISION,
+                            OFFICIAL_REVISION, DELTA,
+                            USER_NAME, USER_ENTRY_TIME, USER_PROTECTED,
+                            ETL_RUN_ID, IS_CURRENT, EXTRACTION_DATE
+                        ) VALUES (
+                            :plantId, :issueRevision, :scName, :scRevision,
+                            :officialRevision, :delta,
+                            :userName, :userEntryTime, :userProtected,
+                            :etlRunId, 'Y', SYSDATE
+                        )";
+                    
+                    sqlStatements.Add(insertSql);
+                    
+                    int recordsLoaded = 0;
+                    foreach (var row in allSCReferences)
+                    {
+                        using var cmd = new OracleCommand(insertSql, connection);
+                        cmd.Transaction = transaction;
+                        cmd.Parameters.Add(new OracleParameter("plantId", row.GetValueOrDefault("PlantID", DBNull.Value)));
+                        cmd.Parameters.Add(new OracleParameter("issueRevision", row.GetValueOrDefault("IssueRevision", DBNull.Value)));
+                        cmd.Parameters.Add(new OracleParameter("scName", row.GetValueOrDefault("SCName", DBNull.Value)));
+                        cmd.Parameters.Add(new OracleParameter("scRevision", row.GetValueOrDefault("SCRevision", DBNull.Value)));
+                        cmd.Parameters.Add(new OracleParameter("officialRevision", row.GetValueOrDefault("OfficialRevision", DBNull.Value)));
+                        cmd.Parameters.Add(new OracleParameter("delta", row.GetValueOrDefault("Delta", DBNull.Value)));
+                        cmd.Parameters.Add(new OracleParameter("userName", row.GetValueOrDefault("UserName", DBNull.Value)));
+                        
+                        // Handle UserEntryTime as DateTime
+                        var userEntryTime = row.GetValueOrDefault("UserEntryTime", DBNull.Value);
+                        if (userEntryTime != DBNull.Value && userEntryTime != null)
+                        {
+                            if (DateTime.TryParse(userEntryTime.ToString(), out var dateTime))
+                            {
+                                cmd.Parameters.Add(new OracleParameter("userEntryTime", dateTime));
+                            }
+                            else
+                            {
+                                cmd.Parameters.Add(new OracleParameter("userEntryTime", DBNull.Value));
+                            }
+                        }
+                        else
+                        {
+                            cmd.Parameters.Add(new OracleParameter("userEntryTime", DBNull.Value));
+                        }
+                        
+                        cmd.Parameters.Add(new OracleParameter("userProtected", row.GetValueOrDefault("UserProtected", DBNull.Value)));
+                        cmd.Parameters.Add(new OracleParameter("etlRunId", etlRunId));
+                        
+                        await cmd.ExecuteNonQueryAsync();
+                        recordsLoaded++;
+                    }
+                    
+                    // Complete ETL run
+                    await CompleteETLRun(etlRunId, "SUCCESS", recordsLoaded, 0, connection, transaction);
+                    
+                    // Commit transaction
+                    await transaction.CommitAsync();
+                    _logger.LogInformation("Transaction committed successfully - all SC references saved");
+                    
+                    result.Status = "SUCCESS";
+                    result.RecordsLoaded = recordsLoaded;
+                    result.EndTime = DateTime.Now;
+                    result.Message = $"Successfully loaded {recordsLoaded} SC references";
+                    result.SqlStatements = sqlStatements;
+                    
+                    return result;
+                }
+                catch (Exception ex)
+                {
+                    await transaction.RollbackAsync();
+                    _logger.LogError(ex, "Error during SC references ETL - transaction rolled back");
+                    
+                    if (etlRunId > 0)
+                    {
+                        await LogETLError(etlRunId, ex, "SC_REFERENCES");
+                    }
+                    
+                    throw;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to load SC references");
+                result.Status = "ERROR";
+                result.Message = $"Error: {ex.Message}. No data was modified - transaction was rolled back.";
+                result.EndTime = DateTime.Now;
+                return result;
+            }
+        }
+        
+        public async Task<ETLResult> LoadVSMReferences()
+        {
+            var result = new ETLResult { StartTime = DateTime.Now };
+            var sqlStatements = new List<string>();
+            int etlRunId = 0;
+            
+            try
+            {
+                _logger.LogInformation("Step 1: Fetching VSM references data from API...");
+                
+                // Fetch all plants first
+                var plantsResponse = await _apiService.FetchDataAsync("plants");
+                var plantsData = _deserializer.DeserializeApiResponse(plantsResponse, "plants");
+                
+                if (plantsData == null || !plantsData.Any())
+                {
+                    result.Status = "NO_DATA";
+                    result.Message = "No plants found";
+                    return result;
+                }
+                
+                var allVSMReferences = new List<Dictionary<string, object>>();
+                
+                // For each plant, fetch its issues first to get issue revisions
+                foreach (var plant in plantsData)
+                {
+                    var plantId = plant.GetValueOrDefault("PlantID", "")?.ToString();
+                    if (string.IsNullOrEmpty(plantId)) continue;
+                    
+                    // Get issues for this plant
+                    var issuesResponse = await _apiService.FetchDataAsync($"plants/{plantId}/issues");
+                    var issuesData = _deserializer.DeserializeApiResponse(issuesResponse, $"plants/{plantId}/issues");
+                    
+                    if (issuesData == null) continue;
+                    
+                    // For each issue revision, get VSM references
+                    foreach (var issue in issuesData)
+                    {
+                        var issueRevision = issue.GetValueOrDefault("IssueRevision", "")?.ToString();
+                        if (string.IsNullOrEmpty(issueRevision)) continue;
+                        
+                        var vsmRefResponse = await _apiService.FetchDataAsync($"plants/{plantId}/issues/rev/{issueRevision}/vsm");
+                        var vsmRefData = _deserializer.DeserializeApiResponse(vsmRefResponse, $"plants/{plantId}/issues/rev/{issueRevision}/vsm");
+                        
+                        if (vsmRefData == null) continue;
+                        
+                        // Add PlantID and IssueRevision to each record
+                        foreach (var vsmRef in vsmRefData)
+                        {
+                            vsmRef["PlantID"] = plantId;
+                            vsmRef["IssueRevision"] = issueRevision;
+                            allVSMReferences.Add(vsmRef);
+                        }
+                    }
+                }
+                
+                if (!allVSMReferences.Any())
+                {
+                    result.Status = "NO_DATA";
+                    result.Message = "No VSM references found";
+                    return result;
+                }
+                
+                _logger.LogInformation($"Successfully fetched {allVSMReferences.Count} VSM references from API");
+                
+                using var connection = new OracleConnection(_connectionString);
+                await connection.OpenAsync();
+                using var transaction = connection.BeginTransaction();
+                
+                try
+                {
+                    // Start ETL run
+                    etlRunId = await StartETLRun("REFERENCE", "VSM_REFERENCES", connection, transaction);
+                    
+                    // Mark existing records as historical
+                    string updateSql = "UPDATE VSM_REFERENCES SET IS_CURRENT = 'N' WHERE IS_CURRENT = 'Y'";
+                    sqlStatements.Add(updateSql);
+                    
+                    using (var updateCmd = new OracleCommand(updateSql, connection))
+                    {
+                        updateCmd.Transaction = transaction;
+                        var updated = await updateCmd.ExecuteNonQueryAsync();
+                        _logger.LogInformation($"Marked {updated} existing VSM references as historical");
+                    }
+                    
+                    // Insert new records
+                    string insertSql = @"
+                        INSERT INTO VSM_REFERENCES (
+                            PLANT_ID, ISSUE_REVISION, VSM_NAME, VSM_REVISION,
+                            OFFICIAL_REVISION, DELTA,
+                            USER_NAME, USER_ENTRY_TIME, USER_PROTECTED,
+                            ETL_RUN_ID, IS_CURRENT, EXTRACTION_DATE
+                        ) VALUES (
+                            :plantId, :issueRevision, :vsmName, :vsmRevision,
+                            :officialRevision, :delta,
+                            :userName, :userEntryTime, :userProtected,
+                            :etlRunId, 'Y', SYSDATE
+                        )";
+                    
+                    sqlStatements.Add(insertSql);
+                    
+                    int recordsLoaded = 0;
+                    foreach (var row in allVSMReferences)
+                    {
+                        using var cmd = new OracleCommand(insertSql, connection);
+                        cmd.Transaction = transaction;
+                        cmd.Parameters.Add(new OracleParameter("plantId", row.GetValueOrDefault("PlantID", DBNull.Value)));
+                        cmd.Parameters.Add(new OracleParameter("issueRevision", row.GetValueOrDefault("IssueRevision", DBNull.Value)));
+                        cmd.Parameters.Add(new OracleParameter("vsmName", row.GetValueOrDefault("VSMName", DBNull.Value)));
+                        cmd.Parameters.Add(new OracleParameter("vsmRevision", row.GetValueOrDefault("VSMRevision", DBNull.Value)));
+                        cmd.Parameters.Add(new OracleParameter("officialRevision", row.GetValueOrDefault("OfficialRevision", DBNull.Value)));
+                        cmd.Parameters.Add(new OracleParameter("delta", row.GetValueOrDefault("Delta", DBNull.Value)));
+                        cmd.Parameters.Add(new OracleParameter("userName", row.GetValueOrDefault("UserName", DBNull.Value)));
+                        
+                        // Handle UserEntryTime as DateTime
+                        var userEntryTime = row.GetValueOrDefault("UserEntryTime", DBNull.Value);
+                        if (userEntryTime != DBNull.Value && userEntryTime != null)
+                        {
+                            if (DateTime.TryParse(userEntryTime.ToString(), out var dateTime))
+                            {
+                                cmd.Parameters.Add(new OracleParameter("userEntryTime", dateTime));
+                            }
+                            else
+                            {
+                                cmd.Parameters.Add(new OracleParameter("userEntryTime", DBNull.Value));
+                            }
+                        }
+                        else
+                        {
+                            cmd.Parameters.Add(new OracleParameter("userEntryTime", DBNull.Value));
+                        }
+                        
+                        cmd.Parameters.Add(new OracleParameter("userProtected", row.GetValueOrDefault("UserProtected", DBNull.Value)));
+                        cmd.Parameters.Add(new OracleParameter("etlRunId", etlRunId));
+                        
+                        await cmd.ExecuteNonQueryAsync();
+                        recordsLoaded++;
+                    }
+                    
+                    // Complete ETL run
+                    await CompleteETLRun(etlRunId, "SUCCESS", recordsLoaded, 0, connection, transaction);
+                    
+                    // Commit transaction
+                    await transaction.CommitAsync();
+                    _logger.LogInformation("Transaction committed successfully - all VSM references saved");
+                    
+                    result.Status = "SUCCESS";
+                    result.RecordsLoaded = recordsLoaded;
+                    result.EndTime = DateTime.Now;
+                    result.Message = $"Successfully loaded {recordsLoaded} VSM references";
+                    result.SqlStatements = sqlStatements;
+                    
+                    return result;
+                }
+                catch (Exception ex)
+                {
+                    await transaction.RollbackAsync();
+                    _logger.LogError(ex, "Error during VSM references ETL - transaction rolled back");
+                    
+                    if (etlRunId > 0)
+                    {
+                        await LogETLError(etlRunId, ex, "VSM_REFERENCES");
+                    }
+                    
+                    throw;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to load VSM references");
+                result.Status = "ERROR";
+                result.Message = $"Error: {ex.Message}. No data was modified - transaction was rolled back.";
+                result.EndTime = DateTime.Now;
+                return result;
+            }
+        }
+
+        // ===================== PLANT LOADER MANAGEMENT =====================
+        
+        public async Task<bool> CreatePlantLoaderTable()
+        {
+            try
+            {
+                using var connection = new OracleConnection(_connectionString);
+                await connection.OpenAsync();
+                
+                // Check if table exists
+                string checkSql = "SELECT COUNT(*) FROM USER_TABLES WHERE TABLE_NAME = 'ETL_PLANT_LOADER'";
+                using var checkCmd = new OracleCommand(checkSql, connection);
+                var exists = Convert.ToInt32(await checkCmd.ExecuteScalarAsync());
+                
+                if (exists > 0)
+                {
+                    _logger.LogInformation("ETL_PLANT_LOADER table already exists");
+                    return true;
+                }
+                
+                // Create table
+                string createSql = @"
+                    CREATE TABLE ETL_PLANT_LOADER (
+                        PLANT_ID           VARCHAR2(50) NOT NULL,
+                        PLANT_NAME         VARCHAR2(200),
+                        IS_ACTIVE          CHAR(1) DEFAULT 'Y' CHECK (IS_ACTIVE IN ('Y', 'N')),
+                        LOAD_PRIORITY      NUMBER DEFAULT 100,
+                        NOTES              VARCHAR2(500),
+                        CREATED_DATE       DATE DEFAULT SYSDATE,
+                        CREATED_BY         VARCHAR2(100) DEFAULT USER,
+                        MODIFIED_DATE      DATE DEFAULT SYSDATE,
+                        MODIFIED_BY        VARCHAR2(100) DEFAULT USER,
+                        CONSTRAINT PK_ETL_PLANT_LOADER PRIMARY KEY (PLANT_ID)
+                    )";
+                
+                using var createCmd = new OracleCommand(createSql, connection);
+                await createCmd.ExecuteNonQueryAsync();
+                
+                // Create index
+                string indexSql = "CREATE INDEX IDX_ETL_PLANT_ACTIVE ON ETL_PLANT_LOADER(IS_ACTIVE, LOAD_PRIORITY)";
+                using var indexCmd = new OracleCommand(indexSql, connection);
+                await indexCmd.ExecuteNonQueryAsync();
+                
+                _logger.LogInformation("Successfully created ETL_PLANT_LOADER table");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating ETL_PLANT_LOADER table");
+                return false;
+            }
+        }
+        
+        public async Task<List<Dictionary<string, object>>> GetAllPlants()
+        {
+            var plants = new List<Dictionary<string, object>>();
+            
+            try
+            {
+                using var connection = new OracleConnection(_connectionString);
+                await connection.OpenAsync();
+                
+                string sql = @"
+                    SELECT PLANT_ID, PLANT_NAME, LONG_DESCRIPTION 
+                    FROM PLANTS 
+                    WHERE IS_CURRENT = 'Y' 
+                    ORDER BY PLANT_NAME";
+                
+                using var cmd = new OracleCommand(sql, connection);
+                using var reader = await cmd.ExecuteReaderAsync();
+                
+                while (await reader.ReadAsync())
+                {
+                    plants.Add(new Dictionary<string, object>
+                    {
+                        ["PlantId"] = reader.GetString(0),
+                        ["PlantName"] = reader.IsDBNull(1) ? "" : reader.GetString(1),
+                        ["LongDescription"] = reader.IsDBNull(2) ? "" : reader.GetString(2)
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching all plants");
+            }
+            
+            return plants;
+        }
+        
+        public async Task<List<PlantLoaderConfig>> GetPlantLoaderConfigs()
+        {
+            var configs = new List<PlantLoaderConfig>();
+            
+            try
+            {
+                using var connection = new OracleConnection(_connectionString);
+                await connection.OpenAsync();
+                
+                string sql = @"
+                    SELECT 
+                        L.PLANT_ID,
+                        L.PLANT_NAME,
+                        L.IS_ACTIVE,
+                        L.LOAD_PRIORITY,
+                        L.NOTES,
+                        P.LONG_DESCRIPTION,
+                        P.OPERATOR_ID
+                    FROM ETL_PLANT_LOADER L
+                    LEFT JOIN PLANTS P ON L.PLANT_ID = P.PLANT_ID AND P.IS_CURRENT = 'Y'
+                    ORDER BY L.LOAD_PRIORITY, L.PLANT_ID";
+                
+                using var cmd = new OracleCommand(sql, connection);
+                using var reader = await cmd.ExecuteReaderAsync();
+                
+                while (await reader.ReadAsync())
+                {
+                    configs.Add(new PlantLoaderConfig
+                    {
+                        PlantId = reader.GetString(0),
+                        PlantName = reader.IsDBNull(1) ? "" : reader.GetString(1),
+                        IsActive = reader.GetString(2) == "Y",
+                        LoadPriority = reader.IsDBNull(3) ? 100 : reader.GetInt32(3),
+                        Notes = reader.IsDBNull(4) ? "" : reader.GetString(4),
+                        LongDescription = reader.IsDBNull(5) ? "" : reader.GetString(5),
+                        OperatorId = reader.IsDBNull(6) ? "" : reader.GetString(6)
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching plant loader configs");
+            }
+            
+            return configs;
+        }
+        
+        public async Task<bool> AddPlantToLoader(string plantId, string plantName, string notes = "")
+        {
+            try
+            {
+                using var connection = new OracleConnection(_connectionString);
+                await connection.OpenAsync();
+                
+                string sql = @"
+                    INSERT INTO ETL_PLANT_LOADER (PLANT_ID, PLANT_NAME, NOTES, IS_ACTIVE)
+                    VALUES (:plantId, :plantName, :notes, 'Y')";
+                
+                using var cmd = new OracleCommand(sql, connection);
+                cmd.Parameters.Add(new OracleParameter("plantId", plantId));
+                cmd.Parameters.Add(new OracleParameter("plantName", plantName));
+                cmd.Parameters.Add(new OracleParameter("notes", notes ?? ""));
+                
+                await cmd.ExecuteNonQueryAsync();
+                _logger.LogInformation($"Added plant {plantId} to loader table");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error adding plant {plantId} to loader");
+                return false;
+            }
+        }
+        
+        public async Task<bool> TogglePlantActive(string plantId, bool isActive)
+        {
+            try
+            {
+                using var connection = new OracleConnection(_connectionString);
+                await connection.OpenAsync();
+                
+                string sql = @"
+                    UPDATE ETL_PLANT_LOADER 
+                    SET IS_ACTIVE = :isActive, MODIFIED_DATE = SYSDATE
+                    WHERE PLANT_ID = :plantId";
+                
+                using var cmd = new OracleCommand(sql, connection);
+                cmd.Parameters.Add(new OracleParameter("isActive", isActive ? "Y" : "N"));
+                cmd.Parameters.Add(new OracleParameter("plantId", plantId));
+                
+                var rows = await cmd.ExecuteNonQueryAsync();
+                _logger.LogInformation($"Toggled plant {plantId} active status to {isActive}");
+                return rows > 0;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error toggling plant {plantId} active status");
+                return false;
+            }
+        }
+        
+        public async Task<bool> RemovePlantFromLoader(string plantId)
+        {
+            try
+            {
+                using var connection = new OracleConnection(_connectionString);
+                await connection.OpenAsync();
+                
+                string sql = "DELETE FROM ETL_PLANT_LOADER WHERE PLANT_ID = :plantId";
+                
+                using var cmd = new OracleCommand(sql, connection);
+                cmd.Parameters.Add(new OracleParameter("plantId", plantId));
+                
+                var rows = await cmd.ExecuteNonQueryAsync();
+                _logger.LogInformation($"Removed plant {plantId} from loader table");
+                return rows > 0;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error removing plant {plantId} from loader");
+                return false;
+            }
+        }
+        
+        // New efficient version that only loads selected plants
+        public async Task<ETLResult> LoadPCSReferencesForSelectedPlants()
+        {
+            var result = new ETLResult { StartTime = DateTime.Now };
+            var sqlStatements = new List<string>();
+            int etlRunId = 0;
+            
+            try
+            {
+                _logger.LogInformation("Step 1: Fetching active plants from loader table...");
+                
+                // Get active plants from loader table
+                var activePlants = await GetPlantLoaderConfigs();
+                var activePlantIds = activePlants.Where(p => p.IsActive).Select(p => p.PlantId).ToList();
+                
+                if (!activePlantIds.Any())
+                {
+                    result.Status = "NO_DATA";
+                    result.Message = "No active plants selected in ETL_PLANT_LOADER table";
+                    return result;
+                }
+                
+                _logger.LogInformation($"Loading PCS references for {activePlantIds.Count} selected plants: {string.Join(", ", activePlantIds)}");
+                
+                var allPCSReferences = new List<Dictionary<string, object>>();
+                int apiCallCount = 0;
+                int plantIterations = 0;
+                int issueIterations = 0;
+                
+                // Only process selected plants
+                foreach (var plantId in activePlantIds)
+                {
+                    plantIterations++;
+                    
+                    // Get issues for this plant
+                    var issuesResponse = await _apiService.FetchDataAsync($"plants/{plantId}/issues");
+                    apiCallCount++;
+                    var issuesData = _deserializer.DeserializeApiResponse(issuesResponse, $"plants/{plantId}/issues");
+                    
+                    if (issuesData == null || !issuesData.Any()) continue;
+                    
+                    _logger.LogInformation($"Processing {issuesData.Count} issues for plant {plantId}");
+                    
+                    // For each issue revision, get PCS references
+                    foreach (var issue in issuesData)
+                    {
+                        issueIterations++;
+                        var issueRevision = issue.GetValueOrDefault("IssueRevision", "")?.ToString();
+                        if (string.IsNullOrEmpty(issueRevision)) continue;
+                        
+                        var pcsRefResponse = await _apiService.FetchDataAsync($"plants/{plantId}/issues/rev/{issueRevision}/pcs");
+                        apiCallCount++;
+                        var pcsRefData = _deserializer.DeserializeApiResponse(pcsRefResponse, $"plants/{plantId}/issues/rev/{issueRevision}/pcs");
+                        
+                        if (pcsRefData == null || !pcsRefData.Any()) continue;
+                        
+                        // Add PlantID and IssueRevision to each record
+                        foreach (var pcsRef in pcsRefData)
+                        {
+                            pcsRef["PlantID"] = plantId;
+                            pcsRef["IssueRevision"] = issueRevision;
+                            allPCSReferences.Add(pcsRef);
+                        }
+                    }
+                }
+                
+                if (!allPCSReferences.Any())
+                {
+                    result.Status = "NO_DATA";
+                    result.Message = $"No PCS references found for selected plants";
+                    return result;
+                }
+                
+                _logger.LogInformation($"Successfully fetched {allPCSReferences.Count} PCS references from API");
+                
+                using var connection = new OracleConnection(_connectionString);
+                await connection.OpenAsync();
+                using var transaction = connection.BeginTransaction();
+                
+                try
+                {
+                    // Start ETL run
+                    etlRunId = await StartETLRun("REFERENCE", "PCS_REFERENCES", connection, transaction);
+                    
+                    // Only mark existing records as historical for selected plants
+                    string updateSql = $@"
+                        UPDATE PCS_REFERENCES 
+                        SET IS_CURRENT = 'N' 
+                        WHERE IS_CURRENT = 'Y' 
+                        AND PLANT_ID IN ({string.Join(",", activePlantIds.Select(id => $"'{id}'"))})";
+                    sqlStatements.Add(updateSql);
+                    
+                    using (var updateCmd = new OracleCommand(updateSql, connection))
+                    {
+                        updateCmd.Transaction = transaction;
+                        var updated = await updateCmd.ExecuteNonQueryAsync();
+                        _logger.LogInformation($"Marked {updated} existing PCS references as historical for selected plants");
+                    }
+                    
+                    // Insert new records
+                    string insertSql = @"
+                        INSERT INTO PCS_REFERENCES (
+                            PLANT_ID, ISSUE_REVISION, PCS_NAME, PCS_REVISION,
+                            USER_NAME, USER_ENTRY_TIME, USER_PROTECTED,
+                            ETL_RUN_ID, IS_CURRENT, EXTRACTION_DATE
+                        ) VALUES (
+                            :plantId, :issueRevision, :pcsName, :pcsRevision,
+                            :userName, :userEntryTime, :userProtected,
+                            :etlRunId, 'Y', SYSDATE
+                        )";
+                    
+                    sqlStatements.Add(insertSql);
+                    
+                    int recordsLoaded = 0;
+                    foreach (var row in allPCSReferences)
+                    {
+                        using var cmd = new OracleCommand(insertSql, connection);
+                        cmd.Transaction = transaction;
+                        
+                        // Ensure we have valid values for required fields
+                        var plantId = row.GetValueOrDefault("PlantID", "")?.ToString();
+                        var issueRevision = row.GetValueOrDefault("IssueRevision", "")?.ToString();
+                        var pcsName = row.GetValueOrDefault("PCSName", row.GetValueOrDefault("Name", ""))?.ToString();
+                        var pcsRevision = row.GetValueOrDefault("PCSRevision", row.GetValueOrDefault("Revision", ""))?.ToString();
+                        
+                        // Skip if essential fields are missing
+                        if (string.IsNullOrEmpty(plantId) || string.IsNullOrEmpty(issueRevision))
+                        {
+                            _logger.LogWarning($"Skipping record with missing PlantID or IssueRevision");
+                            continue;
+                        }
+                        
+                        // Use default values if PCS fields are missing
+                        if (string.IsNullOrEmpty(pcsName)) pcsName = "UNKNOWN";
+                        if (string.IsNullOrEmpty(pcsRevision)) pcsRevision = "0";
+                        
+                        cmd.Parameters.Add(new OracleParameter("plantId", plantId));
+                        cmd.Parameters.Add(new OracleParameter("issueRevision", issueRevision));
+                        cmd.Parameters.Add(new OracleParameter("pcsName", pcsName));
+                        cmd.Parameters.Add(new OracleParameter("pcsRevision", pcsRevision));
+                        cmd.Parameters.Add(new OracleParameter("userName", row.GetValueOrDefault("UserName", DBNull.Value)));
+                        
+                        // Handle UserEntryTime as DateTime
+                        var userEntryTime = row.GetValueOrDefault("UserEntryTime", DBNull.Value);
+                        if (userEntryTime != DBNull.Value && userEntryTime != null)
+                        {
+                            if (DateTime.TryParse(userEntryTime.ToString(), out var dateTime))
+                            {
+                                cmd.Parameters.Add(new OracleParameter("userEntryTime", dateTime));
+                            }
+                            else
+                            {
+                                cmd.Parameters.Add(new OracleParameter("userEntryTime", DBNull.Value));
+                            }
+                        }
+                        else
+                        {
+                            cmd.Parameters.Add(new OracleParameter("userEntryTime", DBNull.Value));
+                        }
+                        
+                        cmd.Parameters.Add(new OracleParameter("userProtected", row.GetValueOrDefault("UserProtected", DBNull.Value)));
+                        cmd.Parameters.Add(new OracleParameter("etlRunId", etlRunId));
+                        
+                        await cmd.ExecuteNonQueryAsync();
+                        recordsLoaded++;
+                    }
+                    
+                    // Complete ETL run
+                    await CompleteETLRun(etlRunId, "SUCCESS", recordsLoaded, 0, connection, transaction);
+                    
+                    // Commit transaction
+                    await transaction.CommitAsync();
+                    _logger.LogInformation("Transaction committed successfully - all PCS references saved");
+                    
+                    result.Status = "SUCCESS";
+                    result.RecordsLoaded = recordsLoaded;
+                    result.EndTime = DateTime.Now;
+                    result.ApiCallCount = apiCallCount;
+                    result.PlantIterations = plantIterations;
+                    result.IssueIterations = issueIterations;
+                    result.Message = $"Successfully loaded {recordsLoaded} PCS references for {activePlantIds.Count} selected plants. API Calls: {apiCallCount}, Time: {result.FormattedDuration}";
+                    result.SqlStatements = sqlStatements;
+                    
+                    return result;
+                }
+                catch (Exception ex)
+                {
+                    await transaction.RollbackAsync();
+                    _logger.LogError(ex, "Error during PCS references ETL - transaction rolled back");
+                    
+                    if (etlRunId > 0)
+                    {
+                        await LogETLError(etlRunId, ex, "PCS_REFERENCES");
+                    }
+                    
+                    throw;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to load PCS references");
+                result.Status = "ERROR";
+                result.Message = $"Error: {ex.Message}. No data was modified - transaction was rolled back.";
+                result.EndTime = DateTime.Now;
+                return result;
+            }
+        }
+
         public async Task<Dictionary<string, TableStatus>> GetTableStatuses()
         {
             var statuses = new Dictionary<string, TableStatus>();
@@ -734,7 +1684,7 @@ VALUES (:plantId, :issueRevision, :userName, :userEntryTime,
                 using var connection = new OracleConnection(_connectionString);
                 await connection.OpenAsync();
 
-                var tables = new[] { "OPERATORS", "PLANTS", "ISSUES", "PCS_REFERENCES" };
+                var tables = new[] { "OPERATORS", "PLANTS", "ISSUES", "PCS_REFERENCES", "SC_REFERENCES", "VSM_REFERENCES" };
                 
                 foreach (var tableName in tables)
                 {
@@ -893,6 +1843,37 @@ VALUES (:plantId, :issueRevision, :userName, :userEntryTime,
             cmd.Parameters.Add(new OracleParameter("etlRunId", etlRunId));
             
             await cmd.ExecuteNonQueryAsync();
+            
+            // Clean up old ETL history - keep only last 10 runs
+            // Industry standard: Keep recent history for troubleshooting but prevent unbounded growth
+            string cleanupSql = @"
+                DELETE FROM ETL_CONTROL 
+                WHERE ETL_RUN_ID NOT IN (
+                    SELECT ETL_RUN_ID FROM (
+                        SELECT ETL_RUN_ID 
+                        FROM ETL_CONTROL 
+                        ORDER BY ETL_RUN_ID DESC
+                        FETCH FIRST 10 ROWS ONLY
+                    ) RECENT_RUNS
+                )";
+            
+            using (var cleanupCmd = new OracleCommand(cleanupSql, connection))
+            {
+                if (transaction != null) cleanupCmd.Transaction = transaction;
+                try
+                {
+                    var deleted = await cleanupCmd.ExecuteNonQueryAsync();
+                    if (deleted > 0)
+                    {
+                        _logger.LogInformation($"Cleaned up {deleted} old ETL history records");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Don't fail the ETL if cleanup fails
+                    _logger.LogWarning(ex, "Failed to clean up old ETL history");
+                }
+            }
             
             if (ownConnection)
             {
@@ -1079,6 +2060,14 @@ VALUES (:plantId, :operatorId, :operatorName, :shortDesc, :project,
         public DateTime EndTime { get; set; }
         public string EndpointName { get; set; } = string.Empty;
         public List<string> SqlStatements { get; set; } = new List<string>();
+        
+        // Performance Metrics
+        public int ApiCallCount { get; set; }
+        public int PlantIterations { get; set; }
+        public int IssueIterations { get; set; }
+        public double TotalSeconds => EndTime > StartTime ? (EndTime - StartTime).TotalSeconds : 0;
+        public double RecordsPerSecond => TotalSeconds > 0 ? RecordsLoaded / TotalSeconds : 0;
+        public string FormattedDuration => TotalSeconds > 0 ? $"{TotalSeconds:F2}s" : "N/A";
     }
 
     public class TableStatus
@@ -1087,6 +2076,17 @@ VALUES (:plantId, :operatorId, :operatorName, :shortDesc, :project,
         public bool Exists { get; set; }
         public int RecordCount { get; set; }
         public DateTime? LastLoadTime { get; set; }
+    }
+    
+    public class PlantLoaderConfig
+    {
+        public string PlantId { get; set; } = string.Empty;
+        public string PlantName { get; set; } = string.Empty;
+        public bool IsActive { get; set; }
+        public int LoadPriority { get; set; }
+        public string Notes { get; set; } = string.Empty;
+        public string LongDescription { get; set; } = string.Empty;
+        public string OperatorId { get; set; } = string.Empty;
     }
 
     public class ETLRunHistory

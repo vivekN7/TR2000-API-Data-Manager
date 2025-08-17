@@ -66,13 +66,7 @@
                     <button class="btn btn-primary" @onclick="TestConnection" disabled="@isLoading">
                         <i class="bi bi-plug"></i> Test Connection
                     </button>
-                    <button class="btn btn-success" @onclick="CreateAllTables" disabled="@(!isConnected || isLoading)">
-                        <i class="bi bi-plus-circle"></i> Create All Tables
-                    </button>
-                    <button class="btn btn-danger" @onclick="DropAllTables" disabled="@(!isConnected || isLoading)">
-                        <i class="bi bi-trash"></i> Drop All Tables
-                    </button>
-                    <button class="btn btn-info" @onclick="RefreshTableStatuses" disabled="@(!isConnected || isLoading)">
+                    <button class="btn btn-info ms-2" @onclick="RefreshTableStatuses" disabled="@(!isConnected || isLoading)">
                         <i class="bi bi-arrow-clockwise"></i> Verify Schema
                     </button>
                 </div>
@@ -312,75 +306,235 @@
         <div class="card mb-3">
             <div class="card-header bg-success text-white">
                 <h5 class="mb-0">
-                    <i class="bi bi-check-circle"></i> Last ETL Operation - Actual SQL Executed
+                    <i class="bi bi-check-circle"></i> Last ETL Operation Results
                 </h5>
             </div>
             <div class="card-body">
-                <p><strong>Status:</strong> @lastETLResult.Status | <strong>Records Loaded:</strong> @lastETLResult.RecordsLoaded | <strong>Duration:</strong> @(((lastETLResult.EndTime - lastETLResult.StartTime).TotalSeconds).ToString("F2")) seconds</p>
-                
-                <div class="sql-preview">
-                    <pre>@string.Join("\n\n", lastETLResult.SqlStatements)</pre>
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <strong>Status:</strong> <span class="badge @(lastETLResult.Status == "SUCCESS" ? "bg-success" : "bg-danger")">@lastETLResult.Status</span>
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Records Loaded:</strong> @lastETLResult.RecordsLoaded
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Duration:</strong> @lastETLResult.FormattedDuration
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Records/Second:</strong> @lastETLResult.RecordsPerSecond.ToString("F2")
+                    </div>
                 </div>
+                
+                @if (lastETLResult.ApiCallCount > 0)
+                {
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <strong>API Calls:</strong> @lastETLResult.ApiCallCount
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Plants Processed:</strong> @lastETLResult.PlantIterations
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Issues Processed:</strong> @lastETLResult.IssueIterations
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Efficiency:</strong> @((lastETLResult.RecordsLoaded / (double)lastETLResult.ApiCallCount).ToString("F2")) records/API call
+                        </div>
+                    </div>
+                }
+                
+                <details>
+                    <summary class="cursor-pointer"><strong>View SQL Executed</strong></summary>
+                    <div class="sql-preview mt-2">
+                        <pre>@string.Join("\n\n", lastETLResult.SqlStatements)</pre>
+                    </div>
+                </details>
             </div>
         </div>
     }
+    
+    <!-- Plant Loader Configuration Section -->
+    <div class="card mb-3">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0">
+                <i class="bi bi-gear-fill"></i> 3. Plant Loader Configuration
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> <strong>Important:</strong> Select which plants to load data for. This dramatically reduces API calls by only processing selected plants.
+            </div>
+            
+            @if (!plantLoaderTableExists)
+            {
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i> Plant loader table does not exist. 
+                    <button class="btn btn-sm btn-success ms-2" @onclick="CreatePlantLoaderTable" disabled="@(!isConnected || isLoading)">
+                        Create Loader Table
+                    </button>
+                </div>
+            }
+            else
+            {
+                <div class="row mb-3">
+                    <div class="col-md-8">
+                        <h6>Add Plant to Loader</h6>
+                        <div class="input-group">
+                            <select class="form-select" @bind="selectedPlantToAdd" disabled="@(!isConnected || isLoading)">
+                                <option value="">-- Select Plant --</option>
+                                @foreach (var plant in availablePlants)
+                                {
+                                    <option value="@plant.PlantId">@plant.PlantName (@plant.LongDescription) - ID: @plant.PlantId</option>
+                                }
+                            </select>
+                            <button class="btn btn-success" @onclick="AddPlantToLoader" disabled="@(!isConnected || isLoading || string.IsNullOrEmpty(selectedPlantToAdd))">
+                                <i class="bi bi-plus-circle"></i> Add to Loader
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <button class="btn btn-info w-100" @onclick="RefreshPlantLoader" disabled="@(!isConnected || isLoading)">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh List
+                        </button>
+                    </div>
+                </div>
+                
+                <h6>Configured Plants for Loading</h6>
+                @if (plantLoaderConfigs.Any())
+                {
+                    <table class="table table-sm table-striped">
+                        <thead>
+                            <tr>
+                                <th>Active</th>
+                                <th>Plant ID</th>
+                                <th>Plant Name</th>
+                                <th>Description</th>
+                                <th>Priority</th>
+                                <th>Notes</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var config in plantLoaderConfigs.OrderBy(c => c.LoadPriority).ThenBy(c => c.PlantId))
+                            {
+                                <tr class="@(config.IsActive ? "" : "table-secondary")">
+                                    <td>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" checked="@config.IsActive" 
+                                                   @onchange="@(async (e) => await TogglePlantActive(config.PlantId, (bool)e.Value))"
+                                                   disabled="@(!isConnected || isLoading)">
+                                        </div>
+                                    </td>
+                                    <td>@config.PlantId</td>
+                                    <td>@config.PlantName</td>
+                                    <td>@config.LongDescription</td>
+                                    <td>@config.LoadPriority</td>
+                                    <td>@config.Notes</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-danger" @onclick="@(() => RemovePlantFromLoader(config.PlantId))" 
+                                                disabled="@(!isConnected || isLoading)">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                    
+                    <div class="alert alert-success mt-3">
+                        <strong>Active Plants for Loading:</strong> @string.Join(", ", plantLoaderConfigs.Where(c => c.IsActive).Select(c => $"{c.PlantName} ({c.PlantId})"))
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-warning">
+                        No plants configured in loader table. Add plants above to enable selective loading.
+                    </div>
+                }
+            }
+        </div>
+    </div>
 
     <!-- Reference Data Loading Section -->
     <div class="card mb-3">
         <div class="card-header">
             <h5 class="mb-0">
-                <i class="bi bi-link-45deg"></i> 3. Reference Data Loading
+                <i class="bi bi-link-45deg"></i> 4. Reference Data Loading
             </h5>
         </div>
         <div class="card-body">
-            <div class="row mb-3">
-                <div class="col-md-4">
-                    <label class="form-label">Select Plant:</label>
-                    <select class="form-select" disabled="@(!isConnected || isLoading)">
-                        <option value="">-- Select Plant --</option>
-                    </select>
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label">Select Revision:</label>
-                    <select class="form-select" disabled="@(!isConnected || isLoading)">
-                        <option value="">-- Select Revision --</option>
-                    </select>
-                </div>
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> Reference tables link issues to their referenced specifications (PCS, SC, VSM, etc.)
+                <br/>Note: Loading reference data iterates through all plants and issues - this may take several minutes.
             </div>
             
             <div class="row mb-3">
-                <div class="col-md-3">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="pcsRef" disabled="@(!isConnected || isLoading)">
-                        <label class="form-check-label" for="pcsRef">PCS References</label>
-                    </div>
+                <div class="col-md-4">
+                    <button class="btn btn-primary w-100" @onclick="LoadPCSReferences" disabled="@(!isConnected || isLoading)">
+                        @if (isLoading && loadingTable == "PCS_REFERENCES")
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Loading PCS References...</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-download"></i>
+                            <span>Load PCS References</span>
+                        }
+                    </button>
+                    <small class="text-muted d-block mt-1">Links issues to PCS specifications</small>
                 </div>
-                <div class="col-md-3">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="scRef" disabled="@(!isConnected || isLoading)">
-                        <label class="form-check-label" for="scRef">SC References</label>
-                    </div>
+                <div class="col-md-4">
+                    <button class="btn btn-primary w-100" @onclick="LoadSCReferences" disabled="@(!isConnected || isLoading)">
+                        @if (isLoading && loadingTable == "SC_REFERENCES")
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Loading SC References...</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-download"></i>
+                            <span>Load SC References</span>
+                        }
+                    </button>
+                    <small class="text-muted d-block mt-1">Links issues to SC specifications</small>
                 </div>
-                <div class="col-md-3">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="vsmRef" disabled="@(!isConnected || isLoading)">
-                        <label class="form-check-label" for="vsmRef">VSM References</label>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="vdsRef" disabled="@(!isConnected || isLoading)">
-                        <label class="form-check-label" for="vdsRef">VDS References</label>
-                    </div>
+                <div class="col-md-4">
+                    <button class="btn btn-primary w-100" @onclick="LoadVSMReferences" disabled="@(!isConnected || isLoading)">
+                        @if (isLoading && loadingTable == "VSM_REFERENCES")
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Loading VSM References...</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-download"></i>
+                            <span>Load VSM References</span>
+                        }
+                    </button>
+                    <small class="text-muted d-block mt-1">Links issues to VSM specifications</small>
                 </div>
             </div>
             
-            <button class="btn btn-primary" disabled="@(!isConnected || isLoading)">
-                <i class="bi bi-download"></i> Load Selected
-            </button>
-            <button class="btn btn-success ms-2" disabled="@(!isConnected || isLoading)">
-                <i class="bi bi-download"></i> Load All References
-            </button>
+            <div class="row">
+                <div class="col-12">
+                    <button class="btn btn-success" @onclick="LoadAllReferences" disabled="@(!isConnected || isLoading)">
+                        @if (isLoading && loadingTable == "ALL_REFERENCES")
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Loading All References...</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-download"></i>
+                            <span>Load All Reference Tables</span>
+                        }
+                    </button>
+                    <span class="ms-3 text-muted">
+                        <i class="bi bi-clock"></i> This may take 5-10 minutes
+                    </span>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -388,7 +542,7 @@
     <div class="card">
         <div class="card-header">
             <h5 class="mb-0">
-                <i class="bi bi-clock-history"></i> 4. ETL Run History
+                <i class="bi bi-clock-history"></i> 5. ETL Run History
             </h5>
         </div>
         <div class="card-body">
@@ -447,6 +601,19 @@
     private ETLSqlPreview? currentSqlPreview = null;
     private ETLResult? lastETLResult = null;
     
+    // Plant Loader Configuration
+    private bool plantLoaderTableExists = false;
+    private List<PlantLoaderConfig> plantLoaderConfigs = new();
+    private List<PlantInfo> availablePlants = new();
+    private string selectedPlantToAdd = "";
+    
+    private class PlantInfo
+    {
+        public string PlantId { get; set; } = "";
+        public string PlantName { get; set; } = "";
+        public string LongDescription { get; set; } = "";
+    }
+    
     protected override async Task OnInitializedAsync()
     {
         await TestConnection();
@@ -454,6 +621,8 @@
         {
             await RefreshTableStatuses();
             await RefreshETLHistory();
+            await CheckPlantLoaderTable();
+            await LoadAvailablePlants();
         }
     }
     
@@ -687,6 +856,390 @@
         {
             isLoading = false;
             loadingTable = "";
+            StateHasChanged();
+        }
+    }
+    
+    private async Task LoadPCSReferences()
+    {
+        isLoading = true;
+        loadingTable = "PCS_REFERENCES";
+        loadMessage = "";
+        showSqlPreview = false;
+        StateHasChanged();
+        
+        try
+        {
+            loadMessage = "Loading PCS references for all plants and issues... This may take several minutes.";
+            StateHasChanged();
+            
+            var result = await OracleService.LoadPCSReferencesForSelectedPlants();
+            lastETLResult = result;
+            
+            if (result.Status == "SUCCESS")
+            {
+                loadMessage = $"Successfully loaded {result.RecordsLoaded} PCS references!";
+                await RefreshTableStatuses();
+                await RefreshETLHistory();
+            }
+            else if (result.Status == "NO_DATA")
+            {
+                loadMessage = "No PCS references found to load.";
+            }
+            else
+            {
+                loadMessage = $"Failed to load PCS references: {result.Message}";
+            }
+        }
+        catch (Exception ex)
+        {
+            loadMessage = $"Error loading PCS references: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            loadingTable = "";
+            StateHasChanged();
+        }
+    }
+    
+    private async Task LoadSCReferences()
+    {
+        isLoading = true;
+        loadingTable = "SC_REFERENCES";
+        loadMessage = "";
+        showSqlPreview = false;
+        StateHasChanged();
+        
+        try
+        {
+            loadMessage = "Loading SC references for all plants and issues... This may take several minutes.";
+            StateHasChanged();
+            
+            var result = await OracleService.LoadSCReferences();
+            lastETLResult = result;
+            
+            if (result.Status == "SUCCESS")
+            {
+                loadMessage = $"Successfully loaded {result.RecordsLoaded} SC references!";
+                await RefreshTableStatuses();
+                await RefreshETLHistory();
+            }
+            else if (result.Status == "NO_DATA")
+            {
+                loadMessage = "No SC references found to load.";
+            }
+            else
+            {
+                loadMessage = $"Failed to load SC references: {result.Message}";
+            }
+        }
+        catch (Exception ex)
+        {
+            loadMessage = $"Error loading SC references: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            loadingTable = "";
+            StateHasChanged();
+        }
+    }
+    
+    private async Task LoadVSMReferences()
+    {
+        isLoading = true;
+        loadingTable = "VSM_REFERENCES";
+        loadMessage = "";
+        showSqlPreview = false;
+        StateHasChanged();
+        
+        try
+        {
+            loadMessage = "Loading VSM references for all plants and issues... This may take several minutes.";
+            StateHasChanged();
+            
+            var result = await OracleService.LoadVSMReferences();
+            lastETLResult = result;
+            
+            if (result.Status == "SUCCESS")
+            {
+                loadMessage = $"Successfully loaded {result.RecordsLoaded} VSM references!";
+                await RefreshTableStatuses();
+                await RefreshETLHistory();
+            }
+            else if (result.Status == "NO_DATA")
+            {
+                loadMessage = "No VSM references found to load.";
+            }
+            else
+            {
+                loadMessage = $"Failed to load VSM references: {result.Message}";
+            }
+        }
+        catch (Exception ex)
+        {
+            loadMessage = $"Error loading VSM references: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            loadingTable = "";
+            StateHasChanged();
+        }
+    }
+    
+    private async Task LoadAllReferences()
+    {
+        isLoading = true;
+        loadingTable = "ALL_REFERENCES";
+        loadMessage = "";
+        showSqlPreview = false;
+        StateHasChanged();
+        
+        try
+        {
+            loadMessage = "Loading all reference tables... This may take 5-10 minutes.";
+            StateHasChanged();
+            
+            int totalRecords = 0;
+            var errors = new List<string>();
+            
+            // Load PCS References
+            loadMessage = "Loading PCS references...";
+            StateHasChanged();
+            var pcsResult = await OracleService.LoadPCSReferences();
+            if (pcsResult.Status == "SUCCESS")
+                totalRecords += pcsResult.RecordsLoaded;
+            else if (pcsResult.Status == "ERROR")
+                errors.Add($"PCS: {pcsResult.Message}");
+            
+            // Load SC References
+            loadMessage = "Loading SC references...";
+            StateHasChanged();
+            var scResult = await OracleService.LoadSCReferences();
+            if (scResult.Status == "SUCCESS")
+                totalRecords += scResult.RecordsLoaded;
+            else if (scResult.Status == "ERROR")
+                errors.Add($"SC: {scResult.Message}");
+            
+            // Load VSM References
+            loadMessage = "Loading VSM references...";
+            StateHasChanged();
+            var vsmResult = await OracleService.LoadVSMReferences();
+            if (vsmResult.Status == "SUCCESS")
+                totalRecords += vsmResult.RecordsLoaded;
+            else if (vsmResult.Status == "ERROR")
+                errors.Add($"VSM: {vsmResult.Message}");
+            
+            if (errors.Any())
+            {
+                loadMessage = $"Loaded {totalRecords} records with {errors.Count} errors: {string.Join("; ", errors)}";
+            }
+            else
+            {
+                loadMessage = $"Successfully loaded all reference tables! Total records: {totalRecords}";
+            }
+            
+            await RefreshTableStatuses();
+            await RefreshETLHistory();
+        }
+        catch (Exception ex)
+        {
+            loadMessage = $"Error loading reference tables: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            loadingTable = "";
+            StateHasChanged();
+        }
+    }
+    
+    // Plant Loader Configuration Methods
+    private async Task CheckPlantLoaderTable()
+    {
+        try
+        {
+            // Check if the table exists by trying to fetch configs
+            var configs = await OracleService.GetPlantLoaderConfigs();
+            plantLoaderTableExists = true;
+            plantLoaderConfigs = configs;
+        }
+        catch
+        {
+            plantLoaderTableExists = false;
+        }
+    }
+    
+    private async Task LoadAvailablePlants()
+    {
+        try
+        {
+            // Get all plants from the PLANTS table
+            var allPlantsData = await OracleService.GetAllPlants();
+            
+            availablePlants = allPlantsData.Select(p => new PlantInfo
+            {
+                PlantId = p["PlantId"]?.ToString() ?? "",
+                PlantName = p["PlantName"]?.ToString() ?? "",
+                LongDescription = p["LongDescription"]?.ToString() ?? ""
+            }).ToList();
+            
+            // Remove plants that are already in the loader
+            var existingPlantIds = plantLoaderConfigs.Select(c => c.PlantId).ToHashSet();
+            availablePlants = availablePlants.Where(p => !existingPlantIds.Contains(p.PlantId)).ToList();
+        }
+        catch (Exception ex)
+        {
+            loadMessage = $"Error loading available plants: {ex.Message}";
+        }
+    }
+    
+    private async Task CreatePlantLoaderTable()
+    {
+        isLoading = true;
+        loadMessage = "";
+        StateHasChanged();
+        
+        try
+        {
+            var success = await OracleService.CreatePlantLoaderTable();
+            if (success)
+            {
+                loadMessage = "Successfully created ETL_PLANT_LOADER table";
+                plantLoaderTableExists = true;
+                await RefreshPlantLoader();
+            }
+            else
+            {
+                loadMessage = "Failed to create plant loader table";
+            }
+        }
+        catch (Exception ex)
+        {
+            loadMessage = $"Error creating plant loader table: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+    
+    private async Task RefreshPlantLoader()
+    {
+        isLoading = true;
+        StateHasChanged();
+        
+        try
+        {
+            plantLoaderConfigs = await OracleService.GetPlantLoaderConfigs();
+            await LoadAvailablePlants();
+            loadMessage = $"Loaded {plantLoaderConfigs.Count} plant configurations";
+        }
+        catch (Exception ex)
+        {
+            loadMessage = $"Error refreshing plant loader: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+    
+    private async Task AddPlantToLoader()
+    {
+        if (string.IsNullOrEmpty(selectedPlantToAdd))
+            return;
+            
+        isLoading = true;
+        StateHasChanged();
+        
+        try
+        {
+            var plant = availablePlants.FirstOrDefault(p => p.PlantId == selectedPlantToAdd);
+            if (plant != null)
+            {
+                var success = await OracleService.AddPlantToLoader(plant.PlantId, plant.PlantName, "Added via UI");
+                if (success)
+                {
+                    loadMessage = $"Added plant {plant.PlantName} to loader";
+                    selectedPlantToAdd = "";
+                    await RefreshPlantLoader();
+                }
+                else
+                {
+                    loadMessage = $"Failed to add plant {plant.PlantName}";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            loadMessage = $"Error adding plant: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+    
+    private async Task TogglePlantActive(string plantId, bool isActive)
+    {
+        isLoading = true;
+        StateHasChanged();
+        
+        try
+        {
+            var success = await OracleService.TogglePlantActive(plantId, isActive);
+            if (success)
+            {
+                loadMessage = $"Updated plant {plantId} active status";
+                await RefreshPlantLoader();
+            }
+            else
+            {
+                loadMessage = $"Failed to update plant {plantId}";
+            }
+        }
+        catch (Exception ex)
+        {
+            loadMessage = $"Error toggling plant: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+    
+    private async Task RemovePlantFromLoader(string plantId)
+    {
+        isLoading = true;
+        StateHasChanged();
+        
+        try
+        {
+            var success = await OracleService.RemovePlantFromLoader(plantId);
+            if (success)
+            {
+                loadMessage = $"Removed plant {plantId} from loader";
+                await RefreshPlantLoader();
+            }
+            else
+            {
+                loadMessage = $"Failed to remove plant {plantId}";
+            }
+        }
+        catch (Exception ex)
+        {
+            loadMessage = $"Error removing plant: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
             StateHasChanged();
         }
     }

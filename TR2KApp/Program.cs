@@ -14,6 +14,9 @@ builder.Services.AddHttpClient();
 builder.Services.AddScoped<TR2000ApiService>();
 builder.Services.AddScoped<ApiResponseDeserializer>();
 
+// Add Oracle ETL service
+builder.Services.AddScoped<OracleETLService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

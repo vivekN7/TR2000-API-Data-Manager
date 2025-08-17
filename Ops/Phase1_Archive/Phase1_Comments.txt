@@ -280,7 +280,22 @@ Get subsegments and properties:
 *Params: VDSNAME=[String]REVISION=[String] - put these two params one below the other instead of side by side.
 
 
-For all "Section 5: Bolt Tension" endpoints:
-* Show the input params one below the other instead of side by side.
-* If an input param is a query type, then mention that.
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+UserName, UserEntryTime and UserProtected and their data STILL does not appear in "Get Issue revisions". This data should be taken from the raw json output. Put these columns on the leftmost of the table. 

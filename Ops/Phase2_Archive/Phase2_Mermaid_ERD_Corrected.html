@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TR2000 Phase 2: Complete ERD Diagrams (Corrected)</title>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ 
+            startOnLoad: true,
+            theme: 'default',
+            er: {
+                layoutDirection: 'TB',
+                minEntityWidth: 100,
+                minEntityHeight: 75,
+                entityPadding: 15,
+                useMaxWidth: true,
+                fontSize: 16
+            }
+        });
+    </script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        
+        header {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        h1 {
+            color: #1e3c72;
+            margin: 0 0 10px 0;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 1.1em;
+        }
+        
+        .nav-tabs {
+            display: flex;
+            background: white;
+            border-radius: 10px;
+            padding: 5px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow-x: auto;
+            flex-wrap: wrap;
+        }
+        
+        .nav-tab {
+            flex: 1;
+            min-width: 120px;
+            padding: 12px 20px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #666;
+            transition: all 0.3s;
+            border-radius: 8px;
+            font-size: 0.95em;
+            margin: 2px;
+        }
+        
+        .nav-tab:hover {
+            background: #f0f4f8;
+        }
+        
+        .nav-tab.active {
+            background: #1e3c72;
+            color: white;
+        }
+        
+        .content-section {
+            display: none;
+        }
+        
+        .content-section.active {
+            display: block;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h2 {
+            color: #1e3c72;
+            margin-top: 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        .mermaid-container {
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            overflow-x: auto;
+            min-height: 400px;
+        }
+        
+        .description {
+            background: #e6f3ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid #1e3c72;
+        }
+        
+        .legend {
+            background: #f0f4f8;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .legend-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .legend-symbol {
+            font-family: monospace;
+            background: white;
+            padding: 3px 8px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        
+        .field-mapping {
+            margin-top: 30px;
+        }
+        
+        .field-mapping h3 {
+            color: #1e3c72;
+            margin-bottom: 15px;
+        }
+        
+        .field-mapping table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid #ddd;
+        }
+        
+        .field-mapping th {
+            background: #f0f4f8;
+            padding: 10px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+        
+        .field-mapping td {
+            padding: 8px;
+            border: 1px solid #ddd;
+        }
+        
+        .pk {
+            background: #e6ffe6;
+            font-weight: bold;
+        }
+        
+        .fk {
+            background: #ffe6e6;
+            font-weight: bold;
+        }
+        
+        .note-box {
+            background: #fff9e6;
+            border: 1px solid #ffd700;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        
+        .note-box h3 {
+            color: #d4a000;
+            margin-top: 0;
+        }
+        
+        .info-box {
+            background: #e8f4fd;
+            border: 1px solid #4a90e2;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        
+        .info-box h3 {
+            color: #2c5aa0;
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>TR2000 Phase 2: Complete Entity Relationship Diagrams</h1>
+            <p class="subtitle">Oracle Staging Database Schema with Full ERD (Syntax Corrected Version)</p>
+        </header>
+        
+        <nav class="nav-tabs">
+            <button class="nav-tab active" onclick="showTab(event, 'overview')">Overview</button>
+            <button class="nav-tab" onclick="showTab(event, 'master')">Master Data</button>
+            <button class="nav-tab" onclick="showTab(event, 'issues')">Issues</button>
+            <button class="nav-tab" onclick="showTab(event, 'pcs')">PCS</button>
+            <button class="nav-tab" onclick="showTab(event, 'pcs-details')">PCS Details</button>
+            <button class="nav-tab" onclick="showTab(event, 'vds')">VDS</button>
+            <button class="nav-tab" onclick="showTab(event, 'bolt')">Bolt Tension</button>
+            <button class="nav-tab" onclick="showTab(event, 'etl')">ETL Control</button>
+            <button class="nav-tab" onclick="showTab(event, 'complete')">Full System</button>
+        </nav>
+        
+        <!-- Overview Section -->
+        <div id="overview" class="content-section active">
+            <div class="card">
+                <h2>System Overview ERD</h2>
+                
+                <div class="legend">
+                    <h3>ERD Notation Guide</h3>
+                    <div class="legend-grid">
+                        <div class="legend-item">
+                            <span class="legend-symbol">||--o{</span>
+                            <span>One to Many (1:M)</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-symbol">||--||</span>
+                            <span>One to One (1:1)</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="pk">PK</span>
+                            <span>Primary Key</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="fk">FK</span>
+                            <span>Foreign Key</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="description">
+                    High-level overview showing the main entities and their relationships.
+                </div>
+                
+                <div class="mermaid-container">
+                    <pre class="mermaid">
+erDiagram
+    OPERATORS ||--o{ PLANTS : operates
+    PLANTS ||--o{ ISSUES : has
+    PLANTS ||--o{ PCS : contains
+    ISSUES ||--o{ REFERENCES : includes
+    PCS ||--o{ PCS_DETAILS : has
+    VDS ||--o{ VDS_SUBSEGMENTS : contains
+    ETL_CONTROL ||--o{ ETL_LOGS : tracks
+    
+    OPERATORS {
+        int operator_id PK
+        string operator_name
+    }
+    
+    PLANTS {
+        string plant_id PK
+        int operator_id FK
+        string long_description
+        string common_lib_plant_code
+    }
+    
+    ISSUES {
+        string plant_id FK
+        string issue_revision PK
+        string status
+        date rev_date
+    }
+    
+    REFERENCES {
+        string plant_id FK
+        string issue_revision FK
+        string reference_type
+        string reference_id
+    }
+    
+    PCS {
+        string plant_id FK
+        string pcs PK
+        string revision
+        string rating_class
+    }
+    
+    PCS_DETAILS {
+        string plant_id FK
+        string pcs FK
+        string revision FK
+        string design_code
+    }
+    
+    VDS {
+        string vds PK
+        string revision
+        string description
+    }
+    
+    VDS_SUBSEGMENTS {
+        string vds FK
+        string revision FK
+        int subsegment_id PK
+    }
+    
+    ETL_CONTROL {
+        int etl_run_id PK
+        date run_date
+        string status
+    }
+    
+    ETL_LOGS {
+        int log_id PK
+        int etl_run_id FK
+        string endpoint_name
+    }
+                    </pre>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Master Data Section -->
+        <div id="master" class="content-section">
+            <div class="card">
+                <h2>Master Data ERD - Operators and Plants</h2>
+                
+                <div class="description">
+                    Relationship between Operators and Plants showing foreign key linkage and temporal versioning.
+                </div>
+                
+                <div class="mermaid-container">
+                    <pre class="mermaid">
+erDiagram
+    STG_OPERATORS ||--o{ STG_PLANTS : operates
+    
+    STG_OPERATORS {
+        int operator_id PK
+        string operator_name
+        int etl_run_id
+        date extraction_date
+        string is_current
+        date valid_from
+        date valid_to
+        string hash_value
+    }
+    
+    STG_PLANTS {
+        string plant_id PK
+        int operator_id FK
+        string operator_name
+        string short_description
+        string project
+        string long_description
+        string common_lib_plant_code
+        string initial_revision
+        int area_id
+        string area
+        string category_id
+        string category
+        string document_space_link
+        string celsius_bar
+        string visible
+        string user_protected
+        int etl_run_id
+        date extraction_date
+        string is_current
+        string hash_value
+    }
+                    </pre>
+                </div>
+                
+                <div class="info-box">
+                    <h3>Composite Primary Keys</h3>
+                    <p>The actual Oracle tables use composite primary keys: (operator_id, extraction_date) for STG_OPERATORS and (plant_id, extraction_date) for STG_PLANTS to support temporal data management.</p>
+                </div>
+                
+                <div class="field-mapping">
+                    <h3>Foreign Key Mapping</h3>
+                    <table>
+                        <tr>
+                            <th>Source Table</th>
+                            <th>Source Field</th>
+                            <th>Target Table</th>
+                            <th>Target Field</th>
+                        </tr>
+                        <tr>
+                            <td>STG_PLANTS</td>
+                            <td class="fk">operator_id (FK)</td>
+                            <td>STG_OPERATORS</td>
+                            <td class="pk">operator_id (PK)</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Issues Section -->
+        <div id="issues" class="content-section">
+            <div class="card">
+                <h2>Issues and References ERD</h2>
+                
+                <div class="description">
+                    Issues contain references to multiple specification types (PCS, SC, VSM, VDS, EDS, MDS, VSK, ESK).
+                </div>
+                
+                <div class="mermaid-container">
+                    <pre class="mermaid">
+erDiagram
+    STG_PLANTS ||--o{ STG_ISSUES : has
+    STG_ISSUES ||--o{ STG_PCS_REFERENCES : references
+    STG_ISSUES ||--o{ STG_MDS_REFERENCES : references
+    STG_ISSUES ||--o{ STG_PIPE_ELEMENT_REFERENCES : includes
+    
+    STG_PLANTS {
+        string plant_id PK
+        string long_description
+        date extraction_date
+    }
+    
+    STG_ISSUES {
+        string plant_id FK
+        string issue_revision PK
+        string status
+        string rev_date
+        string pcs_revision
+        string vds_revision
+        string mds_revision
+        string user_name
+        string user_entry_time
+        int etl_run_id
+        date extraction_date
+    }
+    
+    STG_PCS_REFERENCES {
+        string plant_id FK
+        string issue_revision FK
+        string pcs PK
+        string revision
+        string status
+        string rating_class
+        string material_group
+        string delta
+        date extraction_date
+    }
+    
+    STG_MDS_REFERENCES {
+        string plant_id FK
+        string issue_revision FK
+        string mds PK
+        string revision
+        string area
+        string status
+        string delta
+        date extraction_date
+    }
+    
+    STG_PIPE_ELEMENT_REFERENCES {
+        string plant_id FK
+        string issue_revision FK
+        int element_id PK
+        string element_group
+        string dimension_standard
+        string material_grade
+        date extraction_date
+    }
+                    </pre>
+                </div>
+                
+                <div class="info-box">
+                    <h3>Composite Primary Keys</h3>
+                    <p>Issues table: (plant_id, issue_revision, extraction_date)<br>
+                    Reference tables: (plant_id, issue_revision, [reference_id], revision, extraction_date)</p>
+                </div>
+                
+                <div class="field-mapping">
+                    <h3>Foreign Key Mappings</h3>
+                    <table>
+                        <tr>
+                            <th>Source Table</th>
+                            <th>Source Fields</th>
+                            <th>Target Table</th>
+                            <th>Target Fields</th>
+                        </tr>
+                        <tr>
+                            <td>STG_ISSUES</td>
+                            <td class="fk">plant_id (FK)</td>
+                            <td>STG_PLANTS</td>
+                            <td class="pk">plant_id (PK)</td>
+                        </tr>
+                        <tr>
+                            <td>STG_PCS_REFERENCES</td>
+                            <td class="fk">plant_id + issue_revision (FK)</td>
+                            <td>STG_ISSUES</td>
+                            <td class="pk">plant_id + issue_revision (PK)</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- PCS Section -->
+        <div id="pcs" class="content-section">
+            <div class="card">
+                <h2>PCS (Piping Class Specification) Main ERD</h2>
+                
+                <div class="description">
+                    PCS master table with its main relationships to detail tables.
+                </div>
+                
+                <div class="mermaid-container">
+                    <pre class="mermaid">
+erDiagram
+    STG_PLANTS ||--o{ STG_PCS : contains
+    STG_PCS ||--|| STG_PCS_PROPERTIES : has
+    STG_PCS ||--|| STG_PCS_TEMP_PRESSURE : has
+    STG_PCS ||--o{ STG_PCS_PIPE_SIZES : defines
+    
+    STG_PLANTS {
+        string plant_id PK
+        string long_description
+        date extraction_date
+    }
+    
+    STG_PCS {
+        string plant_id FK
+        string pcs PK
+        string revision
+        string status
+        string rating_class
+        string material_group
+        string design_code
+        string last_update
+        string last_update_by
+        date extraction_date
+    }
+    
+    STG_PCS_PROPERTIES {
+        string plant_id FK
+        string pcs FK
+        string revision FK
+        string sc
+        string vsm
+        int corr_allowance
+        string service_remark
+        date extraction_date
+    }
+    
+    STG_PCS_TEMP_PRESSURE {
+        string plant_id FK
+        string pcs FK
+        string revision FK
+        string temperature
+        string pressure
+        date extraction_date
+    }
+    
+    STG_PCS_PIPE_SIZES {
+        string plant_id FK
+        string pcs FK
+        string revision FK
+        string nom_size PK
+        string outer_diam
+        string wall_thickness
+        string schedule
+        date extraction_date
+    }
+                    </pre>
+                </div>
+                
+                <div class="info-box">
+                    <h3>Composite Primary Keys</h3>
+                    <p>STG_PCS: (plant_id, pcs, revision, extraction_date)<br>
+                    Detail tables inherit the same composite key pattern plus their own identifiers.</p>
+                </div>
+                
+                <div class="field-mapping">
+                    <h3>Foreign Key Mappings</h3>
+                    <table>
+                        <tr>
+                            <th>Source Table</th>
+                            <th>Source Fields</th>
+                            <th>Target Table</th>
+                            <th>Target Fields</th>
+                        </tr>
+                        <tr>
+                            <td>STG_PCS</td>
+                            <td class="fk">plant_id (FK)</td>
+                            <td>STG_PLANTS</td>
+                            <td class="pk">plant_id (PK)</td>
+                        </tr>
+                        <tr>
+                            <td>STG_PCS_PROPERTIES</td>
+                            <td class="fk">plant_id + pcs + revision (FK)</td>
+                            <td>STG_PCS</td>
+                            <td class="pk">plant_id + pcs + revision (PK)</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- PCS Details Section -->
+        <div id="pcs-details" class="content-section">
+            <div class="card">
+                <h2>PCS Detail Tables ERD</h2>
+                
+                <div class="description">
+                    Detailed PCS elements including pipe elements, valve elements, and embedded notes.
+                </div>
+                
+                <div class="mermaid-container">
+                    <pre class="mermaid">
+erDiagram
+    STG_PCS ||--o{ STG_PCS_PIPE_ELEMENTS : contains
+    STG_PCS ||--o{ STG_PCS_VALVE_ELEMENTS : contains
+    STG_PCS ||--o{ STG_PCS_EMBEDDED_NOTES : has
+    STG_PCS ||--o{ STG_PCS_MANUFACTURERS : has
+    
+    STG_PCS {
+        string plant_id PK
+        string pcs
+        string revision
+        string rating_class
+        date extraction_date
+    }
+    
+    STG_PCS_PIPE_ELEMENTS {
+        string plant_id FK
+        string pcs FK
+        string revision FK
+        int element_id PK
+        string element_group
+        string dimension_standard
+        string material_grade
+        string component_code
+        string material_code
+        date extraction_date
+    }
+    
+    STG_PCS_VALVE_ELEMENTS {
+        string plant_id FK
+        string pcs FK
+        string revision FK
+        int valve_id PK
+        string valve_type
+        string valve_class
+        string body_material
+        string end_connection
+        date extraction_date
+    }
+    
+    STG_PCS_EMBEDDED_NOTES {
+        string plant_id FK
+        string pcs FK
+        string revision FK
+        int note_id PK
+        string note_type
+        string note_text
+        string created_by
+        date extraction_date
+    }
+    
+    STG_PCS_MANUFACTURERS {
+        string plant_id FK
+        string pcs FK
+        string revision FK
+        int manufacturer_id PK
+        string manufacturer_name
+        string component_type
+        date extraction_date
+    }
+                    </pre>
+                </div>
+            </div>
+        </div>
+        
+        <!-- VDS Section -->
+        <div id="vds" class="content-section">
+            <div class="card">
+                <h2>VDS (Valve Datasheet) ERD</h2>
+                
+                <div class="description">
+                    VDS master table with subsegments and properties. Note: VDS is global and not plant-specific.
+                </div>
+                
+                <div class="mermaid-container">
+                    <pre class="mermaid">
+erDiagram
+    STG_VDS ||--o{ STG_VDS_SUBSEGMENTS : contains
+    STG_VDS ||--o{ STG_VDS_PROPERTIES : has
+    
+    STG_VDS {
+        string vds PK
+        string revision
+        string description
+        string valve_type
+        string design_standard
+        string size_range
+        string pressure_class
+        int etl_run_id
+        date extraction_date
+        string is_current
+    }
+    
+    STG_VDS_SUBSEGMENTS {
+        string vds FK
+        string revision FK
+        int subsegment_id PK
+        string segment_name
+        string segment_type
+        string material
+        string specification
+        date extraction_date
+    }
+    
+    STG_VDS_PROPERTIES {
+        string vds FK
+        string revision FK
+        string property_name PK
+        string property_value
+        string property_unit
+        date extraction_date
+    }
+                    </pre>
+                </div>
+                
+                <div class="note-box">
+                    <h3>Important Note</h3>
+                    <p>VDS data is global and not specific to any plant. The VDS list endpoint returns over 44,000 items.</p>
+                </div>
+                
+                <div class="info-box">
+                    <h3>Composite Primary Keys</h3>
+                    <p>STG_VDS: (vds, revision, extraction_date)<br>
+                    STG_VDS_SUBSEGMENTS: (vds, revision, subsegment_id, extraction_date)</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Bolt Tension Section -->
+        <div id="bolt" class="content-section">
+            <div class="card">
+                <h2>Bolt Tension ERD</h2>
+                
+                <div class="description">
+                    Bolt tension specifications linked to plants via common_lib_plant_code.
+                </div>
+                
+                <div class="mermaid-container">
+                    <pre class="mermaid">
+erDiagram
+    STG_PLANTS ||--o{ STG_BOLT_TENSION_SPEC : uses
+    STG_BOLT_TENSION_SPEC ||--o{ STG_BOLT_TENSION_DETAIL : contains
+    STG_BOLT_TENSION_SPEC ||--o{ STG_BOLT_TENSION_TABLE : has
+    
+    STG_PLANTS {
+        string plant_id PK
+        string common_lib_plant_code
+        date extraction_date
+    }
+    
+    STG_BOLT_TENSION_SPEC {
+        string plant_code FK
+        string flange_standard PK
+        string bolt_spec
+        string gasket_type
+        string design_code
+        int etl_run_id
+        date extraction_date
+    }
+    
+    STG_BOLT_TENSION_DETAIL {
+        string plant_code FK
+        string flange_standard FK
+        string flange_size PK
+        string pressure_rating
+        string bolt_size
+        int num_bolts
+        decimal target_stress
+        date extraction_date
+    }
+    
+    STG_BOLT_TENSION_TABLE {
+        string plant_code FK
+        string flange_standard FK
+        string table_type PK
+        string table_data
+        date extraction_date
+    }
+                    </pre>
+                </div>
+                
+                <div class="field-mapping">
+                    <h3>Foreign Key Mapping</h3>
+                    <table>
+                        <tr>
+                            <th>Source Table</th>
+                            <th>Source Field</th>
+                            <th>Target Table</th>
+                            <th>Target Field</th>
+                        </tr>
+                        <tr>
+                            <td>STG_BOLT_TENSION_SPEC</td>
+                            <td class="fk">plant_code (FK)</td>
+                            <td>STG_PLANTS</td>
+                            <td class="pk">common_lib_plant_code</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ETL Control Section -->
+        <div id="etl" class="content-section">
+            <div class="card">
+                <h2>ETL Control and Monitoring ERD</h2>
+                
+                <div class="description">
+                    ETL control tables for tracking extraction runs, logging, and data quality.
+                </div>
+                
+                <div class="mermaid-container">
+                    <pre class="mermaid">
+erDiagram
+    ETL_CONTROL ||--o{ ETL_ENDPOINT_LOG : tracks
+    ETL_CONTROL ||--o{ ETL_ERROR_LOG : logs
+    ETL_CONTROL ||--o{ ETL_DATA_QUALITY : validates
+    
+    ETL_CONTROL {
+        int etl_run_id PK
+        date run_date
+        string run_type
+        string status
+        int records_extracted
+        int records_loaded
+        int records_rejected
+        int error_count
+        date start_time
+        date end_time
+        int duration_seconds
+        string initiated_by
+    }
+    
+    ETL_ENDPOINT_LOG {
+        int log_id PK
+        int etl_run_id FK
+        string endpoint_name
+        string plant_id
+        string api_url
+        int http_status_code
+        int response_time_ms
+        int record_count
+        string status
+        date processed_date
+    }
+    
+    ETL_ERROR_LOG {
+        int error_id PK
+        int etl_run_id FK
+        string error_type
+        string error_message
+        string endpoint_name
+        string stack_trace
+        date error_timestamp
+    }
+    
+    ETL_DATA_QUALITY {
+        int quality_id PK
+        int etl_run_id FK
+        string table_name
+        string validation_type
+        int failed_count
+        string validation_details
+        date validation_date
+    }
+                    </pre>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Complete System Section -->
+        <div id="complete" class="content-section">
+            <div class="card">
+                <h2>Complete System ERD - Simplified View</h2>
+                
+                <div class="description">
+                    Simplified view of the entire system showing major entity groups and their relationships.
+                </div>
+                
+                <div class="mermaid-container">
+                    <pre class="mermaid">
+erDiagram
+    OPERATORS ||--o{ PLANTS : operates
+    PLANTS ||--o{ ISSUES : has
+    PLANTS ||--o{ PCS : contains
+    PLANTS ||--o{ BOLT_TENSION : uses
+    ISSUES ||--o{ PCS_REF : references
+    ISSUES ||--o{ SC_REF : references
+    ISSUES ||--o{ VSM_REF : references
+    ISSUES ||--o{ VDS_REF : references
+    ISSUES ||--o{ EDS_REF : references
+    ISSUES ||--o{ MDS_REF : references
+    ISSUES ||--o{ VSK_REF : references
+    ISSUES ||--o{ ESK_REF : references
+    ISSUES ||--o{ PIPE_ELEM_REF : includes
+    PCS ||--o{ PCS_PROPERTIES : has
+    PCS ||--o{ PCS_TEMP_PRESSURE : has
+    PCS ||--o{ PCS_PIPE_SIZES : defines
+    PCS ||--o{ PCS_PIPE_ELEMENTS : contains
+    PCS ||--o{ PCS_VALVE_ELEMENTS : contains
+    PCS ||--o{ PCS_EMBEDDED_NOTES : includes
+    VDS ||--o{ VDS_SUBSEGMENTS : contains
+    VDS ||--o{ VDS_PROPERTIES : has
+    BOLT_TENSION ||--o{ BOLT_DETAIL : contains
+    ETL_CONTROL ||--o{ ETL_LOGS : tracks
+    ETL_CONTROL ||--o{ ALL_STAGING_TABLES : populates
+    
+    OPERATORS {
+        int id PK
+        string name
+    }
+    
+    PLANTS {
+        string id PK
+        int operator_id FK
+        string common_lib_code
+    }
+    
+    ISSUES {
+        string plant_id FK
+        string revision PK
+    }
+    
+    PCS {
+        string plant_id FK
+        string pcs PK
+        string revision
+    }
+    
+    PCS_REF {
+        string plant_id FK
+        string issue_rev FK
+        string pcs FK
+    }
+    
+    SC_REF {
+        string plant_id FK
+        string issue_rev FK
+        string sc
+    }
+    
+    VSM_REF {
+        string plant_id FK
+        string issue_rev FK
+        string vsm
+    }
+    
+    VDS_REF {
+        string plant_id FK
+        string issue_rev FK
+        string vds FK
+    }
+    
+    EDS_REF {
+        string plant_id FK
+        string issue_rev FK
+        string eds
+    }
+    
+    MDS_REF {
+        string plant_id FK
+        string issue_rev FK
+        string mds
+    }
+    
+    VSK_REF {
+        string plant_id FK
+        string issue_rev FK
+        string vsk
+    }
+    
+    ESK_REF {
+        string plant_id FK
+        string issue_rev FK
+        string esk
+    }
+    
+    PIPE_ELEM_REF {
+        string plant_id FK
+        string issue_rev FK
+        int element_id PK
+    }
+    
+    PCS_PROPERTIES {
+        string plant_id FK
+        string pcs FK
+        string revision FK
+    }
+    
+    PCS_TEMP_PRESSURE {
+        string plant_id FK
+        string pcs FK
+        string revision FK
+    }
+    
+    PCS_PIPE_SIZES {
+        string plant_id FK
+        string pcs FK
+        string nom_size PK
+    }
+    
+    PCS_PIPE_ELEMENTS {
+        string plant_id FK
+        string pcs FK
+        int element_id PK
+    }
+    
+    PCS_VALVE_ELEMENTS {
+        string plant_id FK
+        string pcs FK
+        int valve_id PK
+    }
+    
+    PCS_EMBEDDED_NOTES {
+        string plant_id FK
+        string pcs FK
+        int note_id PK
+    }
+    
+    VDS {
+        string vds PK
+        string revision
+    }
+    
+    VDS_SUBSEGMENTS {
+        string vds FK
+        int subsegment_id PK
+    }
+    
+    VDS_PROPERTIES {
+        string vds FK
+        string property PK
+    }
+    
+    BOLT_TENSION {
+        string plant_code FK
+        string standard PK
+    }
+    
+    BOLT_DETAIL {
+        string plant_code FK
+        string flange_size PK
+    }
+    
+    ETL_CONTROL {
+        int run_id PK
+        string status
+    }
+    
+    ETL_LOGS {
+        int log_id PK
+        int run_id FK
+    }
+    
+    ALL_STAGING_TABLES {
+        int etl_run_id FK
+        date extract_date
+    }
+                    </pre>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function showTab(event, tabName) {
+            // Hide all content sections
+            const sections = document.querySelectorAll('.content-section');
+            sections.forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            // Remove active class from all tabs
+            const tabs = document.querySelectorAll('.nav-tab');
+            tabs.forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected section
+            document.getElementById(tabName).classList.add('active');
+            
+            // Mark clicked tab as active
+            event.target.classList.add('active');
+        }
+    </script>
+</body>
+</html>

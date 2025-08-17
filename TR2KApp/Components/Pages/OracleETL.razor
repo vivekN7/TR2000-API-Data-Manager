@@ -1,0 +1,693 @@
+@page "/oracle-etl"
+@using TR2KBlazorLibrary.Logic.Services
+@using TR2KBlazorLibrary.Models
+@inject OracleETLService OracleService
+@inject TR2000ApiService ApiService
+@inject ILogger<OracleETL> Logger
+@rendermode InteractiveServer
+
+<PageTitle>Oracle ETL Management</PageTitle>
+
+<style>
+    .sql-preview {
+        background-color: #1e1e1e;
+        color: #d4d4d4;
+        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        padding: 15px;
+        border-radius: 5px;
+        margin: 10px 0;
+        overflow-x: auto;
+    }
+    .sql-keyword {
+        color: #569cd6;
+        font-weight: bold;
+    }
+    .sql-comment {
+        color: #608b4e;
+        font-style: italic;
+    }
+    .step-header {
+        background-color: #f8f9fa;
+        padding: 10px;
+        border-left: 4px solid #007bff;
+        margin-bottom: 10px;
+    }
+    .step-number {
+        display: inline-block;
+        width: 30px;
+        height: 30px;
+        background-color: #007bff;
+        color: white;
+        text-align: center;
+        line-height: 30px;
+        border-radius: 50%;
+        margin-right: 10px;
+    }
+</style>
+
+<div class="container-fluid">
+    <h1>Oracle ETL Management</h1>
+    
+    <!-- Database Setup Section -->
+    <div class="card mb-3">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="bi bi-database"></i> 1. Database Setup
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row align-items-center">
+                <div class="col-auto">
+                    <span class="badge @(isConnected ? "bg-success" : "bg-danger")">
+                        @(isConnected ? "● Connected" : "○ Not Connected") to TR2000_STAGING
+                    </span>
+                </div>
+                <div class="col-auto">
+                    <button class="btn btn-primary" @onclick="TestConnection" disabled="@isLoading">
+                        <i class="bi bi-plug"></i> Test Connection
+                    </button>
+                    <button class="btn btn-success" @onclick="CreateAllTables" disabled="@(!isConnected || isLoading)">
+                        <i class="bi bi-plus-circle"></i> Create All Tables
+                    </button>
+                    <button class="btn btn-danger" @onclick="DropAllTables" disabled="@(!isConnected || isLoading)">
+                        <i class="bi bi-trash"></i> Drop All Tables
+                    </button>
+                    <button class="btn btn-info" @onclick="RefreshTableStatuses" disabled="@(!isConnected || isLoading)">
+                        <i class="bi bi-arrow-clockwise"></i> Verify Schema
+                    </button>
+                </div>
+            </div>
+            @if (!string.IsNullOrEmpty(connectionMessage))
+            {
+                <div class="alert @(connectionMessage.Contains("Success") ? "alert-success" : "alert-danger") mt-3">
+                    @connectionMessage
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Master Data Loading Section -->
+    <div class="card mb-3">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="bi bi-database-fill-add"></i> 2. Master Data Loading
+            </h5>
+        </div>
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Table</th>
+                        <th>Status</th>
+                        <th>Records</th>
+                        <th>Last Load</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>OPERATORS</td>
+                        <td>
+                            @if (tableStatuses.ContainsKey("OPERATORS"))
+                            {
+                                var status = tableStatuses["OPERATORS"];
+                                if (status.Exists)
+                                {
+                                    <span class="badge @(status.RecordCount > 0 ? "bg-success" : "bg-warning")">
+                                        @(status.RecordCount > 0 ? "✓ Loaded" : "○ Empty")
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-danger">Table Not Found</span>
+                                }
+                            }
+                        </td>
+                        <td>
+                            @(tableStatuses.ContainsKey("OPERATORS") ? tableStatuses["OPERATORS"].RecordCount : 0)
+                        </td>
+                        <td>
+                            @if (tableStatuses.ContainsKey("OPERATORS") && tableStatuses["OPERATORS"].LastLoadTime.HasValue)
+                            {
+                                @tableStatuses["OPERATORS"].LastLoadTime.Value.ToString("yyyy-MM-dd HH:mm")
+                            }
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" @onclick="LoadOperators" disabled="@(!isConnected || isLoading)">
+                                @if (loadingTable == "operators")
+                                {
+                                    <span class="spinner-border spinner-border-sm" role="status"></span>
+                                    <span> Loading...</span>
+                                }
+                                else
+                                {
+                                    <span>Load</span>
+                                }
+                            </button>
+                            <button class="btn btn-sm btn-info" @onclick="@(() => ShowSqlPreview("operators"))" disabled="@(!isConnected)">
+                                <i class="bi bi-code-slash"></i> View SQL
+                            </button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>PLANTS</td>
+                        <td>
+                            @if (tableStatuses.ContainsKey("PLANTS"))
+                            {
+                                var status = tableStatuses["PLANTS"];
+                                if (status.Exists)
+                                {
+                                    <span class="badge @(status.RecordCount > 0 ? "bg-success" : "bg-warning")">
+                                        @(status.RecordCount > 0 ? "✓ Loaded" : "○ Empty")
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-danger">Table Not Found</span>
+                                }
+                            }
+                        </td>
+                        <td>
+                            @(tableStatuses.ContainsKey("PLANTS") ? tableStatuses["PLANTS"].RecordCount : 0)
+                        </td>
+                        <td>
+                            @if (tableStatuses.ContainsKey("PLANTS") && tableStatuses["PLANTS"].LastLoadTime.HasValue)
+                            {
+                                @tableStatuses["PLANTS"].LastLoadTime.Value.ToString("yyyy-MM-dd HH:mm")
+                            }
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" @onclick="LoadPlants" disabled="@(!isConnected || isLoading)">
+                                @if (loadingTable == "plants")
+                                {
+                                    <span class="spinner-border spinner-border-sm" role="status"></span>
+                                    <span> Loading...</span>
+                                }
+                                else
+                                {
+                                    <span>Load All</span>
+                                }
+                            </button>
+                            <button class="btn btn-sm btn-info" @onclick="@(() => ShowSqlPreview("plants"))" disabled="@(!isConnected)">
+                                <i class="bi bi-code-slash"></i> View SQL
+                            </button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>ISSUES</td>
+                        <td>
+                            @if (tableStatuses.ContainsKey("ISSUES"))
+                            {
+                                var status = tableStatuses["ISSUES"];
+                                if (status.Exists)
+                                {
+                                    <span class="badge @(status.RecordCount > 0 ? "bg-success" : "bg-warning")">
+                                        @(status.RecordCount > 0 ? "✓ Loaded" : "○ Empty")
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-danger">Table Not Found</span>
+                                }
+                            }
+                        </td>
+                        <td>
+                            @(tableStatuses.ContainsKey("ISSUES") ? tableStatuses["ISSUES"].RecordCount : 0)
+                        </td>
+                        <td>
+                            @if (tableStatuses.ContainsKey("ISSUES") && tableStatuses["ISSUES"].LastLoadTime.HasValue)
+                            {
+                                @tableStatuses["ISSUES"].LastLoadTime.Value.ToString("yyyy-MM-dd HH:mm")
+                            }
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" @onclick="LoadIssues" disabled="@(!isConnected || isLoading)">
+                                @if (loadingTable == "issues")
+                                {
+                                    <span class="spinner-border spinner-border-sm" role="status"></span>
+                                    <span> Loading...</span>
+                                }
+                                else
+                                {
+                                    <span>Load All</span>
+                                }
+                            </button>
+                            <button class="btn btn-sm btn-info" @onclick="@(() => ShowSqlPreview("issues"))" disabled="@(!isConnected)">
+                                <i class="bi bi-code-slash"></i> View SQL
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            @if (!string.IsNullOrEmpty(loadMessage))
+            {
+                <div class="alert @(loadMessage.Contains("Success") || loadMessage.Contains("loaded") ? "alert-success" : "alert-warning") mt-3">
+                    @loadMessage
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- SQL Preview Section -->
+    @if (showSqlPreview && currentSqlPreview != null)
+    {
+        <div class="card mb-3">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-code-slash"></i> @currentSqlPreview.Title
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> <strong>What happens when you click Load:</strong>
+                    <br/>@currentSqlPreview.Description
+                </div>
+                
+                @foreach (var step in currentSqlPreview.Steps)
+                {
+                    <div class="step-header">
+                        <span class="step-number">@step.StepNumber</span>
+                        <strong>@step.Title</strong>
+                        <br/>
+                        <small class="text-muted">@step.Description</small>
+                    </div>
+                    <div class="sql-preview">
+                        <pre>@step.SqlStatement</pre>
+                    </div>
+                }
+                
+                <div class="alert alert-warning mt-3">
+                    <i class="bi bi-lightbulb"></i> <strong>Key Concepts:</strong>
+                    <ul class="mb-0">
+                        <li><strong>SCD Type 2</strong>: Slowly Changing Dimension - keeps all historical data</li>
+                        <li><strong>IS_CURRENT flag</strong>: 'Y' = current data, 'N' = historical data</li>
+                        <li><strong>EXTRACTION_DATE</strong>: Timestamp when data was loaded</li>
+                        <li><strong>ETL_RUN_ID</strong>: Links all records from same load operation</li>
+                    </ul>
+                </div>
+                
+                <div class="alert alert-success mt-3">
+                    <i class="bi bi-shield-check"></i> <strong>Data Safety Guaranteed:</strong>
+                    <ul class="mb-0">
+                        <li><strong>Transaction Protection</strong>: ALL operations wrapped in database transactions</li>
+                        <li><strong>Automatic Rollback</strong>: ANY error = NO data changes (your data is safe!)</li>
+                        <li><strong>API First</strong>: Data fetched BEFORE any database modifications</li>
+                        <li><strong>Zero Data Loss</strong>: Failed operations leave existing data untouched</li>
+                        <li><strong>Full Audit Trail</strong>: All errors logged to ETL_ERROR_LOG table</li>
+                    </ul>
+                    <small class="text-muted">Learn more: See <code>/workspace/TR2000/TR2K/Ops/ETL_Error_Handling_Guide.md</code></small>
+                </div>
+                
+                <button class="btn btn-secondary" @onclick="() => showSqlPreview = false">
+                    <i class="bi bi-x"></i> Close Preview
+                </button>
+            </div>
+        </div>
+    }
+
+    <!-- Last ETL Result Details -->
+    @if (lastETLResult != null && lastETLResult.SqlStatements.Any())
+    {
+        <div class="card mb-3">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-check-circle"></i> Last ETL Operation - Actual SQL Executed
+                </h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Status:</strong> @lastETLResult.Status | <strong>Records Loaded:</strong> @lastETLResult.RecordsLoaded | <strong>Duration:</strong> @(((lastETLResult.EndTime - lastETLResult.StartTime).TotalSeconds).ToString("F2")) seconds</p>
+                
+                <div class="sql-preview">
+                    <pre>@string.Join("\n\n", lastETLResult.SqlStatements)</pre>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Reference Data Loading Section -->
+    <div class="card mb-3">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="bi bi-link-45deg"></i> 3. Reference Data Loading
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <label class="form-label">Select Plant:</label>
+                    <select class="form-select" disabled="@(!isConnected || isLoading)">
+                        <option value="">-- Select Plant --</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Select Revision:</label>
+                    <select class="form-select" disabled="@(!isConnected || isLoading)">
+                        <option value="">-- Select Revision --</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="row mb-3">
+                <div class="col-md-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="pcsRef" disabled="@(!isConnected || isLoading)">
+                        <label class="form-check-label" for="pcsRef">PCS References</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="scRef" disabled="@(!isConnected || isLoading)">
+                        <label class="form-check-label" for="scRef">SC References</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="vsmRef" disabled="@(!isConnected || isLoading)">
+                        <label class="form-check-label" for="vsmRef">VSM References</label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="vdsRef" disabled="@(!isConnected || isLoading)">
+                        <label class="form-check-label" for="vdsRef">VDS References</label>
+                    </div>
+                </div>
+            </div>
+            
+            <button class="btn btn-primary" disabled="@(!isConnected || isLoading)">
+                <i class="bi bi-download"></i> Load Selected
+            </button>
+            <button class="btn btn-success ms-2" disabled="@(!isConnected || isLoading)">
+                <i class="bi bi-download"></i> Load All References
+            </button>
+        </div>
+    </div>
+
+    <!-- ETL Run History Section -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="bi bi-clock-history"></i> 4. ETL Run History
+            </h5>
+        </div>
+        <div class="card-body">
+            @if (etlHistory.Any())
+            {
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Run ID</th>
+                            <th>Date/Time</th>
+                            <th>Type</th>
+                            <th>Status</th>
+                            <th>Records</th>
+                            <th>Errors</th>
+                            <th>Comments</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var run in etlHistory)
+                        {
+                            <tr>
+                                <td>@run.RunId</td>
+                                <td>@run.RunDate.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td>@run.RunType</td>
+                                <td>
+                                    <span class="badge @(run.Status == "SUCCESS" ? "bg-success" : run.Status == "FAILED" ? "bg-danger" : "bg-warning")">
+                                        @run.Status
+                                    </span>
+                                </td>
+                                <td>@run.RecordsLoaded</td>
+                                <td>@run.ErrorCount</td>
+                                <td>@run.Comments</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <p class="text-muted">No ETL runs yet</p>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool isConnected = false;
+    private bool isLoading = false;
+    private bool showSqlPreview = false;
+    private string connectionMessage = "";
+    private string loadMessage = "";
+    private string loadingTable = "";
+    
+    private Dictionary<string, TableStatus> tableStatuses = new();
+    private List<ETLRunHistory> etlHistory = new();
+    private ETLSqlPreview? currentSqlPreview = null;
+    private ETLResult? lastETLResult = null;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await TestConnection();
+        if (isConnected)
+        {
+            await RefreshTableStatuses();
+            await RefreshETLHistory();
+        }
+    }
+    
+    private async Task TestConnection()
+    {
+        isLoading = true;
+        connectionMessage = "";
+        StateHasChanged();
+        
+        try
+        {
+            isConnected = await OracleService.TestConnection();
+            connectionMessage = isConnected 
+                ? "Successfully connected to Oracle database!" 
+                : "Failed to connect to Oracle database. Check connection settings.";
+                
+            if (isConnected)
+            {
+                await RefreshTableStatuses();
+                await RefreshETLHistory();
+            }
+        }
+        catch (Exception ex)
+        {
+            connectionMessage = $"Error: {ex.Message}";
+            isConnected = false;
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+    
+    private async Task CreateAllTables()
+    {
+        isLoading = true;
+        connectionMessage = "";
+        StateHasChanged();
+        
+        try
+        {
+            var success = await OracleService.CreateAllTables();
+            connectionMessage = success 
+                ? "All tables created successfully!" 
+                : "Failed to create some tables. Check logs for details.";
+                
+            if (success)
+            {
+                await RefreshTableStatuses();
+            }
+        }
+        catch (Exception ex)
+        {
+            connectionMessage = $"Error creating tables: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+    
+    private async Task DropAllTables()
+    {
+        isLoading = true;
+        connectionMessage = "";
+        StateHasChanged();
+        
+        try
+        {
+            var success = await OracleService.DropAllTables();
+            connectionMessage = success 
+                ? "All tables dropped successfully!" 
+                : "Failed to drop some tables. Check logs for details.";
+                
+            await RefreshTableStatuses();
+        }
+        catch (Exception ex)
+        {
+            connectionMessage = $"Error dropping tables: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+    
+    private async Task RefreshTableStatuses()
+    {
+        try
+        {
+            tableStatuses = await OracleService.GetTableStatuses();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to refresh table statuses");
+        }
+    }
+    
+    private async Task RefreshETLHistory()
+    {
+        try
+        {
+            etlHistory = await OracleService.GetETLHistory(10);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to refresh ETL history");
+        }
+    }
+    
+    private void ShowSqlPreview(string tableName)
+    {
+        showSqlPreview = true;
+        currentSqlPreview = tableName switch
+        {
+            "operators" => OracleService.GetLoadOperatorsSqlPreview(),
+            "plants" => OracleService.GetLoadPlantsSqlPreview(),
+            "issues" => OracleService.GetLoadIssuesSqlPreview(),
+            _ => null
+        };
+        StateHasChanged();
+    }
+    
+    private async Task LoadOperators()
+    {
+        isLoading = true;
+        loadingTable = "operators";
+        loadMessage = "";
+        showSqlPreview = false;
+        StateHasChanged();
+        
+        try
+        {
+            var result = await OracleService.LoadOperators();
+            lastETLResult = result;
+            
+            if (result.Status == "SUCCESS")
+            {
+                loadMessage = $"Successfully loaded {result.RecordsLoaded} operators!";
+                await RefreshTableStatuses();
+                await RefreshETLHistory();
+            }
+            else
+            {
+                loadMessage = $"Failed to load operators: {result.Message}";
+            }
+        }
+        catch (Exception ex)
+        {
+            loadMessage = $"Error loading operators: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            loadingTable = "";
+            StateHasChanged();
+        }
+    }
+    
+    private async Task LoadPlants()
+    {
+        isLoading = true;
+        loadingTable = "plants";
+        loadMessage = "";
+        showSqlPreview = false;
+        StateHasChanged();
+        
+        try
+        {
+            var result = await OracleService.LoadPlants();
+            lastETLResult = result;
+            
+            if (result.Status == "SUCCESS")
+            {
+                loadMessage = $"Successfully loaded {result.RecordsLoaded} plants!";
+                await RefreshTableStatuses();
+                await RefreshETLHistory();
+            }
+            else
+            {
+                loadMessage = $"Failed to load plants: {result.Message}";
+            }
+        }
+        catch (Exception ex)
+        {
+            loadMessage = $"Error loading plants: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            loadingTable = "";
+            StateHasChanged();
+        }
+    }
+    
+    private async Task LoadIssues()
+    {
+        isLoading = true;
+        loadingTable = "issues";
+        loadMessage = "";
+        showSqlPreview = false;
+        StateHasChanged();
+        
+        try
+        {
+            loadMessage = "Loading issues for all plants... This may take a moment.";
+            StateHasChanged();
+            
+            var result = await OracleService.LoadIssues();
+            lastETLResult = result;
+            
+            if (result.Status == "SUCCESS")
+            {
+                loadMessage = $"Successfully loaded {result.RecordsLoaded} issues!";
+                await RefreshTableStatuses();
+                await RefreshETLHistory();
+            }
+            else
+            {
+                loadMessage = $"Failed to load issues: {result.Message}";
+            }
+        }
+        catch (Exception ex)
+        {
+            loadMessage = $"Error loading issues: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            loadingTable = "";
+            StateHasChanged();
+        }
+    }
+}

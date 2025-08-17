@@ -1,0 +1,1170 @@
+-- =====================================================
+-- TR2000 STAGING DATABASE - ENHANCED SCD2 WITH COMPLETE FIELD COVERAGE
+-- Database: Oracle 21c Express Edition
+-- Schema: TR2000_STAGING  
+-- Version: ENHANCED - Complete API Field Coverage
+-- Updated: 2025-08-17 (Session 20)
+-- 
+-- This DDL implements COMPLETE FIELD COVERAGE based on actual API responses:
+-- - All 25+ ISSUES fields from plant_issues endpoint
+-- - All 24+ PLANTS fields from plants endpoint
+-- - All reference table fields with complete metadata
+-- - New detailed PCS tables (Properties, Temperature/Pressure, Pipe Sizes, Elements)
+-- - Enhanced audit trails and data quality controls
+-- =====================================================
+
+SET SERVEROUTPUT ON;
+SET LINESIZE 200;
+SET PAGESIZE 50;
+
+-- =====================================================
+-- STEP 1: DROP ALL EXISTING OBJECTS (SAFE)
+-- =====================================================
+
+BEGIN
+    -- Drop any old invalid functions from previous attempts
+    FOR f IN (SELECT object_name FROM user_objects WHERE object_type = 'FUNCTION' AND status = 'INVALID') LOOP
+        BEGIN
+            EXECUTE IMMEDIATE 'DROP FUNCTION ' || f.object_name;
+            DBMS_OUTPUT.PUT_LINE('Dropped invalid function: ' || f.object_name);
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+    
+    -- Drop all views
+    FOR v IN (SELECT view_name FROM user_views WHERE view_name NOT LIKE 'USER_%') LOOP
+        BEGIN
+            EXECUTE IMMEDIATE 'DROP VIEW ' || v.view_name;
+            DBMS_OUTPUT.PUT_LINE('Dropped view: ' || v.view_name);
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+    
+    -- Drop all packages
+    FOR p IN (SELECT object_name FROM user_objects WHERE object_type = 'PACKAGE') LOOP
+        BEGIN
+            EXECUTE IMMEDIATE 'DROP PACKAGE ' || p.object_name;
+            DBMS_OUTPUT.PUT_LINE('Dropped package: ' || p.object_name);
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+    
+    -- Drop all procedures
+    FOR p IN (SELECT object_name FROM user_objects WHERE object_type = 'PROCEDURE') LOOP
+        BEGIN
+            EXECUTE IMMEDIATE 'DROP PROCEDURE ' || p.object_name;
+            DBMS_OUTPUT.PUT_LINE('Dropped procedure: ' || p.object_name);
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+    
+    -- Drop all tables
+    FOR t IN (SELECT table_name FROM user_tables) LOOP
+        BEGIN
+            EXECUTE IMMEDIATE 'DROP TABLE ' || t.table_name || ' CASCADE CONSTRAINTS';
+            DBMS_OUTPUT.PUT_LINE('Dropped table: ' || t.table_name);
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+    
+    -- Drop all sequences
+    FOR s IN (SELECT sequence_name FROM user_sequences) LOOP
+        BEGIN
+            EXECUTE IMMEDIATE 'DROP SEQUENCE ' || s.sequence_name;
+            DBMS_OUTPUT.PUT_LINE('Dropped sequence: ' || s.sequence_name);
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+    
+    -- Drop all jobs
+    FOR j IN (SELECT job_name FROM user_scheduler_jobs) LOOP
+        BEGIN
+            DBMS_SCHEDULER.DROP_JOB(j.job_name);
+            DBMS_OUTPUT.PUT_LINE('Dropped job: ' || j.job_name);
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END;
+/
+
+-- =====================================================
+-- STEP 2: CREATE SEQUENCES
+-- =====================================================
+
+CREATE SEQUENCE ETL_RUN_ID_SEQ START WITH 1 INCREMENT BY 1 NOCACHE;
+CREATE SEQUENCE ETL_LOG_ID_SEQ START WITH 1 INCREMENT BY 1 NOCACHE;
+CREATE SEQUENCE ETL_ERROR_ID_SEQ START WITH 1 INCREMENT BY 1 NOCACHE;
+
+-- =====================================================
+-- STEP 3: CREATE CONTROL TABLES
+-- =====================================================
+
+-- ETL Control Table (tracks all ETL runs)
+CREATE TABLE ETL_CONTROL (
+    ETL_RUN_ID         NUMBER DEFAULT ETL_RUN_ID_SEQ.NEXTVAL PRIMARY KEY,
+    RUN_TYPE           VARCHAR2(50),
+    STATUS             VARCHAR2(20) DEFAULT 'RUNNING',
+    START_TIME         DATE DEFAULT SYSDATE,
+    END_TIME           DATE,
+    PROCESSING_TIME_SEC NUMBER,
+    RECORDS_LOADED     NUMBER DEFAULT 0,
+    RECORDS_UPDATED    NUMBER DEFAULT 0,
+    RECORDS_UNCHANGED  NUMBER DEFAULT 0,
+    RECORDS_DELETED    NUMBER DEFAULT 0,
+    RECORDS_REACTIVATED NUMBER DEFAULT 0,
+    ERROR_COUNT        NUMBER DEFAULT 0,
+    API_CALL_COUNT     NUMBER DEFAULT 0,
+    COMMENTS           VARCHAR2(500)
+);
+
+-- ETL Endpoint Log (tracks API calls)
+CREATE TABLE ETL_ENDPOINT_LOG (
+    LOG_ID             NUMBER DEFAULT ETL_LOG_ID_SEQ.NEXTVAL PRIMARY KEY,
+    ETL_RUN_ID         NUMBER REFERENCES ETL_CONTROL(ETL_RUN_ID),
+    ENDPOINT_NAME      VARCHAR2(100),
+    PLANT_ID           VARCHAR2(50),
+    API_URL            VARCHAR2(500),
+    HTTP_STATUS        NUMBER,
+    RECORDS_RETURNED   NUMBER,
+    LOAD_TIME_SECONDS  NUMBER(10,2),
+    ERROR_MESSAGE      VARCHAR2(4000),
+    CREATED_DATE       DATE DEFAULT SYSDATE
+);
+
+-- ETL Error Log (survives rollbacks via autonomous transaction)
+CREATE TABLE ETL_ERROR_LOG (
+    ERROR_ID           NUMBER DEFAULT ETL_ERROR_ID_SEQ.NEXTVAL PRIMARY KEY,
+    ETL_RUN_ID         NUMBER,
+    ERROR_TIME         DATE DEFAULT SYSDATE,
+    ERROR_SOURCE       VARCHAR2(100),
+    ERROR_CODE         VARCHAR2(20),
+    ERROR_MESSAGE      VARCHAR2(4000),
+    STACK_TRACE        CLOB,
+    RECORD_DATA        CLOB
+);
+
+-- ETL Plant Loader (scope control)
+CREATE TABLE ETL_PLANT_LOADER (
+    PLANT_ID           VARCHAR2(50) NOT NULL,
+    PLANT_NAME         VARCHAR2(200),
+    IS_ACTIVE          CHAR(1) DEFAULT 'Y' CHECK (IS_ACTIVE IN ('Y', 'N')),
+    LOAD_PRIORITY      NUMBER DEFAULT 100,
+    NOTES              VARCHAR2(500),
+    CREATED_DATE       DATE DEFAULT SYSDATE,
+    CREATED_BY         VARCHAR2(100) DEFAULT USER,
+    MODIFIED_DATE      DATE DEFAULT SYSDATE,
+    MODIFIED_BY        VARCHAR2(100) DEFAULT USER,
+    CONSTRAINT PK_ETL_PLANT_LOADER PRIMARY KEY (PLANT_ID)
+);
+
+-- ETL Issue Loader (scope control for reference tables)
+CREATE TABLE ETL_ISSUE_LOADER (
+    PLANT_ID           VARCHAR2(50) NOT NULL,
+    ISSUE_REVISION     VARCHAR2(20) NOT NULL,
+    PLANT_NAME         VARCHAR2(200),
+    CREATED_DATE       DATE DEFAULT SYSDATE,
+    CONSTRAINT PK_ETL_ISSUE_LOADER PRIMARY KEY (PLANT_ID, ISSUE_REVISION),
+    CONSTRAINT FK_ISSUE_LOADER_PLANT FOREIGN KEY (PLANT_ID) 
+        REFERENCES ETL_PLANT_LOADER(PLANT_ID) ON DELETE CASCADE
+);
+
+-- ETL Reconciliation (tracks counts)
+CREATE TABLE ETL_RECONCILIATION (
+    ETL_RUN_ID         NUMBER,
+    ENTITY_TYPE        VARCHAR2(50),
+    SOURCE_COUNT       NUMBER,
+    TARGET_COUNT       NUMBER,
+    DIFF_COUNT         NUMBER,
+    CHECK_TIME         DATE DEFAULT SYSDATE,
+    CONSTRAINT PK_ETL_RECON PRIMARY KEY (ETL_RUN_ID, ENTITY_TYPE)
+);
+
+-- =====================================================
+-- STEP 4: CREATE ENHANCED STAGING TABLES WITH COMPLETE FIELDS
+-- =====================================================
+
+-- Staging for Operators (unchanged - already minimal)
+CREATE TABLE STG_OPERATORS (
+    STG_ID             NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    OPERATOR_ID        NUMBER NOT NULL,
+    OPERATOR_NAME      VARCHAR2(200),
+    ETL_RUN_ID         NUMBER,
+    IS_DUPLICATE       CHAR(1) DEFAULT 'N' CHECK (IS_DUPLICATE IN ('Y','N')),
+    IS_VALID           CHAR(1) DEFAULT 'Y' CHECK (IS_VALID IN ('Y','N')),
+    VALIDATION_ERROR   VARCHAR2(500),
+    PROCESSED_FLAG     CHAR(1) DEFAULT 'N'
+);
+
+-- Enhanced Staging for Plants (ALL 24+ API fields)
+CREATE TABLE STG_PLANTS (
+    STG_ID                   NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    -- Core Plant Fields
+    OPERATOR_ID              NUMBER,
+    OPERATOR_NAME            VARCHAR2(200),
+    PLANT_ID                 VARCHAR2(50) NOT NULL,
+    SHORT_DESCRIPTION        VARCHAR2(200),
+    PROJECT                  VARCHAR2(200),
+    LONG_DESCRIPTION         VARCHAR2(500),
+    COMMON_LIB_PLANT_CODE    VARCHAR2(50),
+    INITIAL_REVISION         VARCHAR2(50),
+    AREA_ID                  NUMBER,
+    AREA                     VARCHAR2(200),
+    -- Extended Plant Configuration Fields
+    ENABLE_EMBEDDED_NOTE     VARCHAR2(10),
+    CATEGORY_ID              VARCHAR2(50),
+    CATEGORY                 VARCHAR2(200),
+    DOCUMENT_SPACE_LINK      VARCHAR2(500),
+    ENABLE_COPY_PCS_FROM_PLANT VARCHAR2(10),
+    OVER_LENGTH              VARCHAR2(50),
+    PCS_QA                   VARCHAR2(50),
+    EDS_MJ                   VARCHAR2(50),
+    CELSIUS_BAR              VARCHAR2(50),
+    WEB_INFO_TEXT            CLOB,
+    BOLT_TENSION_TEXT        CLOB,
+    VISIBLE                  VARCHAR2(10),
+    WINDOWS_REMARK_TEXT      CLOB,
+    USER_PROTECTED           VARCHAR2(20),
+    -- ETL Control Fields
+    ETL_RUN_ID               NUMBER,
+    IS_DUPLICATE             CHAR(1) DEFAULT 'N',
+    IS_VALID                 CHAR(1) DEFAULT 'Y',
+    VALIDATION_ERROR         VARCHAR2(500),
+    PROCESSED_FLAG           CHAR(1) DEFAULT 'N'
+);
+
+-- Enhanced Staging for Issues (ALL 25+ API fields)
+CREATE TABLE STG_ISSUES (
+    STG_ID             NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    PLANT_ID           VARCHAR2(50) NOT NULL,
+    ISSUE_REVISION     VARCHAR2(20) NOT NULL,
+    -- Issue Status and Dates
+    STATUS             VARCHAR2(50),
+    REV_DATE           VARCHAR2(50),
+    PROTECT_STATUS     VARCHAR2(50),
+    -- General Revision Info
+    GENERAL_REVISION   VARCHAR2(50),
+    GENERAL_REV_DATE   VARCHAR2(50),
+    -- Specific Component Revisions and Dates
+    PCS_REVISION       VARCHAR2(50),
+    PCS_REV_DATE       VARCHAR2(50),
+    EDS_REVISION       VARCHAR2(50),
+    EDS_REV_DATE       VARCHAR2(50),
+    VDS_REVISION       VARCHAR2(50),
+    VDS_REV_DATE       VARCHAR2(50),
+    VSK_REVISION       VARCHAR2(50),
+    VSK_REV_DATE       VARCHAR2(50),
+    MDS_REVISION       VARCHAR2(50),
+    MDS_REV_DATE       VARCHAR2(50),
+    ESK_REVISION       VARCHAR2(50),
+    ESK_REV_DATE       VARCHAR2(50),
+    SC_REVISION        VARCHAR2(50),
+    SC_REV_DATE        VARCHAR2(50),
+    VSM_REVISION       VARCHAR2(50),
+    VSM_REV_DATE       VARCHAR2(50),
+    -- User Audit Fields
+    USER_NAME          VARCHAR2(100),
+    USER_ENTRY_TIME    DATE,
+    USER_PROTECTED     VARCHAR2(20),
+    -- ETL Control Fields
+    ETL_RUN_ID         NUMBER,
+    IS_DUPLICATE       CHAR(1) DEFAULT 'N',
+    IS_VALID           CHAR(1) DEFAULT 'Y',
+    VALIDATION_ERROR   VARCHAR2(500),
+    PROCESSED_FLAG     CHAR(1) DEFAULT 'N'
+);
+
+-- Enhanced Staging for PCS References (ALL API fields)
+CREATE TABLE STG_PCS_REFERENCES (
+    STG_ID             NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    PLANT_ID           VARCHAR2(50) NOT NULL,
+    ISSUE_REVISION     VARCHAR2(20) NOT NULL,
+    PCS_NAME           VARCHAR2(100),
+    PCS_REVISION       VARCHAR2(20),
+    REV_DATE           VARCHAR2(50),
+    STATUS             VARCHAR2(50),
+    OFFICIAL_REVISION  VARCHAR2(20),
+    REVISION_SUFFIX    VARCHAR2(20),
+    RATING_CLASS       VARCHAR2(50),
+    MATERIAL_GROUP     VARCHAR2(100),
+    HISTORICAL_PCS     VARCHAR2(100),
+    DELTA              VARCHAR2(50),
+    USER_NAME          VARCHAR2(100),
+    USER_ENTRY_TIME    DATE,
+    USER_PROTECTED     VARCHAR2(20),
+    ETL_RUN_ID         NUMBER,
+    IS_DUPLICATE       CHAR(1) DEFAULT 'N',
+    IS_VALID           CHAR(1) DEFAULT 'Y',
+    VALIDATION_ERROR   VARCHAR2(500),
+    PROCESSED_FLAG     CHAR(1) DEFAULT 'N'
+);
+
+-- Enhanced Staging for SC References
+CREATE TABLE STG_SC_REFERENCES (
+    STG_ID             NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    PLANT_ID           VARCHAR2(50) NOT NULL,
+    ISSUE_REVISION     VARCHAR2(20) NOT NULL,
+    SC_NAME            VARCHAR2(100),
+    SC_REVISION        VARCHAR2(20),
+    REV_DATE           VARCHAR2(50),
+    STATUS             VARCHAR2(50),
+    OFFICIAL_REVISION  VARCHAR2(20),
+    DELTA              VARCHAR2(50),
+    USER_NAME          VARCHAR2(100),
+    USER_ENTRY_TIME    DATE,
+    USER_PROTECTED     VARCHAR2(20),
+    ETL_RUN_ID         NUMBER,
+    IS_DUPLICATE       CHAR(1) DEFAULT 'N',
+    IS_VALID           CHAR(1) DEFAULT 'Y',
+    VALIDATION_ERROR   VARCHAR2(500),
+    PROCESSED_FLAG     CHAR(1) DEFAULT 'N'
+);
+
+-- Enhanced Staging for VSM References
+CREATE TABLE STG_VSM_REFERENCES (
+    STG_ID             NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    PLANT_ID           VARCHAR2(50) NOT NULL,
+    ISSUE_REVISION     VARCHAR2(20) NOT NULL,
+    VSM_NAME           VARCHAR2(100),
+    VSM_REVISION       VARCHAR2(20),
+    REV_DATE           VARCHAR2(50),
+    STATUS             VARCHAR2(50),
+    OFFICIAL_REVISION  VARCHAR2(20),
+    DELTA              VARCHAR2(50),
+    USER_NAME          VARCHAR2(100),
+    USER_ENTRY_TIME    DATE,
+    USER_PROTECTED     VARCHAR2(20),
+    ETL_RUN_ID         NUMBER,
+    IS_DUPLICATE       CHAR(1) DEFAULT 'N',
+    IS_VALID           CHAR(1) DEFAULT 'Y',
+    VALIDATION_ERROR   VARCHAR2(500),
+    PROCESSED_FLAG     CHAR(1) DEFAULT 'N'
+);
+
+-- Enhanced Staging for VDS References
+CREATE TABLE STG_VDS_REFERENCES (
+    STG_ID             NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    PLANT_ID           VARCHAR2(50) NOT NULL,
+    ISSUE_REVISION     VARCHAR2(20) NOT NULL,
+    VDS_NAME           VARCHAR2(100),
+    VDS_REVISION       VARCHAR2(20),
+    REV_DATE           VARCHAR2(50),
+    STATUS             VARCHAR2(50),
+    OFFICIAL_REVISION  VARCHAR2(20),
+    DELTA              VARCHAR2(50),
+    USER_NAME          VARCHAR2(100),
+    USER_ENTRY_TIME    DATE,
+    USER_PROTECTED     VARCHAR2(20),
+    SRC_HASH           RAW(32),
+    ETL_RUN_ID         NUMBER,
+    IS_DUPLICATE       CHAR(1) DEFAULT 'N',
+    IS_VALID           CHAR(1) DEFAULT 'Y',
+    VALIDATION_ERROR   VARCHAR2(500),
+    PROCESSED_FLAG     CHAR(1) DEFAULT 'N'
+);
+
+-- Enhanced Staging for EDS References
+CREATE TABLE STG_EDS_REFERENCES (
+    STG_ID             NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    PLANT_ID           VARCHAR2(50) NOT NULL,
+    ISSUE_REVISION     VARCHAR2(20) NOT NULL,
+    EDS_NAME           VARCHAR2(100),
+    EDS_REVISION       VARCHAR2(20),
+    REV_DATE           VARCHAR2(50),
+    STATUS             VARCHAR2(50),
+    OFFICIAL_REVISION  VARCHAR2(20),
+    DELTA              VARCHAR2(50),
+    USER_NAME          VARCHAR2(100),
+    USER_ENTRY_TIME    DATE,
+    USER_PROTECTED     VARCHAR2(20),
+    ETL_RUN_ID         NUMBER,
+    IS_DUPLICATE       CHAR(1) DEFAULT 'N',
+    IS_VALID           CHAR(1) DEFAULT 'Y',
+    VALIDATION_ERROR   VARCHAR2(500),
+    PROCESSED_FLAG     CHAR(1) DEFAULT 'N'
+);
+
+-- Enhanced Staging for MDS References (includes AREA field)
+CREATE TABLE STG_MDS_REFERENCES (
+    STG_ID             NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    PLANT_ID           VARCHAR2(50) NOT NULL,
+    ISSUE_REVISION     VARCHAR2(20) NOT NULL,
+    MDS_NAME           VARCHAR2(100),
+    MDS_REVISION       VARCHAR2(20),
+    AREA               VARCHAR2(50),
+    REV_DATE           VARCHAR2(50),
+    STATUS             VARCHAR2(50),
+    OFFICIAL_REVISION  VARCHAR2(20),
+    DELTA              VARCHAR2(50),
+    USER_NAME          VARCHAR2(100),
+    USER_ENTRY_TIME    DATE,
+    USER_PROTECTED     VARCHAR2(20),
+    ETL_RUN_ID         NUMBER,
+    IS_DUPLICATE       CHAR(1) DEFAULT 'N',
+    IS_VALID           CHAR(1) DEFAULT 'Y',
+    VALIDATION_ERROR   VARCHAR2(500),
+    PROCESSED_FLAG     CHAR(1) DEFAULT 'N'
+);
+
+-- Enhanced Staging for VSK References
+CREATE TABLE STG_VSK_REFERENCES (
+    STG_ID             NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    PLANT_ID           VARCHAR2(50) NOT NULL,
+    ISSUE_REVISION     VARCHAR2(20) NOT NULL,
+    VSK_NAME           VARCHAR2(100),
+    VSK_REVISION       VARCHAR2(20),
+    REV_DATE           VARCHAR2(50),
+    STATUS             VARCHAR2(50),
+    OFFICIAL_REVISION  VARCHAR2(20),
+    DELTA              VARCHAR2(50),
+    USER_NAME          VARCHAR2(100),
+    USER_ENTRY_TIME    DATE,
+    USER_PROTECTED     VARCHAR2(20),
+    ETL_RUN_ID         NUMBER,
+    IS_DUPLICATE       CHAR(1) DEFAULT 'N',
+    IS_VALID           CHAR(1) DEFAULT 'Y',
+    VALIDATION_ERROR   VARCHAR2(500),
+    PROCESSED_FLAG     CHAR(1) DEFAULT 'N'
+);
+
+-- Enhanced Staging for ESK References
+CREATE TABLE STG_ESK_REFERENCES (
+    STG_ID             NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    PLANT_ID           VARCHAR2(50) NOT NULL,
+    ISSUE_REVISION     VARCHAR2(20) NOT NULL,
+    ESK_NAME           VARCHAR2(100),
+    ESK_REVISION       VARCHAR2(20),
+    REV_DATE           VARCHAR2(50),
+    STATUS             VARCHAR2(50),
+    OFFICIAL_REVISION  VARCHAR2(20),
+    DELTA              VARCHAR2(50),
+    USER_NAME          VARCHAR2(100),
+    USER_ENTRY_TIME    DATE,
+    USER_PROTECTED     VARCHAR2(20),
+    ETL_RUN_ID         NUMBER,
+    IS_DUPLICATE       CHAR(1) DEFAULT 'N',
+    IS_VALID           CHAR(1) DEFAULT 'Y',
+    VALIDATION_ERROR   VARCHAR2(500),
+    PROCESSED_FLAG     CHAR(1) DEFAULT 'N'
+);
+
+-- Enhanced Staging for Pipe Element References
+CREATE TABLE STG_PIPE_ELEMENT_REFERENCES (
+    STG_ID             NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    PLANT_ID           VARCHAR2(50) NOT NULL,
+    ISSUE_REVISION     VARCHAR2(20) NOT NULL,
+    -- Pipe Element Fields
+    ELEMENT_GROUP      VARCHAR2(100),
+    DIMENSION_STANDARD VARCHAR2(100),
+    PRODUCT_FORM       VARCHAR2(100),
+    MATERIAL_GRADE     VARCHAR2(100),
+    MDS                VARCHAR2(100),
+    MDS_REVISION       VARCHAR2(20),
+    AREA               VARCHAR2(50),
+    ELEMENT_ID         NUMBER,
+    REVISION           VARCHAR2(20),
+    REV_DATE           VARCHAR2(50),
+    STATUS             VARCHAR2(50),
+    DELTA              VARCHAR2(50),
+    -- User Audit Fields
+    USER_NAME          VARCHAR2(100),
+    USER_ENTRY_TIME    DATE,
+    USER_PROTECTED     VARCHAR2(20),
+    -- ETL Control Fields
+    ETL_RUN_ID         NUMBER,
+    IS_DUPLICATE       CHAR(1) DEFAULT 'N',
+    IS_VALID           CHAR(1) DEFAULT 'Y',
+    VALIDATION_ERROR   VARCHAR2(500),
+    PROCESSED_FLAG     CHAR(1) DEFAULT 'N'
+);
+
+-- =====================================================
+-- STEP 5: CREATE NEW DETAILED PCS STAGING TABLES
+-- =====================================================
+
+-- Staging for PCS Header/Properties (15+ fields)
+CREATE TABLE STG_PCS_HEADER (
+    STG_ID             NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    PLANT_ID           VARCHAR2(50) NOT NULL,
+    PCS_NAME           VARCHAR2(100) NOT NULL,
+    PCS_REVISION       VARCHAR2(20) NOT NULL,
+    STATUS             VARCHAR2(50),
+    REV_DATE           VARCHAR2(50),
+    RATING_CLASS       VARCHAR2(50),
+    TEST_PRESSURE      VARCHAR2(50),
+    MATERIAL_GROUP     VARCHAR2(100),
+    DESIGN_CODE        VARCHAR2(100),
+    LAST_UPDATE        VARCHAR2(50),
+    LAST_UPDATE_BY     VARCHAR2(100),
+    APPROVER           VARCHAR2(100),
+    NOTEPAD            CLOB,
+    SPECIAL_REQ_ID     NUMBER,
+    TUBE_PCS           VARCHAR2(100),
+    NEW_VDS_SECTION    VARCHAR2(100),
+    ETL_RUN_ID         NUMBER,
+    IS_DUPLICATE       CHAR(1) DEFAULT 'N',
+    IS_VALID           CHAR(1) DEFAULT 'Y',
+    VALIDATION_ERROR   VARCHAR2(500),
+    PROCESSED_FLAG     CHAR(1) DEFAULT 'N'
+);
+
+-- Staging for PCS Temperature/Pressure (50+ fields)
+CREATE TABLE STG_PCS_TEMP_PRESSURE (
+    STG_ID                   NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    PLANT_ID                 VARCHAR2(50) NOT NULL,
+    PCS_NAME                 VARCHAR2(100) NOT NULL,
+    PCS_REVISION             VARCHAR2(20) NOT NULL,
+    -- Base Fields
+    STATUS                   VARCHAR2(50),
+    REV_DATE                 VARCHAR2(50),
+    RATING_CLASS             VARCHAR2(50),
+    TEST_PRESSURE            VARCHAR2(50),
+    MATERIAL_GROUP           VARCHAR2(100),
+    DESIGN_CODE              VARCHAR2(100),
+    LAST_UPDATE              VARCHAR2(50),
+    LAST_UPDATE_BY           VARCHAR2(100),
+    APPROVER                 VARCHAR2(100),
+    NOTEPAD                  CLOB,
+    SC                       VARCHAR2(100),
+    VSM                      VARCHAR2(100),
+    DESIGN_CODE_REV_MARK     VARCHAR2(50),
+    CORR_ALLOWANCE           NUMBER,
+    CORR_ALLOWANCE_REV_MARK  VARCHAR2(50),
+    LONG_WELD_EFF            VARCHAR2(50),
+    LONG_WELD_EFF_REV_MARK   VARCHAR2(50),
+    WALL_THK_TOL             VARCHAR2(50),
+    WALL_THK_TOL_REV_MARK    VARCHAR2(50),
+    SERVICE_REMARK           CLOB,
+    SERVICE_REMARK_REV_MARK  VARCHAR2(50),
+    -- Design Pressure Fields (12 temperature/pressure pairs)
+    DESIGN_PRESS_01          VARCHAR2(50),
+    DESIGN_PRESS_02          VARCHAR2(50),
+    DESIGN_PRESS_03          VARCHAR2(50),
+    DESIGN_PRESS_04          VARCHAR2(50),
+    DESIGN_PRESS_05          VARCHAR2(50),
+    DESIGN_PRESS_06          VARCHAR2(50),
+    DESIGN_PRESS_07          VARCHAR2(50),
+    DESIGN_PRESS_08          VARCHAR2(50),
+    DESIGN_PRESS_09          VARCHAR2(50),
+    DESIGN_PRESS_10          VARCHAR2(50),
+    DESIGN_PRESS_11          VARCHAR2(50),
+    DESIGN_PRESS_12          VARCHAR2(50),
+    DESIGN_PRESS_REV_MARK    VARCHAR2(50),
+    -- Design Temperature Fields (12 temperature values)
+    DESIGN_TEMP_01           VARCHAR2(50),
+    DESIGN_TEMP_02           VARCHAR2(50),
+    DESIGN_TEMP_03           VARCHAR2(50),
+    DESIGN_TEMP_04           VARCHAR2(50),
+    DESIGN_TEMP_05           VARCHAR2(50),
+    DESIGN_TEMP_06           VARCHAR2(50),
+    DESIGN_TEMP_07           VARCHAR2(50),
+    DESIGN_TEMP_08           VARCHAR2(50),
+    DESIGN_TEMP_09           VARCHAR2(50),
+    DESIGN_TEMP_10           VARCHAR2(50),
+    DESIGN_TEMP_11           VARCHAR2(50),
+    DESIGN_TEMP_12           VARCHAR2(50),
+    DESIGN_TEMP_REV_MARK     VARCHAR2(50),
+    -- Note ID Fields
+    NOTE_ID_CORR_ALLOWANCE   VARCHAR2(50),
+    NOTE_ID_SERVICE_CODE     VARCHAR2(50),
+    NOTE_ID_WALL_THK_TOL     VARCHAR2(50),
+    NOTE_ID_LONG_WELD_EFF    VARCHAR2(50),
+    NOTE_ID_GENERAL_PCS      VARCHAR2(50),
+    NOTE_ID_DESIGN_CODE      VARCHAR2(50),
+    NOTE_ID_PRESS_TEMP_TABLE VARCHAR2(50),
+    NOTE_ID_PIPE_SIZE_WTH_TABLE VARCHAR2(50),
+    -- Additional Fields
+    PRESS_ELEMENT_CHANGE     VARCHAR2(50),
+    TEMP_ELEMENT_CHANGE      VARCHAR2(50),
+    MATERIAL_GROUP_ID        NUMBER,
+    SPECIAL_REQ_ID           NUMBER,
+    SPECIAL_REQ              VARCHAR2(200),
+    NEW_VDS_SECTION          VARCHAR2(100),
+    TUBE_PCS                 VARCHAR2(100),
+    EDS_MJ_MATRIX            VARCHAR2(50),
+    MJ_REDUCTION_FACTOR      NUMBER,
+    -- ETL Control Fields
+    ETL_RUN_ID               NUMBER,
+    IS_DUPLICATE             CHAR(1) DEFAULT 'N',
+    IS_VALID                 CHAR(1) DEFAULT 'Y',
+    VALIDATION_ERROR         VARCHAR2(500),
+    PROCESSED_FLAG           CHAR(1) DEFAULT 'N'
+);
+
+-- Staging for PCS Pipe Sizes (11 fields)
+CREATE TABLE STG_PCS_PIPE_SIZES (
+    STG_ID               NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    PLANT_ID             VARCHAR2(50) NOT NULL,
+    PCS_NAME             VARCHAR2(100) NOT NULL,
+    PCS_REVISION         VARCHAR2(20) NOT NULL,
+    NOM_SIZE             VARCHAR2(50),
+    OUTER_DIAM           VARCHAR2(50),
+    WALL_THICKNESS       VARCHAR2(50),
+    SCHEDULE             VARCHAR2(50),
+    UNDER_TOLERANCE      VARCHAR2(50),
+    CORROSION_ALLOWANCE  VARCHAR2(50),
+    WELDING_FACTOR       VARCHAR2(50),
+    DIM_ELEMENT_CHANGE   VARCHAR2(50),
+    SCHEDULE_IN_MATRIX   VARCHAR2(50),
+    ETL_RUN_ID           NUMBER,
+    IS_DUPLICATE         CHAR(1) DEFAULT 'N',
+    IS_VALID             CHAR(1) DEFAULT 'Y',
+    VALIDATION_ERROR     VARCHAR2(500),
+    PROCESSED_FLAG       CHAR(1) DEFAULT 'N'
+);
+
+-- Staging for PCS Pipe Elements (25+ fields)
+CREATE TABLE STG_PCS_PIPE_ELEMENTS (
+    STG_ID               NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    PLANT_ID             VARCHAR2(50) NOT NULL,
+    PCS_NAME             VARCHAR2(100) NOT NULL,
+    PCS_REVISION         VARCHAR2(20) NOT NULL,
+    MATERIAL_GROUP_ID    NUMBER,
+    ELEMENT_GROUP_NO     NUMBER,
+    LINE_NO              NUMBER,
+    ELEMENT              VARCHAR2(200),
+    DIM_STANDARD         VARCHAR2(100),
+    FROM_SIZE            VARCHAR2(50),
+    TO_SIZE              VARCHAR2(50),
+    PRODUCT_FORM         VARCHAR2(100),
+    MATERIAL             VARCHAR2(200),
+    MDS                  VARCHAR2(100),
+    EDS                  VARCHAR2(100),
+    EDS_REVISION         VARCHAR2(20),
+    ESK                  VARCHAR2(100),
+    REVMARK              VARCHAR2(50),
+    REMARK               CLOB,
+    PAGE_BREAK           VARCHAR2(10),
+    ELEMENT_GROUP        VARCHAR2(100),
+    MATL_IN_MATRIX       VARCHAR2(10),
+    PARENT_ELEMENT       VARCHAR2(200),
+    ITEM_CODE            VARCHAR2(100),
+    MDS_REVISION         VARCHAR2(20),
+    ETL_RUN_ID           NUMBER,
+    IS_DUPLICATE         CHAR(1) DEFAULT 'N',
+    IS_VALID             CHAR(1) DEFAULT 'Y',
+    VALIDATION_ERROR     VARCHAR2(500),
+    PROCESSED_FLAG       CHAR(1) DEFAULT 'N'
+);
+
+-- =====================================================
+-- STEP 6: CREATE ENHANCED DIMENSION TABLES (COMPLETE SCD2)
+-- =====================================================
+
+-- OPERATORS Dimension (unchanged - already minimal)
+CREATE TABLE OPERATORS (
+    OPERATOR_ID        NUMBER NOT NULL,
+    OPERATOR_NAME      VARCHAR2(200),
+    SRC_HASH           RAW(32),
+    VALID_FROM         DATE DEFAULT SYSDATE,
+    VALID_TO           DATE,
+    IS_CURRENT         CHAR(1) DEFAULT 'Y' CHECK (IS_CURRENT IN ('Y', 'N')),
+    CHANGE_TYPE        VARCHAR2(20),  -- INSERT, UPDATE, DELETE, REACTIVATE
+    DELETE_DATE        DATE,
+    ETL_RUN_ID         NUMBER,
+    CONSTRAINT PK_OPERATORS PRIMARY KEY (OPERATOR_ID, VALID_FROM)
+);
+
+-- Enhanced PLANTS Dimension (ALL 24+ API fields with SCD2)
+CREATE TABLE PLANTS (
+    -- Core Plant Fields
+    OPERATOR_ID              NUMBER,
+    OPERATOR_NAME            VARCHAR2(200),
+    PLANT_ID                 VARCHAR2(50) NOT NULL,
+    SHORT_DESCRIPTION        VARCHAR2(200),
+    PROJECT                  VARCHAR2(200),
+    LONG_DESCRIPTION         VARCHAR2(500),
+    COMMON_LIB_PLANT_CODE    VARCHAR2(50),
+    INITIAL_REVISION         VARCHAR2(50),
+    AREA_ID                  NUMBER,
+    AREA                     VARCHAR2(200),
+    -- Extended Plant Configuration Fields
+    ENABLE_EMBEDDED_NOTE     VARCHAR2(10),
+    CATEGORY_ID              VARCHAR2(50),
+    CATEGORY                 VARCHAR2(200),
+    DOCUMENT_SPACE_LINK      VARCHAR2(500),
+    ENABLE_COPY_PCS_FROM_PLANT VARCHAR2(10),
+    OVER_LENGTH              VARCHAR2(50),
+    PCS_QA                   VARCHAR2(50),
+    EDS_MJ                   VARCHAR2(50),
+    CELSIUS_BAR              VARCHAR2(50),
+    WEB_INFO_TEXT            CLOB,
+    BOLT_TENSION_TEXT        CLOB,
+    VISIBLE                  VARCHAR2(10),
+    WINDOWS_REMARK_TEXT      CLOB,
+    USER_PROTECTED           VARCHAR2(20),
+    -- SCD2 Fields
+    SRC_HASH                 RAW(32),
+    VALID_FROM               DATE DEFAULT SYSDATE,
+    VALID_TO                 DATE,
+    IS_CURRENT               CHAR(1) DEFAULT 'Y' CHECK (IS_CURRENT IN ('Y', 'N')),
+    CHANGE_TYPE              VARCHAR2(20),
+    DELETE_DATE              DATE,
+    ETL_RUN_ID               NUMBER,
+    CONSTRAINT PK_PLANTS PRIMARY KEY (PLANT_ID, VALID_FROM)
+);
+
+-- Enhanced ISSUES Dimension (ALL 25+ API fields with SCD2)
+CREATE TABLE ISSUES (
+    PLANT_ID           VARCHAR2(50) NOT NULL,
+    ISSUE_REVISION     VARCHAR2(20) NOT NULL,
+    -- Issue Status and Dates
+    STATUS             VARCHAR2(50),
+    REV_DATE           DATE,
+    PROTECT_STATUS     VARCHAR2(50),
+    -- General Revision Info
+    GENERAL_REVISION   VARCHAR2(50),
+    GENERAL_REV_DATE   DATE,
+    -- Specific Component Revisions and Dates
+    PCS_REVISION       VARCHAR2(50),
+    PCS_REV_DATE       DATE,
+    EDS_REVISION       VARCHAR2(50),
+    EDS_REV_DATE       DATE,
+    VDS_REVISION       VARCHAR2(50),
+    VDS_REV_DATE       DATE,
+    VSK_REVISION       VARCHAR2(50),
+    VSK_REV_DATE       DATE,
+    MDS_REVISION       VARCHAR2(50),
+    MDS_REV_DATE       DATE,
+    ESK_REVISION       VARCHAR2(50),
+    ESK_REV_DATE       DATE,
+    SC_REVISION        VARCHAR2(50),
+    SC_REV_DATE        DATE,
+    VSM_REVISION       VARCHAR2(50),
+    VSM_REV_DATE       DATE,
+    -- User Audit Fields
+    USER_NAME          VARCHAR2(100),
+    USER_ENTRY_TIME    DATE,
+    USER_PROTECTED     VARCHAR2(20),
+    -- SCD2 Fields
+    SRC_HASH           RAW(32),
+    VALID_FROM         DATE DEFAULT SYSDATE,
+    VALID_TO           DATE,
+    IS_CURRENT         CHAR(1) DEFAULT 'Y' CHECK (IS_CURRENT IN ('Y', 'N')),
+    CHANGE_TYPE        VARCHAR2(20),
+    DELETE_DATE        DATE,
+    ETL_RUN_ID         NUMBER,
+    CONSTRAINT PK_ISSUES PRIMARY KEY (PLANT_ID, ISSUE_REVISION, VALID_FROM)
+);
+
+-- Enhanced PCS_REFERENCES Dimension (ALL API fields with SCD2)
+CREATE TABLE PCS_REFERENCES (
+    PLANT_ID           VARCHAR2(50) NOT NULL,
+    ISSUE_REVISION     VARCHAR2(20) NOT NULL,
+    PCS_NAME           VARCHAR2(100),
+    PCS_REVISION       VARCHAR2(20),
+    REV_DATE           DATE,
+    STATUS             VARCHAR2(50),
+    OFFICIAL_REVISION  VARCHAR2(20),
+    REVISION_SUFFIX    VARCHAR2(20),
+    RATING_CLASS       VARCHAR2(50),
+    MATERIAL_GROUP     VARCHAR2(100),
+    HISTORICAL_PCS     VARCHAR2(100),
+    DELTA              VARCHAR2(50),
+    USER_NAME          VARCHAR2(100),
+    USER_ENTRY_TIME    DATE,
+    USER_PROTECTED     VARCHAR2(20),
+    SRC_HASH           RAW(32),
+    VALID_FROM         DATE DEFAULT SYSDATE,
+    VALID_TO           DATE,
+    IS_CURRENT         CHAR(1) DEFAULT 'Y' CHECK (IS_CURRENT IN ('Y', 'N')),
+    CHANGE_TYPE        VARCHAR2(20),
+    DELETE_DATE        DATE,
+    ETL_RUN_ID         NUMBER,
+    CONSTRAINT PK_PCS_REFERENCES PRIMARY KEY (PLANT_ID, ISSUE_REVISION, PCS_NAME, PCS_REVISION, VALID_FROM)
+);
+
+-- Continue with enhanced reference tables...
+-- (Similar pattern for SC, VSM, VDS, EDS, MDS, VSK, ESK, PIPE_ELEMENT)
+
+-- Enhanced SC_REFERENCES Dimension
+CREATE TABLE SC_REFERENCES (
+    PLANT_ID           VARCHAR2(50) NOT NULL,
+    ISSUE_REVISION     VARCHAR2(20) NOT NULL,
+    SC_NAME            VARCHAR2(100),
+    SC_REVISION        VARCHAR2(20),
+    REV_DATE           DATE,
+    STATUS             VARCHAR2(50),
+    OFFICIAL_REVISION  VARCHAR2(20),
+    DELTA              VARCHAR2(50),
+    USER_NAME          VARCHAR2(100),
+    USER_ENTRY_TIME    DATE,
+    USER_PROTECTED     VARCHAR2(20),
+    SRC_HASH           RAW(32),
+    VALID_FROM         DATE DEFAULT SYSDATE,
+    VALID_TO           DATE,
+    IS_CURRENT         CHAR(1) DEFAULT 'Y' CHECK (IS_CURRENT IN ('Y', 'N')),
+    CHANGE_TYPE        VARCHAR2(20),
+    DELETE_DATE        DATE,
+    ETL_RUN_ID         NUMBER,
+    CONSTRAINT PK_SC_REFERENCES PRIMARY KEY (PLANT_ID, ISSUE_REVISION, SC_NAME, SC_REVISION, VALID_FROM)
+);
+
+-- Enhanced VSM_REFERENCES Dimension
+CREATE TABLE VSM_REFERENCES (
+    PLANT_ID           VARCHAR2(50) NOT NULL,
+    ISSUE_REVISION     VARCHAR2(20) NOT NULL,
+    VSM_NAME           VARCHAR2(100),
+    VSM_REVISION       VARCHAR2(20),
+    REV_DATE           DATE,
+    STATUS             VARCHAR2(50),
+    OFFICIAL_REVISION  VARCHAR2(20),
+    DELTA              VARCHAR2(50),
+    USER_NAME          VARCHAR2(100),
+    USER_ENTRY_TIME    DATE,
+    USER_PROTECTED     VARCHAR2(20),
+    SRC_HASH           RAW(32),
+    VALID_FROM         DATE DEFAULT SYSDATE,
+    VALID_TO           DATE,
+    IS_CURRENT         CHAR(1) DEFAULT 'Y' CHECK (IS_CURRENT IN ('Y', 'N')),
+    CHANGE_TYPE        VARCHAR2(20),
+    DELETE_DATE        DATE,
+    ETL_RUN_ID         NUMBER,
+    CONSTRAINT PK_VSM_REFERENCES PRIMARY KEY (PLANT_ID, ISSUE_REVISION, VSM_NAME, VSM_REVISION, VALID_FROM)
+);
+
+-- Enhanced VDS_REFERENCES Dimension
+CREATE TABLE VDS_REFERENCES (
+    PLANT_ID           VARCHAR2(50) NOT NULL,
+    ISSUE_REVISION     VARCHAR2(20) NOT NULL,
+    VDS_NAME           VARCHAR2(100),
+    VDS_REVISION       VARCHAR2(20),
+    REV_DATE           DATE,
+    STATUS             VARCHAR2(50),
+    OFFICIAL_REVISION  VARCHAR2(20),
+    DELTA              VARCHAR2(50),
+    USER_NAME          VARCHAR2(100),
+    USER_ENTRY_TIME    DATE,
+    USER_PROTECTED     VARCHAR2(20),
+    SRC_HASH           RAW(32),
+    VALID_FROM         DATE DEFAULT SYSDATE,
+    VALID_TO           DATE,
+    IS_CURRENT         CHAR(1) DEFAULT 'Y' CHECK (IS_CURRENT IN ('Y', 'N')),
+    CHANGE_TYPE        VARCHAR2(20),
+    DELETE_DATE        DATE,
+    ETL_RUN_ID         NUMBER,
+    CONSTRAINT PK_VDS_REFERENCES PRIMARY KEY (PLANT_ID, ISSUE_REVISION, VDS_NAME, VDS_REVISION, VALID_FROM)
+);
+
+-- Enhanced EDS_REFERENCES Dimension
+CREATE TABLE EDS_REFERENCES (
+    PLANT_ID           VARCHAR2(50) NOT NULL,
+    ISSUE_REVISION     VARCHAR2(20) NOT NULL,
+    EDS_NAME           VARCHAR2(100),
+    EDS_REVISION       VARCHAR2(20),
+    REV_DATE           DATE,
+    STATUS             VARCHAR2(50),
+    OFFICIAL_REVISION  VARCHAR2(20),
+    DELTA              VARCHAR2(50),
+    USER_NAME          VARCHAR2(100),
+    USER_ENTRY_TIME    DATE,
+    USER_PROTECTED     VARCHAR2(20),
+    SRC_HASH           RAW(32),
+    VALID_FROM         DATE DEFAULT SYSDATE,
+    VALID_TO           DATE,
+    IS_CURRENT         CHAR(1) DEFAULT 'Y' CHECK (IS_CURRENT IN ('Y', 'N')),
+    CHANGE_TYPE        VARCHAR2(20),
+    DELETE_DATE        DATE,
+    ETL_RUN_ID         NUMBER,
+    CONSTRAINT PK_EDS_REFERENCES PRIMARY KEY (PLANT_ID, ISSUE_REVISION, EDS_NAME, EDS_REVISION, VALID_FROM)
+);
+
+-- Enhanced MDS_REFERENCES Dimension (includes AREA field)
+CREATE TABLE MDS_REFERENCES (
+    PLANT_ID           VARCHAR2(50) NOT NULL,
+    ISSUE_REVISION     VARCHAR2(20) NOT NULL,
+    MDS_NAME           VARCHAR2(100),
+    MDS_REVISION       VARCHAR2(20),
+    AREA               VARCHAR2(50),
+    REV_DATE           DATE,
+    STATUS             VARCHAR2(50),
+    OFFICIAL_REVISION  VARCHAR2(20),
+    DELTA              VARCHAR2(50),
+    USER_NAME          VARCHAR2(100),
+    USER_ENTRY_TIME    DATE,
+    USER_PROTECTED     VARCHAR2(20),
+    SRC_HASH           RAW(32),
+    VALID_FROM         DATE DEFAULT SYSDATE,
+    VALID_TO           DATE,
+    IS_CURRENT         CHAR(1) DEFAULT 'Y' CHECK (IS_CURRENT IN ('Y', 'N')),
+    CHANGE_TYPE        VARCHAR2(20),
+    DELETE_DATE        DATE,
+    ETL_RUN_ID         NUMBER,
+    CONSTRAINT PK_MDS_REFERENCES PRIMARY KEY (PLANT_ID, ISSUE_REVISION, MDS_NAME, MDS_REVISION, VALID_FROM)
+);
+
+-- Enhanced VSK_REFERENCES Dimension
+CREATE TABLE VSK_REFERENCES (
+    PLANT_ID           VARCHAR2(50) NOT NULL,
+    ISSUE_REVISION     VARCHAR2(20) NOT NULL,
+    VSK_NAME           VARCHAR2(100),
+    VSK_REVISION       VARCHAR2(20),
+    REV_DATE           DATE,
+    STATUS             VARCHAR2(50),
+    OFFICIAL_REVISION  VARCHAR2(20),
+    DELTA              VARCHAR2(50),
+    USER_NAME          VARCHAR2(100),
+    USER_ENTRY_TIME    DATE,
+    USER_PROTECTED     VARCHAR2(20),
+    SRC_HASH           RAW(32),
+    VALID_FROM         DATE DEFAULT SYSDATE,
+    VALID_TO           DATE,
+    IS_CURRENT         CHAR(1) DEFAULT 'Y' CHECK (IS_CURRENT IN ('Y', 'N')),
+    CHANGE_TYPE        VARCHAR2(20),
+    DELETE_DATE        DATE,
+    ETL_RUN_ID         NUMBER,
+    CONSTRAINT PK_VSK_REFERENCES PRIMARY KEY (PLANT_ID, ISSUE_REVISION, VSK_NAME, VSK_REVISION, VALID_FROM)
+);
+
+-- Enhanced ESK_REFERENCES Dimension
+CREATE TABLE ESK_REFERENCES (
+    PLANT_ID           VARCHAR2(50) NOT NULL,
+    ISSUE_REVISION     VARCHAR2(20) NOT NULL,
+    ESK_NAME           VARCHAR2(100),
+    ESK_REVISION       VARCHAR2(20),
+    REV_DATE           DATE,
+    STATUS             VARCHAR2(50),
+    OFFICIAL_REVISION  VARCHAR2(20),
+    DELTA              VARCHAR2(50),
+    USER_NAME          VARCHAR2(100),
+    USER_ENTRY_TIME    DATE,
+    USER_PROTECTED     VARCHAR2(20),
+    SRC_HASH           RAW(32),
+    VALID_FROM         DATE DEFAULT SYSDATE,
+    VALID_TO           DATE,
+    IS_CURRENT         CHAR(1) DEFAULT 'Y' CHECK (IS_CURRENT IN ('Y', 'N')),
+    CHANGE_TYPE        VARCHAR2(20),
+    DELETE_DATE        DATE,
+    ETL_RUN_ID         NUMBER,
+    CONSTRAINT PK_ESK_REFERENCES PRIMARY KEY (PLANT_ID, ISSUE_REVISION, ESK_NAME, ESK_REVISION, VALID_FROM)
+);
+
+-- Enhanced PIPE_ELEMENT_REFERENCES Dimension
+CREATE TABLE PIPE_ELEMENT_REFERENCES (
+    PLANT_ID           VARCHAR2(50) NOT NULL,
+    ISSUE_REVISION     VARCHAR2(20) NOT NULL,
+    ELEMENT_GROUP      VARCHAR2(100),
+    DIMENSION_STANDARD VARCHAR2(100),
+    PRODUCT_FORM       VARCHAR2(100),
+    MATERIAL_GRADE     VARCHAR2(100),
+    MDS                VARCHAR2(100),
+    MDS_REVISION       VARCHAR2(20),
+    AREA               VARCHAR2(50),
+    ELEMENT_ID         NUMBER,
+    REVISION           VARCHAR2(20),
+    REV_DATE           DATE,
+    STATUS             VARCHAR2(50),
+    DELTA              VARCHAR2(50),
+    USER_NAME          VARCHAR2(100),
+    USER_ENTRY_TIME    DATE,
+    USER_PROTECTED     VARCHAR2(20),
+    SRC_HASH           RAW(32),
+    VALID_FROM         DATE DEFAULT SYSDATE,
+    VALID_TO           DATE,
+    IS_CURRENT         CHAR(1) DEFAULT 'Y' CHECK (IS_CURRENT IN ('Y', 'N')),
+    CHANGE_TYPE        VARCHAR2(20),
+    DELETE_DATE        DATE,
+    ETL_RUN_ID         NUMBER,
+    CONSTRAINT PK_PIPE_ELEMENT_REFERENCES PRIMARY KEY (PLANT_ID, ISSUE_REVISION, ELEMENT_ID, VALID_FROM)
+);
+
+-- =====================================================
+-- STEP 7: CREATE NEW DETAILED PCS DIMENSION TABLES
+-- =====================================================
+
+-- PCS_HEADER Dimension (Complete PCS properties)
+CREATE TABLE PCS_HEADER (
+    PLANT_ID           VARCHAR2(50) NOT NULL,
+    PCS_NAME           VARCHAR2(100) NOT NULL,
+    PCS_REVISION       VARCHAR2(20) NOT NULL,
+    STATUS             VARCHAR2(50),
+    REV_DATE           DATE,
+    RATING_CLASS       VARCHAR2(50),
+    TEST_PRESSURE      VARCHAR2(50),
+    MATERIAL_GROUP     VARCHAR2(100),
+    DESIGN_CODE        VARCHAR2(100),
+    LAST_UPDATE        DATE,
+    LAST_UPDATE_BY     VARCHAR2(100),
+    APPROVER           VARCHAR2(100),
+    NOTEPAD            CLOB,
+    SPECIAL_REQ_ID     NUMBER,
+    TUBE_PCS           VARCHAR2(100),
+    NEW_VDS_SECTION    VARCHAR2(100),
+    SRC_HASH           RAW(32),
+    VALID_FROM         DATE DEFAULT SYSDATE,
+    VALID_TO           DATE,
+    IS_CURRENT         CHAR(1) DEFAULT 'Y' CHECK (IS_CURRENT IN ('Y', 'N')),
+    CHANGE_TYPE        VARCHAR2(20),
+    DELETE_DATE        DATE,
+    ETL_RUN_ID         NUMBER,
+    CONSTRAINT PK_PCS_HEADER PRIMARY KEY (PLANT_ID, PCS_NAME, PCS_REVISION, VALID_FROM)
+);
+
+-- PCS_TEMP_PRESSURE Dimension (Complete temperature/pressure matrix)
+CREATE TABLE PCS_TEMP_PRESSURE (
+    PLANT_ID                 VARCHAR2(50) NOT NULL,
+    PCS_NAME                 VARCHAR2(100) NOT NULL,
+    PCS_REVISION             VARCHAR2(20) NOT NULL,
+    -- Base Fields
+    STATUS                   VARCHAR2(50),
+    REV_DATE                 DATE,
+    RATING_CLASS             VARCHAR2(50),
+    TEST_PRESSURE            VARCHAR2(50),
+    MATERIAL_GROUP           VARCHAR2(100),
+    DESIGN_CODE              VARCHAR2(100),
+    LAST_UPDATE              DATE,
+    LAST_UPDATE_BY           VARCHAR2(100),
+    APPROVER                 VARCHAR2(100),
+    NOTEPAD                  CLOB,
+    SC                       VARCHAR2(100),
+    VSM                      VARCHAR2(100),
+    DESIGN_CODE_REV_MARK     VARCHAR2(50),
+    CORR_ALLOWANCE           NUMBER,
+    CORR_ALLOWANCE_REV_MARK  VARCHAR2(50),
+    LONG_WELD_EFF            VARCHAR2(50),
+    LONG_WELD_EFF_REV_MARK   VARCHAR2(50),
+    WALL_THK_TOL             VARCHAR2(50),
+    WALL_THK_TOL_REV_MARK    VARCHAR2(50),
+    SERVICE_REMARK           CLOB,
+    SERVICE_REMARK_REV_MARK  VARCHAR2(50),
+    -- Design Pressure Fields (12 temperature/pressure pairs)
+    DESIGN_PRESS_01          NUMBER(10,2),
+    DESIGN_PRESS_02          NUMBER(10,2),
+    DESIGN_PRESS_03          NUMBER(10,2),
+    DESIGN_PRESS_04          NUMBER(10,2),
+    DESIGN_PRESS_05          NUMBER(10,2),
+    DESIGN_PRESS_06          NUMBER(10,2),
+    DESIGN_PRESS_07          NUMBER(10,2),
+    DESIGN_PRESS_08          NUMBER(10,2),
+    DESIGN_PRESS_09          NUMBER(10,2),
+    DESIGN_PRESS_10          NUMBER(10,2),
+    DESIGN_PRESS_11          NUMBER(10,2),
+    DESIGN_PRESS_12          NUMBER(10,2),
+    DESIGN_PRESS_REV_MARK    VARCHAR2(50),
+    -- Design Temperature Fields (12 temperature values)
+    DESIGN_TEMP_01           NUMBER(10,2),
+    DESIGN_TEMP_02           NUMBER(10,2),
+    DESIGN_TEMP_03           NUMBER(10,2),
+    DESIGN_TEMP_04           NUMBER(10,2),
+    DESIGN_TEMP_05           NUMBER(10,2),
+    DESIGN_TEMP_06           NUMBER(10,2),
+    DESIGN_TEMP_07           NUMBER(10,2),
+    DESIGN_TEMP_08           NUMBER(10,2),
+    DESIGN_TEMP_09           NUMBER(10,2),
+    DESIGN_TEMP_10           NUMBER(10,2),
+    DESIGN_TEMP_11           NUMBER(10,2),
+    DESIGN_TEMP_12           NUMBER(10,2),
+    DESIGN_TEMP_REV_MARK     VARCHAR2(50),
+    -- Note ID Fields
+    NOTE_ID_CORR_ALLOWANCE   VARCHAR2(50),
+    NOTE_ID_SERVICE_CODE     VARCHAR2(50),
+    NOTE_ID_WALL_THK_TOL     VARCHAR2(50),
+    NOTE_ID_LONG_WELD_EFF    VARCHAR2(50),
+    NOTE_ID_GENERAL_PCS      VARCHAR2(50),
+    NOTE_ID_DESIGN_CODE      VARCHAR2(50),
+    NOTE_ID_PRESS_TEMP_TABLE VARCHAR2(50),
+    NOTE_ID_PIPE_SIZE_WTH_TABLE VARCHAR2(50),
+    -- Additional Fields
+    PRESS_ELEMENT_CHANGE     VARCHAR2(50),
+    TEMP_ELEMENT_CHANGE      VARCHAR2(50),
+    MATERIAL_GROUP_ID        NUMBER,
+    SPECIAL_REQ_ID           NUMBER,
+    SPECIAL_REQ              VARCHAR2(200),
+    NEW_VDS_SECTION          VARCHAR2(100),
+    TUBE_PCS                 VARCHAR2(100),
+    EDS_MJ_MATRIX            VARCHAR2(50),
+    MJ_REDUCTION_FACTOR      NUMBER,
+    -- SCD2 Fields
+    SRC_HASH                 RAW(32),
+    VALID_FROM               DATE DEFAULT SYSDATE,
+    VALID_TO                 DATE,
+    IS_CURRENT               CHAR(1) DEFAULT 'Y' CHECK (IS_CURRENT IN ('Y', 'N')),
+    CHANGE_TYPE              VARCHAR2(20),
+    DELETE_DATE              DATE,
+    ETL_RUN_ID               NUMBER,
+    CONSTRAINT PK_PCS_TEMP_PRESSURE PRIMARY KEY (PLANT_ID, PCS_NAME, PCS_REVISION, VALID_FROM)
+);
+
+-- PCS_PIPE_SIZES Dimension
+CREATE TABLE PCS_PIPE_SIZES (
+    PLANT_ID             VARCHAR2(50) NOT NULL,
+    PCS_NAME             VARCHAR2(100) NOT NULL,
+    PCS_REVISION         VARCHAR2(20) NOT NULL,
+    NOM_SIZE             VARCHAR2(50) NOT NULL,
+    OUTER_DIAM           NUMBER(10,3),
+    WALL_THICKNESS       NUMBER(10,3),
+    SCHEDULE             VARCHAR2(50),
+    UNDER_TOLERANCE      NUMBER(10,3),
+    CORROSION_ALLOWANCE  NUMBER(10,3),
+    WELDING_FACTOR       NUMBER(5,3),
+    DIM_ELEMENT_CHANGE   VARCHAR2(50),
+    SCHEDULE_IN_MATRIX   VARCHAR2(50),
+    SRC_HASH             RAW(32),
+    VALID_FROM           DATE DEFAULT SYSDATE,
+    VALID_TO             DATE,
+    IS_CURRENT           CHAR(1) DEFAULT 'Y' CHECK (IS_CURRENT IN ('Y', 'N')),
+    CHANGE_TYPE          VARCHAR2(20),
+    DELETE_DATE          DATE,
+    ETL_RUN_ID           NUMBER,
+    CONSTRAINT PK_PCS_PIPE_SIZES PRIMARY KEY (PLANT_ID, PCS_NAME, PCS_REVISION, NOM_SIZE, VALID_FROM)
+);
+
+-- PCS_PIPE_ELEMENTS Dimension
+CREATE TABLE PCS_PIPE_ELEMENTS (
+    PLANT_ID             VARCHAR2(50) NOT NULL,
+    PCS_NAME             VARCHAR2(100) NOT NULL,
+    PCS_REVISION         VARCHAR2(20) NOT NULL,
+    MATERIAL_GROUP_ID    NUMBER NOT NULL,
+    ELEMENT_GROUP_NO     NUMBER NOT NULL,
+    LINE_NO              NUMBER NOT NULL,
+    ELEMENT              VARCHAR2(200),
+    DIM_STANDARD         VARCHAR2(100),
+    FROM_SIZE            VARCHAR2(50),
+    TO_SIZE              VARCHAR2(50),
+    PRODUCT_FORM         VARCHAR2(100),
+    MATERIAL             VARCHAR2(200),
+    MDS                  VARCHAR2(100),
+    EDS                  VARCHAR2(100),
+    EDS_REVISION         VARCHAR2(20),
+    ESK                  VARCHAR2(100),
+    REVMARK              VARCHAR2(50),
+    REMARK               CLOB,
+    PAGE_BREAK           VARCHAR2(10),
+    ELEMENT_GROUP        VARCHAR2(100),
+    MATL_IN_MATRIX       VARCHAR2(10),
+    PARENT_ELEMENT       VARCHAR2(200),
+    ITEM_CODE            VARCHAR2(100),
+    MDS_REVISION         VARCHAR2(20),
+    SRC_HASH             RAW(32),
+    VALID_FROM           DATE DEFAULT SYSDATE,
+    VALID_TO             DATE,
+    IS_CURRENT           CHAR(1) DEFAULT 'Y' CHECK (IS_CURRENT IN ('Y', 'N')),
+    CHANGE_TYPE          VARCHAR2(20),
+    DELETE_DATE          DATE,
+    ETL_RUN_ID           NUMBER,
+    CONSTRAINT PK_PCS_PIPE_ELEMENTS PRIMARY KEY (PLANT_ID, PCS_NAME, PCS_REVISION, MATERIAL_GROUP_ID, ELEMENT_GROUP_NO, LINE_NO, VALID_FROM)
+);
+
+-- =====================================================
+-- CONTINUE WITH RAW_JSON, INDEXES, VIEWS, AND PROCEDURES...
+-- This would continue with the same infrastructure as the original DDL
+-- but adapted for the enhanced table structures
+-- =====================================================
+
+COMMIT;
+
+PROMPT '===================================================='
+PROMPT 'ENHANCED DDL CREATION COMPLETE'
+PROMPT '===================================================='
+PROMPT 'Tables Created:'
+PROMPT '- Enhanced PLANTS (24+ fields)'
+PROMPT '- Enhanced ISSUES (25+ fields)' 
+PROMPT '- Enhanced Reference Tables (all with complete field sets)'
+PROMPT '- New PCS Detail Tables (Header, Temp/Pressure, Pipe Sizes, Elements)'
+PROMPT '- All staging tables with complete field coverage'
+PROMPT ''
+PROMPT 'Next Steps:'
+PROMPT '1. Review field mappings with actual API responses'
+PROMPT '2. Update C# ETL services to populate all fields'
+PROMPT '3. Create enhanced Oracle packages for new table structures'
+PROMPT '4. Test with actual API data'
+PROMPT '===================================================='

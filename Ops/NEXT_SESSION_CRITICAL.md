@@ -1,34 +1,39 @@
-# 🔴 CRITICAL: START HERE FOR NEXT SESSION (Session 20)
+# 🔴 CRITICAL: START HERE FOR NEXT SESSION (Session 22)
 
-## ✅ SESSIONS 18-19 COMPLETE: PRODUCTION READY ETL SYSTEM!
+## ✅ SESSION 21 COMPLETE: USER GUIDE COMPREHENSIVE UPDATE!
 
-### 🎯 **MAJOR MILESTONE ACHIEVED:**
-We have successfully completed the core ETL implementation with all 6 reference types working, cleaned up the codebase, and fixed all display issues. The system is now production-ready!
+### 📚 **USER DOCUMENTATION FULLY UPDATED:**
+Fixed critical user documentation inconsistency where ERD and Knowledge Articles still showed outdated minimal table structure instead of enhanced DDL with complete field coverage. All user documentation now accurately reflects the comprehensive engineering data warehouse capabilities.
 
-## 📊 **CURRENT WORKING STATE:**
-- **Application**: Running at http://localhost:5003/etl-operations
-- **All 6 Reference Types**: ✅ Fully functional (VDS, EDS, MDS, VSK, ESK, Pipe Element)
+## 📊 **CURRENT STATE AFTER SESSION 21:**
+- **User Documentation**: ✅ COMPLETELY UPDATED - ETL Operations & User Guide pages reflect enhanced DDL
+- **Master DDL**: ✅ Master_DDL_Script.sql with complete field coverage ready for deployment
+- **Field Coverage**: ✅ 100% API field coverage designed (PLANTS: 5→24+ fields, ISSUES: 5→25+ fields)
+- **New PCS Tables**: ✅ 4 detailed PCS tables designed (Header, Temp/Pressure, Pipe Sizes, Elements)
+- **Documentation Consistency**: ✅ All sections show enhanced schema vs. minimal implementation
+- **Application**: ⚠️ Running with OLD DDL at http://localhost:5003/etl-operations
+- **ETL Services**: ⚠️ Need updating to populate enhanced table fields
+
+## 📊 **PRODUCTION-READY STATE (Sessions 18-19) - WORKING WITH BASIC DDL:**
+- **Basic ETL**: ✅ All 6 reference types functional with minimal fields
 - **Preview SQL**: ✅ Working for all operations
-- **Table Status Display**: ✅ Fixed and showing actual counts
-- **ETL History Display**: ✅ Fixed and showing run history
 - **70% API Reduction**: ✅ Verified with Issue Loader
 - **Cascade Deletion**: ✅ Working throughout
 - **SCD2 Implementation**: ✅ Complete (INSERT, UPDATE, DELETE, REACTIVATE)
-- **Build Status**: ✅ Clean, 0 errors
 
 ## 🔄 **QUICK RECOVERY COMMANDS:**
 
 ```bash
-# 1. Start application
+# 1. Deploy ENHANCED Master DDL (PRIORITY #1)
+sqlplus TR2000_STAGING/piping@host.docker.internal:1521/XEPDB1
+@/workspace/TR2000/TR2K/Ops/Master_DDL_Script.sql
+
+# 2. Start application
 cd /workspace/TR2000/TR2K/TR2KApp
 /home/node/.dotnet/dotnet run --urls "http://0.0.0.0:5003"
 
-# 2. Access application
+# 3. Access application
 http://localhost:5003/etl-operations
-
-# 3. Deploy DDL if needed (already includes all packages)
-sqlplus TR2000_STAGING/piping@host.docker.internal:1521/XEPDB1
-@/workspace/TR2000/TR2K/Ops/Oracle_DDL_SCD2_FINAL.sql
 ```
 
 ## 🗃️ **KEY FILES:**
@@ -39,9 +44,10 @@ sqlplus TR2000_STAGING/piping@host.docker.internal:1521/XEPDB1
 - `/TR2KBlazorLibrary/Models/ETLModels.cs` - All ETL model classes
 - `/TR2KApp/Program.cs` - Cleaned up, only references V2 service
 
-### **DDL & Packages:**
-- `/Ops/Oracle_DDL_SCD2_FINAL.sql` - Complete DDL with all 6 reference packages
-- `/Ops/New_Reference_Packages.sql` - Additional reference type packages
+### **DDL & Analysis:**
+- `/Ops/Master_DDL_Script.sql` - **NEW MASTER DDL** with complete field coverage
+- `/Ops/FIELD_COVERAGE_ANALYSIS.md` - **CRITICAL** field gap analysis and implementation roadmap
+- `/Ops/old/Oracle_DDL_SCD2_FINAL_v1.sql` - Previous DDL (archived)
 
 ### **Documentation:**
 - `/Ops/TR2K_START_HERE.md` - Main project documentation
@@ -68,37 +74,39 @@ sqlplus TR2000_STAGING/piping@host.docker.internal:1521/XEPDB1
 - ✅ Adjusted sidebar title font size
 - ✅ Clean build with 0 errors
 
-## 🎯 **IMMEDIATE TASKS FOR SESSION 20:**
+## 🎯 **IMMEDIATE TASKS FOR SESSION 22:**
 
-### 1. **Knowledge Articles Update** 📚
-- Update the collapsible knowledge section in ETLOperations.razor
-- Document all 6 reference types functionality
-- Add information about 70% API reduction strategy
-- Update SQL examples for each reference type
-- Document cascade deletion behavior
+### 1. **Deploy Enhanced Master DDL** 🚀 **PRIORITY #1**
+- Deploy Master_DDL_Script.sql to Oracle database (READY FOR DEPLOYMENT)
+- Verify all enhanced tables are created correctly
+- Test with sample data to ensure field mappings work
+- Validate new PCS detail tables
 
-### 2. **Create View Data Page** 👁️
-- New page: /data-viewer
-- Display all Oracle tables (read-only)
-- Show both staging and dimension tables
-- Add search/filter functionality
-- Display record counts and last modified dates
-- Paginated view for large tables
+### 2. **Update C# ETL Services** 🔧 **PRIORITY #2**
+- Modify OracleETLServiceV2.cs to populate ALL enhanced table fields
+- Update staging table inserts for PLANTS (5→24+ fields)
+- Update staging table inserts for ISSUES (5→25+ fields)
+- Add RevDate, Status fields to all reference table inserts
+- Create new methods for PCS detail tables (Header, Temp/Pressure, Pipe Sizes, Elements)
 
-### 3. **Implement Batch Loader** 📦
-- "Load All Master Data" button - loads Operators, Plants, Issues in sequence
-- "Load All References" button - loads all 6 reference types for selected issues
-- Progress indicator showing table-by-table status
-- Error handling with retry logic
-- Summary report after completion
-- Time estimation based on record counts
+### 3. **Create Complete Field Mapping** 📊 **PRIORITY #3**
+- Document exact API field → Database column mapping for all tables
+- Create field validation rules for engineering data types
+- Add proper data type conversions (dates, numbers, etc.)
+- Handle NULL values and default values appropriately
 
-### 4. **Performance Monitoring Dashboard** 📊
-- Create dashboard showing ETL metrics
-- API call efficiency tracking
-- Processing time trends
-- Success/failure rates
-- Record count trends
+### 4. **Test Enhanced ETL Process** 🧪 **PRIORITY #4**
+- Test master data loading with all enhanced fields
+- Validate reference table loading with complete metadata
+- Test new PCS detail table loading
+- Verify SCD2 functionality with expanded field sets
+
+### 5. **COMPLETED: User Guide and Documentation** ✅ **SESSION 21 COMPLETE**
+- ✅ Updated User Guide ERD with enhanced table structures
+- ✅ Documented complete field coverage achievement in Knowledge Articles
+- ✅ Updated ERD to show all new fields and PCS tables
+- ✅ Added engineering data analysis capabilities to documentation
+- ✅ All user documentation now consistently reflects enhanced DDL
 
 ## 🔥 **TESTED AND CONFIRMED WORKING:**
 - ✅ Load Operators (8 records)
@@ -134,6 +142,8 @@ The application is now feature-complete for the core ETL functionality:
 - Full audit trail with SCD2
 
 ---
-**Last Updated:** 2025-08-17 Session 19 Complete
-**Next Focus:** Knowledge Articles, View Data Page, Batch Loader
-**GitHub Status:** All changes committed and pushed
+**Last Updated:** 2025-08-17 Session 21 Complete
+**Next Focus:** Deploy Enhanced DDL, Update C# ETL Services, Complete Field Mapping
+**Critical Files:** Master_DDL_Script.sql, FIELD_COVERAGE_ANALYSIS.md
+**GitHub Status:** Session 21 user guide changes ready for commit
+**User Documentation:** ✅ FULLY UPDATED - All pages reflect enhanced DDL

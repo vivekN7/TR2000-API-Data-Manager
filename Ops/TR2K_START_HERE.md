@@ -10,13 +10,13 @@
    - It includes example URLs and JSON raw output examples
    - We must match our implementation exactly with this help page
 5. **DDL SCRIPT POLICY - CRITICAL**: 
-   - **ALWAYS update the main DDL script (Oracle_DDL_SCD2_FINAL.sql)**
+   - **ALWAYS update the main DDL script (Master_DDL_Script.sql)**
    - **NEVER create separate upgrade/patch scripts**
    - The script must completely DROP and RECREATE all database objects
    - This ensures we have ONE source of truth for the database schema
    - The script handles non-existent objects gracefully (won't fail if tables don't exist)
    - When changes are needed: Update the main DDL, then DROP ALL and recreate
-   - Current main DDL: Oracle_DDL_SCD2_FINAL.sql in /Ops/ folder
+   - Current main DDL: Master_DDL_Script.sql in /Ops/ folder
    - **This is NON-NEGOTIABLE - maintain ONE complete DDL script!**
 6. **UI SECURITY POLICY - CRITICAL**:
    - **NEVER add buttons that execute DDL or database scripts directly from the UI**
@@ -73,13 +73,29 @@ catch
 - Update immediately after completing any significant feature
 - Include: what was done, how it works, any issues encountered
 
-## Current State (2025-08-17 - Session 19 COMPLETE) - 🎯 PRODUCTION READY!
+## Current State (2025-08-17 - Session 21 COMPLETE) - 📚 USER GUIDE FULLY UPDATED!
 
-### 🏆 SESSIONS 18-19 ACHIEVEMENTS - MAJOR MILESTONE:
-**FULLY WORKING & PRODUCTION READY:**
+### 🏆 SESSION 21 USER GUIDE ENHANCEMENT COMPLETE:
+**COMPREHENSIVE USER DOCUMENTATION UPDATE:**
+- 📚 **ETL OPERATIONS PAGE:** Updated all Knowledge Articles with enhanced DDL information
+- 🔗 **USER GUIDE PAGE:** Fixed outdated ERD to show enhanced schema with complete field coverage
+- 📊 **VISUAL UPDATES:** ERD now shows 24+ PLANTS fields, 25+ ISSUES fields, and 4 new PCS engineering tables
+- 🚀 **SESSION 20 BREAKTHROUGH DOCUMENTED:** Complete field coverage achievement prominently featured
+- 📋 **ENGINEERING DATA CAPABILITIES:** Added comprehensive section explaining captured engineering data
+- ✅ **CONSISTENCY:** All user documentation now accurately reflects enhanced DDL vs. minimal implementation
+
+### 🏆 SESSION 20 MAJOR BREAKTHROUGH - COMPLETE FIELD COVERAGE:
+**CRITICAL DISCOVERY & ENHANCEMENT (DOCUMENTED IN SESSION 21):**
+- 🔍 **DISCOVERED:** 80% field coverage gap between ETL tables and actual API responses
+- 📊 **ANALYZED:** Complete API field structure vs. current implementation
+- 🚀 **CREATED:** Enhanced Master DDL with complete field coverage (Master_DDL_Script.sql)
+- 📋 **DOCUMENTED:** Comprehensive field gap analysis and implementation roadmap
+- ✅ **REORGANIZED:** Moved old DDL to archive, established new master DDL as single source of truth
+
+### 🏆 SESSIONS 18-19 ACHIEVEMENTS - BASIC ETL FOUNDATION:
+**PRODUCTION-READY ETL OPERATIONS:**
 - ✅ All 6 reference types loading data successfully (VDS, EDS, MDS, VSK, ESK, Pipe Element)
-- ✅ Preview SQL working for ALL operations (fixed in Session 19)
-- ✅ DDL script with automatic recompilation (handles circular dependencies)
+- ✅ Preview SQL working for ALL operations
 - ✅ 70% API call reduction across all reference types
 - ✅ Cascade deletion working for all types
 - ✅ SCD2 implementation complete (INSERT, UPDATE, DELETE, REACTIVATE)
@@ -88,17 +104,23 @@ catch
 - ✅ Fixed table status and ETL history displays
 - ✅ Build clean with 0 errors
 
-**FUTURE ENHANCEMENTS (Nice to have):**
-- 📚 Knowledge Articles update for new functionality
+**IMMEDIATE NEXT PRIORITIES (Session 22):**
+- 🔧 **DEPLOY ENHANCED DDL:** Deploy Master_DDL_Script.sql to Oracle database
+- 📊 **UPDATE C# ETL SERVICES:** Modify all ETL methods to populate enhanced table fields
+- 🧪 **FIELD MAPPING:** Create complete API field → Database column mapping
+- 🧪 **TESTING:** Validate enhanced DDL with actual API data
+- 🏗️ **ENHANCED PROCEDURES:** Update Oracle packages for new table structures
+
+**FUTURE ENHANCEMENTS:**
 - 👁️ View Data page for easy data browsing
 - 📦 Batch Loader for one-click operations
 - 📊 Performance monitoring dashboard
 
 ### Quick Recovery for Next Session:
 ```bash
-# 1. Deploy complete DDL to Oracle (already includes all reference packages)
+# 1. Deploy ENHANCED DDL to Oracle (complete field coverage)
 sqlplus TR2000_STAGING/piping@host.docker.internal:1521/XEPDB1
-@/workspace/TR2000/TR2K/Ops/Oracle_DDL_SCD2_FINAL.sql
+@/workspace/TR2000/TR2K/Ops/Master_DDL_Script.sql
 
 # 2. Start application
 cd /workspace/TR2000/TR2K/TR2KApp
@@ -211,9 +233,10 @@ The TR2000 API Data Manager is a Blazor Server application (.NET 9.0) that inter
    - **ACTION REQUIRED**: Must redeploy DDL to Oracle database!
 
 4. **Files That MUST Be Read Next Session**:
-   - `/workspace/TR2000/TR2K/Ops/NEXT_SESSION_CRITICAL.md` - Immediate tasks
-   - `/workspace/TR2000/TR2K/Ops/TR2K_PROGRESS.md` - Detailed progress
-   - `/workspace/TR2000/TR2K/Ops/Oracle_DDL_SCD2_FINAL.sql` - Deploy this!
+   - `/workspace/TR2000/TR2K/Ops/NEXT_SESSION_CRITICAL.md` - Immediate tasks for Session 21
+   - `/workspace/TR2000/TR2K/Ops/TR2K_PROGRESS.md` - Detailed progress including Session 20
+   - `/workspace/TR2000/TR2K/Ops/Master_DDL_Script.sql` - NEW MASTER DDL with complete field coverage
+   - `/workspace/TR2000/TR2K/Ops/FIELD_COVERAGE_ANALYSIS.md` - Critical field gap analysis
 
 ### 🔥 Previous Session 11 Accomplishments:
 

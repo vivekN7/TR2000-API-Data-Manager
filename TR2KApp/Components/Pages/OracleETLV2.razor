@@ -1,0 +1,351 @@
+@page "/oracle-etl-v2"
+@using TR2KBlazorLibrary.Logic.Services
+@using TR2KBlazorLibrary.Models
+@inject OracleETLServiceV2 ETLService
+@inject ILogger<OracleETLV2> Logger
+@rendermode InteractiveServer
+
+<h3>Oracle ETL - Production SCD2 Implementation</h3>
+
+<div class="alert alert-info">
+    <h5>✅ New Production-Ready Implementation</h5>
+    <ul>
+        <li>Complete SCD2 with INSERT, UPDATE, DELETE, REACTIVATE tracking</li>
+        <li>All logic in Oracle stored procedures</li>
+        <li>C# only fetches data and calls orchestrator</li>
+        <li>Atomic transactions with automatic rollback</li>
+    </ul>
+</div>
+
+@if (!string.IsNullOrEmpty(statusMessage))
+{
+    <div class="alert @(statusMessage.Contains("Error") ? "alert-danger" : statusMessage.Contains("Success") ? "alert-success" : "alert-info")">
+        @statusMessage
+    </div>
+}
+
+<div class="row">
+    <!-- Section 1: Database Setup -->
+    <div class="col-md-6">
+        <div class="card mb-3">
+            <div class="card-header bg-primary text-white">
+                <h5>1. Database Setup</h5>
+            </div>
+            <div class="card-body">
+                <button class="btn btn-info mb-2" @onclick="TestConnection" disabled="@isLoading">
+                    Test Connection
+                </button>
+                <button class="btn btn-warning mb-2" @onclick="DeployDDL" disabled="@isLoading">
+                    Deploy Final DDL
+                </button>
+                
+                @if (connectionStatus)
+                {
+                    <div class="alert alert-success">✅ Connected to Oracle</div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Section 2: Master Data ETL -->
+    <div class="col-md-6">
+        <div class="card mb-3">
+            <div class="card-header bg-success text-white">
+                <h5>2. Master Data ETL</h5>
+            </div>
+            <div class="card-body">
+                <button class="btn btn-primary mb-2" @onclick="LoadOperators" disabled="@isLoading">
+                    Load Operators (SCD2)
+                </button>
+                <button class="btn btn-primary mb-2" @onclick="LoadPlants" disabled="@isLoading">
+                    Load Plants (SCD2)
+                </button>
+                <button class="btn btn-primary mb-2" @onclick="LoadIssues" disabled="@isLoading">
+                    Load Issues (SCD2)
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Section 3: Current Table Status -->
+<div class="card mb-3">
+    <div class="card-header bg-info text-white">
+        <h5>3. Current Table Status</h5>
+    </div>
+    <div class="card-body">
+        <button class="btn btn-sm btn-secondary mb-2" @onclick="RefreshStatus" disabled="@isLoading">
+            Refresh Status
+        </button>
+        
+        @if (tableStatuses != null && tableStatuses.Any())
+        {
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Table</th>
+                        <th>Current Records</th>
+                        <th>Historical Records</th>
+                        <th>Total</th>
+                        <th>Last Modified</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var status in tableStatuses)
+                    {
+                        <tr>
+                            <td>@status.TableName</td>
+                            <td><span class="badge bg-success">@status.CurrentRows</span></td>
+                            <td><span class="badge bg-secondary">@status.HistoricalRows</span></td>
+                            <td><span class="badge bg-primary">@status.TotalRows</span></td>
+                            <td>@status.LastModified?.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+<!-- Section 4: ETL History -->
+<div class="card mb-3">
+    <div class="card-header bg-dark text-white">
+        <h5>4. ETL Run History</h5>
+    </div>
+    <div class="card-body">
+        @if (etlHistory != null && etlHistory.Any())
+        {
+            <table class="table table-sm table-striped">
+                <thead>
+                    <tr>
+                        <th>Run ID</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Start Time</th>
+                        <th>Duration (s)</th>
+                        <th>Loaded</th>
+                        <th>Updated</th>
+                        <th>Deleted</th>
+                        <th>Reactivated</th>
+                        <th>Unchanged</th>
+                        <th>API Calls</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var run in etlHistory)
+                    {
+                        <tr class="@(run.Status == "SUCCESS" ? "" : "table-danger")">
+                            <td>@run.RunId</td>
+                            <td>@run.RunType</td>
+                            <td>
+                                <span class="badge @(run.Status == "SUCCESS" ? "bg-success" : "bg-danger")">
+                                    @run.Status
+                                </span>
+                            </td>
+                            <td>@run.StartTime?.ToString("HH:mm:ss")</td>
+                            <td>@run.ProcessingTimeSeconds?.ToString("F2")</td>
+                            <td>@run.RecordsLoaded</td>
+                            <td>@run.RecordsUpdated</td>
+                            <td>@run.RecordsDeleted</td>
+                            <td>@run.RecordsReactivated</td>
+                            <td>@run.RecordsUnchanged</td>
+                            <td>@run.ApiCallCount</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <p>No ETL runs yet.</p>
+        }
+    </div>
+</div>
+
+<!-- Loading Spinner -->
+@if (isLoading)
+{
+    <div class="text-center">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p>@loadingMessage</p>
+    </div>
+}
+
+@code {
+    private bool isLoading = false;
+    private string statusMessage = "";
+    private string loadingMessage = "";
+    private bool connectionStatus = false;
+    
+    private List<TableStatus> tableStatuses = new List<TableStatus>();
+    private List<ETLRunHistory> etlHistory = new List<ETLRunHistory>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshStatus();
+    }
+
+    private async Task TestConnection()
+    {
+        isLoading = true;
+        loadingMessage = "Testing Oracle connection...";
+        statusMessage = "";
+        
+        try
+        {
+            connectionStatus = await ETLService.TestConnection();
+            statusMessage = connectionStatus ? 
+                "✅ Successfully connected to Oracle database" : 
+                "❌ Failed to connect to Oracle database";
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error: {ex.Message}";
+            Logger.LogError(ex, "Connection test failed");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task DeployDDL()
+    {
+        isLoading = true;
+        loadingMessage = "Deploying SCD2 DDL to Oracle...";
+        statusMessage = "";
+        
+        try
+        {
+            var success = await ETLService.DeployFinalDDL();
+            statusMessage = success ? 
+                "✅ DDL deployed successfully! Database is ready for ETL." : 
+                "❌ DDL deployment failed. Check logs for details.";
+            
+            if (success)
+            {
+                await RefreshStatus();
+            }
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error deploying DDL: {ex.Message}";
+            Logger.LogError(ex, "DDL deployment failed");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadOperators()
+    {
+        isLoading = true;
+        loadingMessage = "Loading operators with SCD2 processing...";
+        statusMessage = "";
+        
+        try
+        {
+            var result = await ETLService.LoadOperators();
+            
+            if (result.Status == "SUCCESS")
+            {
+                statusMessage = $"✅ Success: {result.Message}";
+            }
+            else
+            {
+                statusMessage = $"⚠️ {result.Status}: {result.Message}";
+            }
+            
+            await RefreshStatus();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error: {ex.Message}";
+            Logger.LogError(ex, "Failed to load operators");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadPlants()
+    {
+        isLoading = true;
+        loadingMessage = "Loading plants with SCD2 processing...";
+        statusMessage = "";
+        
+        try
+        {
+            var result = await ETLService.LoadPlants();
+            
+            if (result.Status == "SUCCESS")
+            {
+                statusMessage = $"✅ Success: {result.Message}";
+            }
+            else
+            {
+                statusMessage = $"⚠️ {result.Status}: {result.Message}";
+            }
+            
+            await RefreshStatus();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error: {ex.Message}";
+            Logger.LogError(ex, "Failed to load plants");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadIssues()
+    {
+        isLoading = true;
+        loadingMessage = "Loading issues with SCD2 processing...";
+        statusMessage = "";
+        
+        try
+        {
+            var result = await ETLService.LoadIssuesForSelectedPlants();
+            
+            if (result.Status == "SUCCESS")
+            {
+                statusMessage = $"✅ Success: {result.Message}";
+            }
+            else
+            {
+                statusMessage = $"⚠️ {result.Status}: {result.Message}";
+            }
+            
+            await RefreshStatus();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error: {ex.Message}";
+            Logger.LogError(ex, "Failed to load issues");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task RefreshStatus()
+    {
+        try
+        {
+            tableStatuses = await ETLService.GetTableStatuses();
+            etlHistory = await ETLService.GetETLHistory(10);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to refresh status");
+        }
+    }
+}

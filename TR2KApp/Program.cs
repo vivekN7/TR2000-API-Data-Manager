@@ -16,6 +16,7 @@ builder.Services.AddScoped<ApiResponseDeserializer>();
 
 // Add Oracle ETL service
 builder.Services.AddScoped<OracleETLService>();
+builder.Services.AddScoped<OracleETLServiceV2>(); // New simplified service
 
 var app = builder.Build();
 

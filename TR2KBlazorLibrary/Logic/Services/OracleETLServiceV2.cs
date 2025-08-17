@@ -809,6 +809,31 @@ END LOOP;
                         var issuesData = _deserializer.DeserializeApiResponse(apiResponse, endpoint);
                         apiCalls++;
 
+                        // Log to RAW_JSON for audit trail (best-effort, non-critical)
+                        try
+                        {
+                            await connection.ExecuteAsync(@"
+                                CALL SP_INSERT_RAW_JSON(
+                                    :endpoint, :keyString, :etlRunId, 
+                                    :httpStatus, :durationMs, :headers, :payload
+                                )",
+                                new
+                                {
+                                    endpoint = $"ISSUES_{endpoint}",
+                                    keyString = $"plant_{plantId}",
+                                    etlRunId,
+                                    httpStatus = 200,
+                                    durationMs = 100, // Placeholder - would need to measure actual duration
+                                    headers = "{}",
+                                    payload = apiResponse
+                                }
+                            );
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "RAW_JSON insert failed (non-critical): {Message}", ex.Message);
+                        }
+
                         if (issuesData != null && issuesData.Any())
                         {
                             foreach (var issue in issuesData)
@@ -1135,6 +1160,179 @@ END LOOP;
                 new { plantId }
             );
         }
+
+        #region Issue Loader Methods
+
+        /// <summary>
+        /// Check if issue loader table exists
+        /// </summary>
+        public async Task<bool> CheckIssueLoaderTableExists()
+        {
+            try
+            {
+                using var connection = new OracleConnection(_connectionString);
+                var count = await connection.QuerySingleAsync<int>(@"
+                    SELECT COUNT(*) 
+                    FROM USER_TABLES 
+                    WHERE TABLE_NAME = 'ETL_ISSUE_LOADER'"
+                );
+                return count > 0;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to check issue loader table");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Create issue loader table
+        /// </summary>
+        public async Task CreateIssueLoaderTable()
+        {
+            using var connection = new OracleConnection(_connectionString);
+            await connection.ExecuteAsync(@"
+                CREATE TABLE ETL_ISSUE_LOADER (
+                    PLANT_ID VARCHAR2(50) NOT NULL,
+                    ISSUE_REVISION VARCHAR2(20) NOT NULL,
+                    PLANT_NAME VARCHAR2(200),
+                    LOAD_REFERENCES CHAR(1) DEFAULT 'Y' CHECK (LOAD_REFERENCES IN ('Y', 'N')),
+                    NOTES VARCHAR2(500),
+                    CREATED_DATE DATE DEFAULT SYSDATE,
+                    CREATED_BY VARCHAR2(100) DEFAULT USER,
+                    MODIFIED_DATE DATE DEFAULT SYSDATE,
+                    MODIFIED_BY VARCHAR2(100) DEFAULT USER,
+                    CONSTRAINT PK_ETL_ISSUE_LOADER PRIMARY KEY (PLANT_ID, ISSUE_REVISION),
+                    CONSTRAINT FK_ISSUE_LOADER_PLANT FOREIGN KEY (PLANT_ID) 
+                        REFERENCES ETL_PLANT_LOADER(PLANT_ID) ON DELETE CASCADE
+                )"
+            );
+        }
+
+        /// <summary>
+        /// Get issues for a specific plant
+        /// </summary>
+        public async Task<List<Issue>> GetIssuesForPlant(string plantId)
+        {
+            try
+            {
+                using var connection = new OracleConnection(_connectionString);
+                var issues = await connection.QueryAsync<Issue>(@"
+                    SELECT PLANT_ID as PlantID,
+                           ISSUE_REVISION as IssueRevision,
+                           USER_NAME as UserName,
+                           USER_ENTRY_TIME as UserEntryTime,
+                           USER_PROTECTED as UserProtected
+                    FROM ISSUES 
+                    WHERE IS_CURRENT = 'Y' 
+                      AND PLANT_ID = :plantId
+                    ORDER BY ISSUE_REVISION"
+                , new { plantId });
+                return issues.ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get issues for plant {PlantId}", plantId);
+                return new List<Issue>();
+            }
+        }
+
+        /// <summary>
+        /// Get issue loader entries
+        /// </summary>
+        public async Task<List<IssueLoaderEntry>> GetIssueLoaderEntries()
+        {
+            try
+            {
+                using var connection = new OracleConnection(_connectionString);
+                var entries = await connection.QueryAsync<IssueLoaderEntry>(@"
+                    SELECT il.PLANT_ID as PlantID,
+                           il.ISSUE_REVISION as IssueRevision,
+                           il.PLANT_NAME as PlantName,
+                           CASE WHEN il.LOAD_REFERENCES = 'Y' THEN 1 ELSE 0 END as LoadReferences,
+                           il.NOTES as Notes,
+                           il.CREATED_DATE as CreatedDate,
+                           il.MODIFIED_DATE as ModifiedDate
+                    FROM ETL_ISSUE_LOADER il
+                    ORDER BY il.PLANT_NAME, il.ISSUE_REVISION"
+                );
+                return entries.ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get issue loader entries");
+                return new List<IssueLoaderEntry>();
+            }
+        }
+
+        /// <summary>
+        /// Add issue to loader
+        /// </summary>
+        public async Task AddIssueToLoader(string plantId, string issueRevision)
+        {
+            using var connection = new OracleConnection(_connectionString);
+            
+            // Get plant and issue details
+            var plantName = await connection.QuerySingleOrDefaultAsync<string>(@"
+                SELECT PLANT_NAME
+                FROM ETL_PLANT_LOADER 
+                WHERE PLANT_ID = :plantId",
+                new { plantId }
+            );
+            
+            if (string.IsNullOrEmpty(plantName))
+                throw new Exception($"Plant {plantId} not found in Plant Loader");
+            
+            // Verify issue exists
+            var issueExists = await connection.QuerySingleAsync<int>(@"
+                SELECT COUNT(*)
+                FROM ISSUES 
+                WHERE IS_CURRENT = 'Y' 
+                  AND PLANT_ID = :plantId 
+                  AND ISSUE_REVISION = :issueRevision",
+                new { plantId, issueRevision }
+            );
+            
+            if (issueExists == 0)
+                throw new Exception($"Issue {issueRevision} not found for plant {plantId}");
+            
+            // Insert into issue loader
+            await connection.ExecuteAsync(@"
+                INSERT INTO ETL_ISSUE_LOADER (PLANT_ID, ISSUE_REVISION, PLANT_NAME, LOAD_REFERENCES)
+                VALUES (:plantId, :issueRevision, :plantName, 'Y')",
+                new { plantId, issueRevision, plantName }
+            );
+        }
+
+        /// <summary>
+        /// Remove issue from loader
+        /// </summary>
+        public async Task RemoveIssueFromLoader(string plantId, string issueRevision)
+        {
+            using var connection = new OracleConnection(_connectionString);
+            await connection.ExecuteAsync(@"
+                DELETE FROM ETL_ISSUE_LOADER 
+                WHERE PLANT_ID = :plantId AND ISSUE_REVISION = :issueRevision",
+                new { plantId, issueRevision }
+            );
+        }
+
+        /// <summary>
+        /// Toggle issue load references flag
+        /// </summary>
+        public async Task ToggleIssueLoadReferences(string plantId, string issueRevision)
+        {
+            using var connection = new OracleConnection(_connectionString);
+            await connection.ExecuteAsync(@"
+                UPDATE ETL_ISSUE_LOADER 
+                SET LOAD_REFERENCES = CASE WHEN LOAD_REFERENCES = 'Y' THEN 'N' ELSE 'Y' END,
+                    MODIFIED_DATE = SYSDATE
+                WHERE PLANT_ID = :plantId AND ISSUE_REVISION = :issueRevision",
+                new { plantId, issueRevision }
+            );
+        }
+
+        #endregion
 
         /// <summary>
         /// Parse datetime from various formats safely

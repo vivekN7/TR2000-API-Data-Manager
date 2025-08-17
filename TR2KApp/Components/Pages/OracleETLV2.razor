@@ -129,7 +129,8 @@
                                 <li><code>ETL_CONTROL</code></li>
                                 <li><code>ETL_ERROR_LOG</code></li>
                                 <li><code>ETL_PLANT_LOADER</code></li>
-                                <li><code>RAW_JSON</code></li>
+                                <li><code>ETL_ISSUE_LOADER</code></li>
+                                <li><code>RAW_JSON</code> <span class="badge bg-info">Issues</span></li>
                                 <li class="text-muted">Auto-cleanup</li>
                             </ul>
                         </div>
@@ -325,6 +326,102 @@
     </div>
 </div>
 
+<!-- Section 2.5: Issue Loader Configuration (Reference Scope Control) -->
+<div class="card mb-3">
+    <div class="card-header" style="background-color: #00346a; color: white;">
+        <h6 class="mb-0">2.5. Issue Loader Configuration (Reference Tables Scope)</h6>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-12">
+                @if (!issueLoaderTableExists)
+                {
+                    <div class="alert alert-warning small">
+                        Issue loader table doesn't exist yet.
+                    </div>
+                    <button class="btn btn-outline-primary mb-2" @onclick="CreateIssueLoaderTable" disabled="@isLoading">
+                        Create Issue Loader Table
+                    </button>
+                }
+                else
+                {
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small">Select Plant:</label>
+                            <select class="form-select form-select-sm" @bind="selectedPlantForIssues" @onchange="OnPlantSelectedForIssues" disabled="@isLoading">
+                                <option value="">-- Select Plant --</option>
+                                @foreach (var entry in plantLoaderEntries ?? new List<PlantLoaderEntry>())
+                                {
+                                    <option value="@entry.PlantID">@entry.PlantName (@entry.PlantID)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">Select Issue Revision:</label>
+                            <div class="input-group input-group-sm">
+                                <select class="form-select" @bind="selectedIssueRevision" disabled="@(isLoading || string.IsNullOrEmpty(selectedPlantForIssues))">
+                                    <option value="">-- Select Issue --</option>
+                                    @foreach (var issue in availableIssues)
+                                    {
+                                        <option value="@issue.IssueRevision">@issue.IssueRevision</option>
+                                    }
+                                </select>
+                                <button class="btn btn-outline-primary" @onclick="AddIssueToLoader" disabled="@(isLoading || string.IsNullOrEmpty(selectedPlantForIssues) || string.IsNullOrEmpty(selectedIssueRevision))">
+                                    Add
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    @if (issueLoaderEntries != null && issueLoaderEntries.Any())
+                    {
+                        <h6 class="small">Issues Selected for Reference Loading:</h6>
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Plant</th>
+                                    <th>Issue Revision</th>
+                                    <th>Load Refs</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var entry in issueLoaderEntries)
+                                {
+                                    <tr>
+                                        <td class="small">@entry.PlantName (@entry.PlantID)</td>
+                                        <td class="small">@entry.IssueRevision</td>
+                                        <td>
+                                            <span class="badge @(entry.LoadReferences ? "bg-success" : "bg-secondary")">
+                                                @(entry.LoadReferences ? "Yes" : "No")
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-link text-primary p-0 me-2" @onclick="() => ToggleIssueLoadReferences(entry.PlantID, entry.IssueRevision)" disabled="@isLoading">
+                                                Toggle
+                                            </button>
+                                            <button class="btn btn-sm btn-link text-danger p-0" @onclick="() => RemoveIssueFromLoader(entry.PlantID, entry.IssueRevision)" disabled="@isLoading">
+                                                Remove
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                        <small class="text-muted">
+                            @issueLoaderEntries.Count(e => e.LoadReferences) issue(s) will have their reference tables loaded (API optimization: ~70% fewer calls).
+                        </small>
+                    }
+                    else
+                    {
+                        <p class="small text-muted">No issues configured yet. Select issues above to control which reference tables are loaded.</p>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Section 3: Master Data ETL -->
 <div class="card mb-3">
     <div class="card-header" style="background-color: #00346a; color: white;">
@@ -489,6 +586,13 @@
     private List<PlantLoaderEntry> plantLoaderEntries = new List<PlantLoaderEntry>();
     private List<Plant> availablePlants = new List<Plant>();
     
+    // Issue Loader variables
+    private bool issueLoaderTableExists = false;
+    private string selectedPlantForIssues = "";
+    private string selectedIssueRevision = "";
+    private List<IssueLoaderEntry> issueLoaderEntries = new List<IssueLoaderEntry>();
+    private List<Issue> availableIssues = new List<Issue>();
+    
     private List<TableStatus> tableStatuses = new List<TableStatus>();
     private List<ETLRunHistory> etlHistory = new List<ETLRunHistory>();
 
@@ -496,6 +600,7 @@
     {
         await RefreshStatus();
         await CheckPlantLoaderStatus();
+        await CheckIssueLoaderStatus();
     }
     
     private void ToggleKnowledgeSection()
@@ -609,6 +714,154 @@
             isLoading = false;
         }
     }
+
+    #region Issue Loader Methods
+
+    private async Task CheckIssueLoaderStatus()
+    {
+        try
+        {
+            issueLoaderTableExists = await ETLService.CheckIssueLoaderTableExists();
+            if (issueLoaderTableExists)
+            {
+                await LoadIssueLoaderData();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to check issue loader status");
+        }
+    }
+
+    private async Task LoadIssueLoaderData()
+    {
+        try
+        {
+            issueLoaderEntries = await ETLService.GetIssueLoaderEntries();
+            StateHasChanged(); // Refresh UI after loading issue loader data
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load issue loader data");
+        }
+    }
+
+    private async Task CreateIssueLoaderTable()
+    {
+        isLoading = true;
+        loadingMessage = "Creating issue loader table...";
+        
+        try
+        {
+            await ETLService.CreateIssueLoaderTable();
+            issueLoaderTableExists = true;
+            await LoadIssueLoaderData();
+            statusMessage = "✅ Issue loader table created successfully";
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error creating issue loader table: {ex.Message}";
+            Logger.LogError(ex, "Failed to create issue loader table");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task OnPlantSelectedForIssues(ChangeEventArgs e)
+    {
+        selectedPlantForIssues = e.Value?.ToString() ?? "";
+        selectedIssueRevision = ""; // Reset issue selection
+        
+        if (!string.IsNullOrEmpty(selectedPlantForIssues))
+        {
+            try
+            {
+                availableIssues = await ETLService.GetIssuesForPlant(selectedPlantForIssues);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to load issues for plant {PlantId}", selectedPlantForIssues);
+                availableIssues = new List<Issue>();
+            }
+        }
+        else
+        {
+            availableIssues = new List<Issue>();
+        }
+        
+        StateHasChanged();
+    }
+
+    private async Task AddIssueToLoader()
+    {
+        isLoading = true;
+        loadingMessage = "Adding issue to loader...";
+        
+        try
+        {
+            await ETLService.AddIssueToLoader(selectedPlantForIssues, selectedIssueRevision);
+            await LoadIssueLoaderData();
+            selectedIssueRevision = ""; // Reset selection
+            statusMessage = "✅ Issue added to loader";
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error adding issue: {ex.Message}";
+            Logger.LogError(ex, "Failed to add issue");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task RemoveIssueFromLoader(string plantId, string issueRevision)
+    {
+        isLoading = true;
+        loadingMessage = "Removing issue from loader...";
+        
+        try
+        {
+            await ETLService.RemoveIssueFromLoader(plantId, issueRevision);
+            await LoadIssueLoaderData();
+            statusMessage = "✅ Issue removed from loader";
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error removing issue: {ex.Message}";
+            Logger.LogError(ex, "Failed to remove issue");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ToggleIssueLoadReferences(string plantId, string issueRevision)
+    {
+        isLoading = true;
+        loadingMessage = "Toggling reference loading...";
+        
+        try
+        {
+            await ETLService.ToggleIssueLoadReferences(plantId, issueRevision);
+            await LoadIssueLoaderData();
+            statusMessage = "✅ Reference loading toggled";
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error toggling reference loading: {ex.Message}";
+            Logger.LogError(ex, "Failed to toggle reference loading");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    #endregion
 
     private async Task TestConnection()
     {

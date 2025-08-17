@@ -36,6 +36,365 @@ namespace TR2KBlazorLibrary.Logic.Services
         }
 
         /// <summary>
+        /// Get SQL preview for Operators ETL
+        /// </summary>
+        public ETLSqlPreview GetOperatorsSqlPreview()
+        {
+            return new ETLSqlPreview
+            {
+                Title = "Load Operators - Complete SCD2 Process",
+                Description = "This process implements full SCD Type 2 change tracking for Operators, maintaining complete history of all changes.",
+                Steps = new List<ETLStep>
+                {
+                    new ETLStep
+                    {
+                        StepNumber = 1,
+                        Title = "Fetch from API",
+                        Description = "C# fetches all operators from TR2000 API",
+                        SqlStatement = @"-- C# Code (not SQL)
+await _apiService.FetchDataAsync('https://equinor.pipespec-api.presight.com/operators');
+
+Returns: 8 operators with OperatorID and OperatorName"
+                    },
+                    new ETLStep
+                    {
+                        StepNumber = 2,
+                        Title = "Get ETL Run ID",
+                        Description = "Generate unique identifier for this ETL run",
+                        SqlStatement = @"SELECT ETL_RUN_ID_SEQ.NEXTVAL FROM DUAL;
+
+-- Insert control record
+INSERT INTO ETL_CONTROL (ETL_RUN_ID, RUN_TYPE, STATUS, START_TIME, API_CALL_COUNT)
+VALUES (:etlRunId, 'OPERATORS', 'RUNNING', SYSTIMESTAMP, 1);"
+                    },
+                    new ETLStep
+                    {
+                        StepNumber = 3,
+                        Title = "Load to Staging",
+                        Description = "Insert API data into staging table (temporary holding area)",
+                        SqlStatement = @"-- C# performs bulk insert (8 records)
+INSERT INTO STG_OPERATORS (OPERATOR_ID, OPERATOR_NAME, ETL_RUN_ID)
+VALUES (:OperatorId, :OperatorName, :EtlRunId);
+
+-- Staging is TEMPORARY - cleared after successful processing
+-- No history kept in staging - it's just a landing zone"
+                    },
+                    new ETLStep
+                    {
+                        StepNumber = 4,
+                        Title = "Call Orchestrator",
+                        Description = "Oracle SP_PROCESS_ETL_BATCH handles ALL business logic",
+                        SqlStatement = @"BEGIN
+    SP_PROCESS_ETL_BATCH(
+        p_etl_run_id => :etlRunId,
+        p_entity_type => 'OPERATORS'
+    );
+END;
+
+This orchestrator performs:
+1. Deduplication (handles duplicate API data)
+2. Validation (checks business rules)
+3. SCD2 Processing (5 sub-steps below)
+4. Reconciliation (verifies counts)
+5. COMMIT (single atomic transaction)"
+                    },
+                    new ETLStep
+                    {
+                        StepNumber = 5,
+                        Title = "Step 4.1: Handle Deletions",
+                        Description = "Mark records as deleted if missing from API (soft delete)",
+                        SqlStatement = @"UPDATE OPERATORS o
+SET o.VALID_TO = SYSDATE,
+    o.IS_CURRENT = 'N',
+    o.DELETE_DATE = SYSDATE,
+    o.CHANGE_TYPE = 'DELETE'
+WHERE o.IS_CURRENT = 'Y'
+  AND NOT EXISTS (
+    SELECT 1 FROM STG_OPERATORS s
+    WHERE s.OPERATOR_ID = o.OPERATOR_ID
+      AND s.ETL_RUN_ID = :etlRunId
+  );
+
+-- Records are NEVER physically deleted
+-- Full history preserved forever
+-- Can query deleted records with DELETE_DATE IS NOT NULL"
+                    },
+                    new ETLStep
+                    {
+                        StepNumber = 6,
+                        Title = "Step 4.2: Handle Reactivations",
+                        Description = "Reactivate previously deleted records that return",
+                        SqlStatement = @"INSERT INTO OPERATORS (
+    OPERATOR_ID, OPERATOR_NAME, SRC_HASH,
+    VALID_FROM, IS_CURRENT, CHANGE_TYPE, ETL_RUN_ID
+)
+SELECT s.OPERATOR_ID, s.OPERATOR_NAME,
+       STANDARD_HASH(fields, 'SHA256'),
+       SYSDATE, 'Y', 'REACTIVATE', :etlRunId
+FROM STG_OPERATORS s
+WHERE EXISTS (deleted record) AND NOT EXISTS (current record);
+
+-- Tracks the business scenario of removed then restored data
+-- Maintains audit trail of lifecycle"
+                    },
+                    new ETLStep
+                    {
+                        StepNumber = 7,
+                        Title = "Step 4.3: Detect Unchanged",
+                        Description = "Skip records with no changes (performance optimization)",
+                        SqlStatement = @"SELECT COUNT(*) INTO v_records_unchanged
+FROM STG_OPERATORS s
+INNER JOIN OPERATORS o ON o.OPERATOR_ID = s.OPERATOR_ID
+WHERE o.IS_CURRENT = 'Y'
+  AND STANDARD_HASH(o.fields) = STANDARD_HASH(s.fields);
+
+-- Uses SHA256 hash for efficient change detection
+-- Unchanged records are NOT rewritten
+-- Reduces database I/O and storage"
+                    },
+                    new ETLStep
+                    {
+                        StepNumber = 8,
+                        Title = "Step 4.4: Handle Updates",
+                        Description = "Create new version for changed records",
+                        SqlStatement = @"-- Close old version
+UPDATE OPERATORS o
+SET o.VALID_TO = SYSDATE, o.IS_CURRENT = 'N'
+WHERE o.IS_CURRENT = 'Y' AND [hash changed];
+
+-- Insert new version
+INSERT INTO OPERATORS (all_fields, CHANGE_TYPE)
+VALUES (new_values, 'UPDATE');
+
+-- Both versions kept: old with IS_CURRENT='N', new with IS_CURRENT='Y'
+-- Can query historical state at any point in time"
+                    },
+                    new ETLStep
+                    {
+                        StepNumber = 9,
+                        Title = "Step 4.5: Handle Inserts",
+                        Description = "Add brand new records",
+                        SqlStatement = @"INSERT INTO OPERATORS (
+    OPERATOR_ID, OPERATOR_NAME, SRC_HASH,
+    VALID_FROM, IS_CURRENT, CHANGE_TYPE, ETL_RUN_ID
+)
+SELECT s.*, SYSDATE, 'Y', 'INSERT', :etlRunId
+FROM STG_OPERATORS s
+WHERE NOT EXISTS (
+    SELECT 1 FROM OPERATORS o
+    WHERE o.OPERATOR_ID = s.OPERATOR_ID
+);
+
+-- New records start their history
+-- VALID_FROM = now, VALID_TO = null
+-- IS_CURRENT = 'Y'"
+                    },
+                    new ETLStep
+                    {
+                        StepNumber = 10,
+                        Title = "Update Control & Commit",
+                        Description = "Record metrics and commit transaction",
+                        SqlStatement = @"UPDATE ETL_CONTROL
+SET RECORDS_UNCHANGED = :unchanged,
+    RECORDS_UPDATED = :updated,
+    RECORDS_LOADED = :inserted,
+    RECORDS_DELETED = :deleted,
+    RECORDS_REACTIVATED = :reactivated,
+    STATUS = 'SUCCESS',
+    END_TIME = SYSTIMESTAMP
+WHERE ETL_RUN_ID = :etlRunId;
+
+COMMIT; -- Single atomic commit
+
+-- If ANY error occurs: ROLLBACK everything
+-- Error logged via autonomous transaction (survives rollback)
+-- Data integrity guaranteed"
+                    },
+                    new ETLStep
+                    {
+                        StepNumber = 11,
+                        Title = "Post-ETL Cleanup (Automatic)",
+                        Description = "Cleanup runs AFTER successful ETL - no DBA required",
+                        SqlStatement = @"-- Cleanup executes AFTER COMMIT (non-critical)
+BEGIN
+    -- Keep only last 10 ETL runs
+    DELETE FROM ETL_CONTROL WHERE ETL_RUN_ID < 
+        (SELECT MIN(ETL_RUN_ID) FROM last_10_runs);
+    
+    -- Clean 30-day old error logs
+    DELETE FROM ETL_ERROR_LOG WHERE ERROR_TIME < SYSDATE - 30;
+    
+    -- Clean orphaned staging (safety)
+    DELETE FROM STG_* WHERE ETL_RUN_ID < current - 10;
+    
+    COMMIT; -- Separate commit
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Cleanup errors don't fail ETL
+        LOG_ETL_ERROR('Non-critical cleanup error');
+END;
+
+-- NO DBA REQUIRED! Runs with your permissions
+-- NO SCHEDULED JOBS! Runs after each ETL
+-- If cleanup fails, ETL still succeeds"
+                    }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Get SQL preview for Plants ETL
+        /// </summary>
+        public ETLSqlPreview GetPlantsSqlPreview()
+        {
+            return new ETLSqlPreview
+            {
+                Title = "Load Plants - Complete SCD2 Process",
+                Description = "This process implements full SCD Type 2 change tracking for Plants (130 records), with foreign key to Operators.",
+                Steps = new List<ETLStep>
+                {
+                    new ETLStep
+                    {
+                        StepNumber = 1,
+                        Title = "Fetch from API",
+                        Description = "C# fetches all plants from TR2000 API",
+                        SqlStatement = @"-- C# Code
+await _apiService.FetchDataAsync('https://equinor.pipespec-api.presight.com/plants');
+
+Returns: 130 plants with:
+- PlantID (e.g., '47')
+- PlantName/ShortDescription (e.g., 'AASTA')
+- LongDescription (e.g., 'Aasta Hansteen')
+- OperatorID (FK to OPERATORS)
+- CommonLibPlantCode (e.g., 'AHA')"
+                    },
+                    new ETLStep
+                    {
+                        StepNumber = 2,
+                        Title = "Load to Staging",
+                        Description = "Bulk insert 130 plants to staging",
+                        SqlStatement = @"INSERT INTO STG_PLANTS (
+    PLANT_ID, PLANT_NAME, LONG_DESCRIPTION,
+    OPERATOR_ID, COMMON_LIB_PLANT_CODE, ETL_RUN_ID
+) VALUES (
+    :PlantId, :PlantName, :LongDescription,
+    :OperatorId, :CommonLibPlantCode, :EtlRunId
+);
+
+-- Field mappings:
+-- PlantName: Uses ShortDescription if PlantName missing
+-- All fields nullable except PLANT_ID"
+                    },
+                    new ETLStep
+                    {
+                        StepNumber = 3,
+                        Title = "SCD2 Processing",
+                        Description = "PKG_PLANTS_ETL.PROCESS_SCD2 handles all logic",
+                        SqlStatement = @"-- Same 5-step process as OPERATORS:
+1. DELETE: Mark missing plants as deleted
+2. REACTIVATE: Restore previously deleted plants
+3. UNCHANGED: Skip if hash matches (most common)
+4. UPDATE: New version for changed plants
+5. INSERT: Add new plants
+
+-- Key difference: More fields in hash
+STANDARD_HASH(
+    PLANT_ID || PLANT_NAME || LONG_DESCRIPTION ||
+    OPERATOR_ID || COMMON_LIB_PLANT_CODE
+)"
+                    },
+                    new ETLStep
+                    {
+                        StepNumber = 4,
+                        Title = "Data Integrity",
+                        Description = "Validation and error handling",
+                        SqlStatement = @"-- Validation checks:
+- PLANT_ID required (cannot be null)
+- PLANT_NAME max 200 characters
+- Foreign key to OPERATORS validated
+
+-- Error handling:
+IF validation_failed THEN
+    UPDATE STG_PLANTS 
+    SET IS_VALID = 'N',
+        VALIDATION_ERROR = 'specific error'
+    WHERE [failed condition];
+    
+    -- Record still processed but marked
+END IF;
+
+-- Autonomous error logging:
+LOG_ETL_ERROR(run_id, source, code, message);
+-- This survives even if transaction rolls back"
+                    },
+                    new ETLStep
+                    {
+                        StepNumber = 5,
+                        Title = "Reconciliation",
+                        Description = "Verify data consistency",
+                        SqlStatement = @"INSERT INTO ETL_RECONCILIATION (
+    ETL_RUN_ID, ENTITY_TYPE, 
+    SOURCE_COUNT, TARGET_COUNT, DIFF_COUNT
+)
+SELECT :etlRunId, 'PLANTS',
+       (SELECT COUNT(*) FROM STG_PLANTS WHERE IS_VALID='Y'),
+       (SELECT COUNT(*) FROM PLANTS WHERE IS_CURRENT='Y'),
+       ABS(source - target);
+
+-- Alert if difference > 10%
+-- Helps detect data quality issues"
+                    }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Get SQL preview for Issues ETL
+        /// </summary>
+        public ETLSqlPreview GetIssuesSqlPreview()
+        {
+            return new ETLSqlPreview
+            {
+                Title = "Load Issues - Multi-Plant Process",
+                Description = "Loads issues for all 130 plants with multiple API calls. Uses ETL_PLANT_LOADER for scope control.",
+                Steps = new List<ETLStep>
+                {
+                    new ETLStep
+                    {
+                        StepNumber = 1,
+                        Title = "Plant Loader Scope",
+                        Description = "Check which plants to process",
+                        SqlStatement = @"SELECT PLANT_ID, PLANT_NAME
+FROM ETL_PLANT_LOADER
+WHERE IS_ACTIVE = 'Y'
+ORDER BY LOAD_PRIORITY;
+
+-- ETL_PLANT_LOADER controls scope
+-- Without it: 130 plants × N issues = 500+ API calls
+-- With it: 3-5 plants × N issues = 30-50 API calls
+-- 90% reduction in processing time!"
+                    },
+                    new ETLStep
+                    {
+                        StepNumber = 2,
+                        Title = "API Loop",
+                        Description = "Fetch issues for each active plant",
+                        SqlStatement = @"FOR each plant IN active_plants LOOP
+    -- API call for each plant
+    await FetchDataAsync('/plants/{plantId}/issues');
+    
+    -- Each returns multiple issue revisions
+    -- Insert all to staging with same ETL_RUN_ID
+END LOOP;
+
+-- Typical: 3-10 issues per plant
+-- Total records: 50-500 depending on scope"
+                    }
+                }
+            };
+        }
+
+        /// <summary>
         /// Test Oracle database connection
         /// </summary>
         public async Task<bool> TestConnection()
@@ -112,7 +471,7 @@ namespace TR2KBlazorLibrary.Logic.Services
                         VALUES (:OperatorId, :OperatorName, :EtlRunId)",
                         new 
                         { 
-                            OperatorId = Convert.ToInt32(row["OperatorId"]),
+                            OperatorId = Convert.ToInt32(row["OperatorID"]),  // Fixed: OperatorID with capital ID
                             OperatorName = row["OperatorName"]?.ToString(),
                             EtlRunId = etlRunId
                         }
@@ -226,10 +585,10 @@ namespace TR2KBlazorLibrary.Logic.Services
                         )",
                         new 
                         { 
-                            PlantId = row["PlantId"]?.ToString(),
-                            PlantName = row["PlantName"]?.ToString(),
+                            PlantId = row["PlantID"]?.ToString(),  // Fixed: PlantID with capital ID
+                            PlantName = row.ContainsKey("PlantName") ? row["PlantName"]?.ToString() : row["ShortDescription"]?.ToString(),  // Use ShortDescription as PlantName
                             LongDescription = row["LongDescription"]?.ToString(),
-                            OperatorId = row.ContainsKey("OperatorId") ? Convert.ToInt32(row["OperatorId"]) : (int?)null,
+                            OperatorId = row.ContainsKey("OperatorID") ? Convert.ToInt32(row["OperatorID"]) : (int?)null,  // Fixed: OperatorID with capital ID
                             CommonLibPlantCode = row["CommonLibPlantCode"]?.ToString(),
                             EtlRunId = etlRunId
                         }
@@ -515,56 +874,6 @@ namespace TR2KBlazorLibrary.Logic.Services
             }
         }
 
-        /// <summary>
-        /// Deploy the final DDL script
-        /// </summary>
-        public async Task<bool> DeployFinalDDL()
-        {
-            try
-            {
-                _logger.LogInformation("Deploying final SCD2 DDL...");
-                
-                // Read the DDL file
-                var ddlPath = "/workspace/TR2000/TR2K/Ops/Oracle_DDL_SCD2_FINAL.sql";
-                if (!System.IO.File.Exists(ddlPath))
-                {
-                    _logger.LogError("DDL file not found at " + ddlPath);
-                    return false;
-                }
-
-                var ddlScript = await System.IO.File.ReadAllTextAsync(ddlPath);
-                
-                using var connection = new OracleConnection(_connectionString);
-                await connection.OpenAsync();
-
-                // Split by GO or / delimiters and execute each block
-                var scriptBlocks = ddlScript.Split(new[] { "\n/\n", "\nGO\n" }, StringSplitOptions.RemoveEmptyEntries);
-                
-                foreach (var block in scriptBlocks)
-                {
-                    if (string.IsNullOrWhiteSpace(block) || block.Trim().StartsWith("--"))
-                        continue;
-
-                    try
-                    {
-                        await connection.ExecuteAsync(block);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning($"Block execution warning: {ex.Message}");
-                        // Continue with other blocks
-                    }
-                }
-
-                _logger.LogInformation("DDL deployment completed successfully");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to deploy DDL");
-                return false;
-            }
-        }
     }
     
     // Note: Using ETLResult, ETLRunHistory, and TableStatus classes from OracleETLService

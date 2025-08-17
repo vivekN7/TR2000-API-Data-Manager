@@ -10,14 +10,20 @@
    - It includes example URLs and JSON raw output examples
    - We must match our implementation exactly with this help page
 5. **DDL SCRIPT POLICY - CRITICAL**: 
-   - **ALWAYS update the main DDL script (Oracle_DDL_SCD2_Native_Hash.sql)**
+   - **ALWAYS update the main DDL script (Oracle_DDL_SCD2_FINAL.sql)**
    - **NEVER create separate upgrade/patch scripts**
    - The script must completely DROP and RECREATE all database objects
    - This ensures we have ONE source of truth for the database schema
    - The script handles non-existent objects gracefully (won't fail if tables don't exist)
    - When changes are needed: Update the main DDL, then DROP ALL and recreate
-   - Current main DDL: Oracle_DDL_SCD2_Native_Hash.sql in /Ops/ folder
+   - Current main DDL: Oracle_DDL_SCD2_FINAL.sql in /Ops/ folder
    - **This is NON-NEGOTIABLE - maintain ONE complete DDL script!**
+6. **UI SECURITY POLICY - CRITICAL**:
+   - **NEVER add buttons that execute DDL or database scripts directly from the UI**
+   - **NEVER add "Deploy DDL", "Drop Tables", or similar dangerous operations to web pages**
+   - **DDL deployment must ALWAYS be done manually by the user via SQL*Plus or similar tools**
+   - **UI should only perform data operations (SELECT, INSERT via ETL procedures)**
+   - **This is a SECURITY requirement - no exceptions!**
 
 ## 🛡️ DATA INTEGRITY & TRANSACTION SAFETY REQUIREMENTS
 **ALL database operations MUST use transactions to ensure data integrity:**
@@ -60,10 +66,45 @@ catch
 - Update immediately after completing any significant feature
 - Include: what was done, how it works, any issues encountered
 
-## Current State (2025-08-17 - Session 7 End) - 🚀 PHASE 3 ORACLE ETL WITH PLANT LOADER!
+## Current State (2025-08-17 - Session 11 Complete) - ✅ PRODUCTION-READY SCD2 WITH FULL EDUCATIONAL UI!
 The TR2000 API Data Manager is a Blazor Server application (.NET 9.0) that interfaces with the TR2000 API to manage piping specification data.
 
-### 🔥 LATEST ACCOMPLISHMENTS (2025-08-17 Session 7):
+### 🔥 LATEST ACCOMPLISHMENTS (2025-08-17 Session 11):
+
+#### Session 11 - PRODUCTION READY WITH FULL EDUCATIONAL UI:
+
+1. **Fixed Critical Issues** ✅
+   - Fixed Load Plants error (PKG_PLANTS_ETL.PROCESS_SCD2 was incomplete)
+   - Fixed API field name mismatches (OperatorID, PlantID with capital ID)
+   - Updated main DDL - NO upgrade scripts per policy
+
+2. **Security Improvements** 🔒
+   - Removed ALL dangerous DDL buttons from UI (Deploy DDL, Drop Tables, etc.)
+   - Added UI SECURITY POLICY to documentation
+   - DDL deployment must be done manually via SQL*Plus
+
+3. **Educational SQL Preview System** 📚
+   - Added "Preview SQL" buttons for all ETL operations
+   - Shows detailed step-by-step SQL with explanations
+   - 11 steps for Operators, 5 for Plants, 2 for Issues
+   - Includes data integrity features and retention policies
+   - Modal display with syntax-highlighted SQL
+
+4. **Cleanup Strategy Without DBA** 🧹
+   - Cleanup runs AFTER successful ETL (not before)
+   - No scheduled jobs needed - part of ETL process
+   - No DBA permissions required
+   - Non-critical - failures don't break ETL
+   - Automatic retention: ETL_CONTROL (10 runs), ETL_ERROR_LOG (30 days)
+
+5. **Complete SCD2 Implementation** 🎯
+   - Both OPERATORS and PLANTS fully working
+   - Handles INSERT, UPDATE, DELETE, REACTIVATE
+   - Full audit trail with CHANGE_TYPE tracking
+   - Hash-based change detection
+   - Atomic transactions with rollback
+
+### 🔥 Previous Session 7 Accomplishments:
 
 #### 1. **Plant Loader Configuration System** 🎯
 - **ETL_PLANT_LOADER table**: Controls which plants to load (dramatic efficiency gain!)

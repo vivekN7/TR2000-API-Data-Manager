@@ -918,8 +918,184 @@ CREATE OR REPLACE PACKAGE BODY PKG_PLANTS_ETL AS
         v_records_deleted   NUMBER := 0;
         v_records_reactivated NUMBER := 0;
     BEGIN
-        -- Similar logic to OPERATORS but for PLANTS table
-        -- (Implementation follows same pattern)
+        -- Step 1: Handle deletions
+        UPDATE PLANTS p
+        SET p.VALID_TO = SYSDATE,
+            p.IS_CURRENT = 'N',
+            p.DELETE_DATE = SYSDATE,
+            p.CHANGE_TYPE = 'DELETE'
+        WHERE p.IS_CURRENT = 'Y'
+          AND NOT EXISTS (
+            SELECT 1 FROM STG_PLANTS s
+            WHERE s.PLANT_ID = p.PLANT_ID
+              AND s.ETL_RUN_ID = p_etl_run_id
+              AND s.IS_DUPLICATE = 'N'
+              AND s.IS_VALID = 'Y'
+          );
+        v_records_deleted := SQL%ROWCOUNT;
+        
+        -- Step 2: Handle reactivations
+        INSERT INTO PLANTS (
+            PLANT_ID, PLANT_NAME, LONG_DESCRIPTION, OPERATOR_ID, 
+            COMMON_LIB_PLANT_CODE, SRC_HASH,
+            VALID_FROM, IS_CURRENT, CHANGE_TYPE, ETL_RUN_ID
+        )
+        SELECT 
+            s.PLANT_ID,
+            s.PLANT_NAME,
+            s.LONG_DESCRIPTION,
+            s.OPERATOR_ID,
+            s.COMMON_LIB_PLANT_CODE,
+            STANDARD_HASH(
+                NVL(s.PLANT_ID, '~') || '|' ||
+                NVL(s.PLANT_NAME, '~') || '|' ||
+                NVL(s.LONG_DESCRIPTION, '~') || '|' ||
+                NVL(TO_CHAR(s.OPERATOR_ID), '~') || '|' ||
+                NVL(s.COMMON_LIB_PLANT_CODE, '~'),
+                'SHA256'
+            ),
+            SYSDATE,
+            'Y',
+            'REACTIVATE',
+            p_etl_run_id
+        FROM STG_PLANTS s
+        WHERE s.ETL_RUN_ID = p_etl_run_id
+          AND s.IS_DUPLICATE = 'N'
+          AND s.IS_VALID = 'Y'
+          AND EXISTS (
+            SELECT 1 FROM PLANTS p
+            WHERE p.PLANT_ID = s.PLANT_ID
+              AND p.DELETE_DATE IS NOT NULL
+              AND p.IS_CURRENT = 'N'
+              AND NOT EXISTS (
+                SELECT 1 FROM PLANTS p2
+                WHERE p2.PLANT_ID = s.PLANT_ID
+                  AND p2.IS_CURRENT = 'Y'
+              )
+          );
+        v_records_reactivated := SQL%ROWCOUNT;
+        
+        -- Step 3: Count unchanged
+        SELECT COUNT(*) INTO v_records_unchanged
+        FROM STG_PLANTS s
+        INNER JOIN PLANTS p ON p.PLANT_ID = s.PLANT_ID
+        WHERE p.IS_CURRENT = 'Y'
+          AND s.ETL_RUN_ID = p_etl_run_id
+          AND s.IS_DUPLICATE = 'N'
+          AND s.IS_VALID = 'Y'
+          AND STANDARD_HASH(
+              NVL(p.PLANT_ID, '~') || '|' ||
+              NVL(p.PLANT_NAME, '~') || '|' ||
+              NVL(p.LONG_DESCRIPTION, '~') || '|' ||
+              NVL(TO_CHAR(p.OPERATOR_ID), '~') || '|' ||
+              NVL(p.COMMON_LIB_PLANT_CODE, '~'),
+              'SHA256'
+          ) = STANDARD_HASH(
+              NVL(s.PLANT_ID, '~') || '|' ||
+              NVL(s.PLANT_NAME, '~') || '|' ||
+              NVL(s.LONG_DESCRIPTION, '~') || '|' ||
+              NVL(TO_CHAR(s.OPERATOR_ID), '~') || '|' ||
+              NVL(s.COMMON_LIB_PLANT_CODE, '~'),
+              'SHA256'
+          );
+        
+        -- Step 4: Handle updates
+        UPDATE PLANTS p
+        SET p.VALID_TO = SYSDATE, 
+            p.IS_CURRENT = 'N'
+        WHERE p.IS_CURRENT = 'Y'
+          AND EXISTS (
+            SELECT 1 FROM STG_PLANTS s
+            WHERE s.PLANT_ID = p.PLANT_ID
+              AND s.ETL_RUN_ID = p_etl_run_id
+              AND s.IS_DUPLICATE = 'N'
+              AND s.IS_VALID = 'Y'
+              AND STANDARD_HASH(
+                  NVL(p.PLANT_ID, '~') || '|' ||
+                  NVL(p.PLANT_NAME, '~') || '|' ||
+                  NVL(p.LONG_DESCRIPTION, '~') || '|' ||
+                  NVL(TO_CHAR(p.OPERATOR_ID), '~') || '|' ||
+                  NVL(p.COMMON_LIB_PLANT_CODE, '~'),
+                  'SHA256'
+              ) != STANDARD_HASH(
+                  NVL(s.PLANT_ID, '~') || '|' ||
+                  NVL(s.PLANT_NAME, '~') || '|' ||
+                  NVL(s.LONG_DESCRIPTION, '~') || '|' ||
+                  NVL(TO_CHAR(s.OPERATOR_ID), '~') || '|' ||
+                  NVL(s.COMMON_LIB_PLANT_CODE, '~'),
+                  'SHA256'
+              )
+          );
+        v_records_updated := SQL%ROWCOUNT;
+        
+        -- Insert new versions for updates
+        INSERT INTO PLANTS (
+            PLANT_ID, PLANT_NAME, LONG_DESCRIPTION, OPERATOR_ID, 
+            COMMON_LIB_PLANT_CODE, SRC_HASH,
+            VALID_FROM, IS_CURRENT, CHANGE_TYPE, ETL_RUN_ID
+        )
+        SELECT 
+            s.PLANT_ID,
+            s.PLANT_NAME,
+            s.LONG_DESCRIPTION,
+            s.OPERATOR_ID,
+            s.COMMON_LIB_PLANT_CODE,
+            STANDARD_HASH(
+                NVL(s.PLANT_ID, '~') || '|' ||
+                NVL(s.PLANT_NAME, '~') || '|' ||
+                NVL(s.LONG_DESCRIPTION, '~') || '|' ||
+                NVL(TO_CHAR(s.OPERATOR_ID), '~') || '|' ||
+                NVL(s.COMMON_LIB_PLANT_CODE, '~'),
+                'SHA256'
+            ),
+            SYSDATE,
+            'Y',
+            'UPDATE',
+            p_etl_run_id
+        FROM STG_PLANTS s
+        WHERE s.ETL_RUN_ID = p_etl_run_id
+          AND s.IS_DUPLICATE = 'N'
+          AND s.IS_VALID = 'Y'
+          AND EXISTS (
+            SELECT 1 FROM PLANTS p
+            WHERE p.PLANT_ID = s.PLANT_ID
+              AND p.VALID_TO = SYSDATE
+              AND p.CHANGE_TYPE IS NULL
+          );
+        
+        -- Step 5: Handle new inserts
+        INSERT INTO PLANTS (
+            PLANT_ID, PLANT_NAME, LONG_DESCRIPTION, OPERATOR_ID, 
+            COMMON_LIB_PLANT_CODE, SRC_HASH,
+            VALID_FROM, IS_CURRENT, CHANGE_TYPE, ETL_RUN_ID
+        )
+        SELECT 
+            s.PLANT_ID,
+            s.PLANT_NAME,
+            s.LONG_DESCRIPTION,
+            s.OPERATOR_ID,
+            s.COMMON_LIB_PLANT_CODE,
+            STANDARD_HASH(
+                NVL(s.PLANT_ID, '~') || '|' ||
+                NVL(s.PLANT_NAME, '~') || '|' ||
+                NVL(s.LONG_DESCRIPTION, '~') || '|' ||
+                NVL(TO_CHAR(s.OPERATOR_ID), '~') || '|' ||
+                NVL(s.COMMON_LIB_PLANT_CODE, '~'),
+                'SHA256'
+            ),
+            SYSDATE,
+            'Y',
+            'INSERT',
+            p_etl_run_id
+        FROM STG_PLANTS s
+        WHERE s.ETL_RUN_ID = p_etl_run_id
+          AND s.IS_DUPLICATE = 'N'
+          AND s.IS_VALID = 'Y'
+          AND NOT EXISTS (
+            SELECT 1 FROM PLANTS p
+            WHERE p.PLANT_ID = s.PLANT_ID
+          );
+        v_records_inserted := SQL%ROWCOUNT;
         
         -- Update ETL control
         UPDATE ETL_CONTROL
@@ -1063,6 +1239,43 @@ BEGIN
     
     -- SINGLE ATOMIC COMMIT
     COMMIT;
+    
+    -- CLEANUP OLD DATA (After successful commit)
+    -- Non-critical - doesn't fail ETL if cleanup fails
+    BEGIN
+        -- Keep only last 10 ETL runs
+        DELETE FROM ETL_CONTROL
+        WHERE ETL_RUN_ID < (
+            SELECT MIN(ETL_RUN_ID) 
+            FROM (
+                SELECT ETL_RUN_ID 
+                FROM ETL_CONTROL 
+                ORDER BY ETL_RUN_ID DESC
+            ) 
+            WHERE ROWNUM <= 10
+        );
+        
+        -- Clean error logs older than 30 days
+        DELETE FROM ETL_ERROR_LOG 
+        WHERE ERROR_TIME < SYSDATE - 30;
+        
+        -- Clean orphaned staging (safety - should be empty)
+        DELETE FROM STG_OPERATORS WHERE ETL_RUN_ID < p_etl_run_id - 10;
+        DELETE FROM STG_PLANTS WHERE ETL_RUN_ID < p_etl_run_id - 10;
+        DELETE FROM STG_ISSUES WHERE ETL_RUN_ID < p_etl_run_id - 10;
+        
+        COMMIT; -- Separate commit for cleanup
+    EXCEPTION
+        WHEN OTHERS THEN
+            -- Cleanup errors are logged but don't fail ETL
+            LOG_ETL_ERROR(
+                p_etl_run_id,
+                'POST_ETL_CLEANUP',
+                SQLCODE,
+                'Non-critical cleanup error: ' || SQLERRM,
+                NULL
+            );
+    END;
     
     DBMS_APPLICATION_INFO.SET_MODULE(NULL, NULL);
     

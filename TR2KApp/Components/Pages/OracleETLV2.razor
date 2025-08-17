@@ -5,91 +5,150 @@
 @inject ILogger<OracleETLV2> Logger
 @rendermode InteractiveServer
 
-<h3>Oracle ETL - Production SCD2 Implementation</h3>
+<h3>Oracle ETL - SCD2 Implementation</h3>
 
-<div class="alert alert-info">
-    <h5>✅ New Production-Ready Implementation</h5>
-    <ul>
-        <li>Complete SCD2 with INSERT, UPDATE, DELETE, REACTIVATE tracking</li>
-        <li>All logic in Oracle stored procedures</li>
-        <li>C# only fetches data and calls orchestrator</li>
-        <li>Atomic transactions with automatic rollback</li>
-        <li>RAW_JSON audit trail with automatic 30-day cleanup (no DBA required)</li>
-    </ul>
-</div>
-
-<!-- Educational Section: Understanding SCD2 -->
-<div class="card mb-3 border-primary">
-    <div class="card-header bg-primary text-white">
-        <h5 class="mb-0">
-            <i class="bi bi-mortarboard"></i> Understanding SCD2 (Slowly Changing Dimension Type 2)
-        </h5>
+<!-- Collapsible Knowledge Articles Section -->
+<div class="card mb-3">
+    <div class="card-header" style="background-color: #00346a; color: white; cursor: pointer;" @onclick="ToggleKnowledgeSection">
+        <h6 class="mb-0">
+            <i class="bi @(showKnowledgeSection ? "bi-chevron-down" : "bi-chevron-right")"></i> 
+            Knowledge Articles & Documentation
+            <small class="text-white-50 ms-2">(@(showKnowledgeSection ? "click to collapse" : "click to expand"))</small>
+        </h6>
     </div>
-    <div class="card-body">
-        <p><strong>What is SCD2?</strong> A data warehousing technique that tracks historical changes by creating new records for each change while preserving old records.</p>
-        
-        <h6>Key Concepts:</h6>
-        <ul>
-            <li><strong>VALID_FROM/VALID_TO</strong>: Temporal boundaries showing when a record was active</li>
-            <li><strong>IS_CURRENT</strong>: Flag indicating the current version (Y/N)</li>
-            <li><strong>CHANGE_TYPE</strong>: Tracks the operation (INSERT, UPDATE, DELETE, REACTIVATE)</li>
-            <li><strong>SRC_HASH</strong>: SHA256 hash of all fields to detect changes</li>
-        </ul>
+    @if (showKnowledgeSection)
+    {
+        <div class="card-body">
+            <!-- Understanding SCD2 -->
+            <details class="mb-3">
+                <summary class="h6 text-primary" style="cursor: pointer;">
+                    <i class="bi bi-mortarboard"></i> Understanding SCD2 (Slowly Changing Dimension Type 2)
+                </summary>
+                <div class="mt-2 ps-3">
+                    <p><strong>What is SCD2?</strong> A data warehousing technique that tracks historical changes by creating new records for each change while preserving old records.</p>
+                    
+                    <h6>Key Concepts:</h6>
+                    <ul>
+                        <li><strong>VALID_FROM/VALID_TO</strong>: Temporal boundaries showing when a record was active</li>
+                        <li><strong>IS_CURRENT</strong>: Flag indicating the current version (Y/N)</li>
+                        <li><strong>CHANGE_TYPE</strong>: Tracks the operation (INSERT, UPDATE, DELETE, REACTIVATE)</li>
+                        <li><strong>SRC_HASH</strong>: SHA256 hash of all fields to detect changes</li>
+                    </ul>
 
-        <h6>Our Implementation Handles:</h6>
-        <ol>
-            <li><strong>INSERT</strong>: New records from API → Create with IS_CURRENT='Y'</li>
-            <li><strong>UPDATE</strong>: Changed records → Close old (IS_CURRENT='N'), create new version</li>
-            <li><strong>DELETE</strong>: Missing from API → Mark with DELETE_DATE, IS_CURRENT='N'</li>
-            <li><strong>REACTIVATE</strong>: Deleted record returns → Create new version with CHANGE_TYPE='REACTIVATE'</li>
-            <li><strong>UNCHANGED</strong>: No changes detected → Skip processing</li>
-        </ol>
-    </div>
-</div>
+                    <h6>Our Implementation Handles:</h6>
+                    <ol>
+                        <li><strong>INSERT</strong>: New records from API → Create with IS_CURRENT='Y'</li>
+                        <li><strong>UPDATE</strong>: Changed records → Close old (IS_CURRENT='N'), create new version</li>
+                        <li><strong>DELETE</strong>: Missing from API → Mark with DELETE_DATE, IS_CURRENT='N'</li>
+                        <li><strong>REACTIVATE</strong>: Deleted record returns → Create new version with CHANGE_TYPE='REACTIVATE'</li>
+                        <li><strong>UNCHANGED</strong>: No changes detected → Skip processing</li>
+                    </ol>
+                </div>
+            </details>
 
-<!-- Educational Section: ETL Process Flow -->
-<div class="card mb-3 border-success">
-    <div class="card-header bg-success text-white">
-        <h5 class="mb-0">
-            <i class="bi bi-diagram-3"></i> ETL Process Flow - What Happens Behind the Scenes
-        </h5>
-    </div>
-    <div class="card-body">
-        <h6>When you click "Load Operators" or "Load Plants":</h6>
-        
-        <div class="row">
-            <div class="col-md-6">
-                <h6 class="text-primary">Step 1: C# Service (Minimal)</h6>
-                <ol>
-                    <li>Fetch data from TR2000 API</li>
-                    <li>Get next ETL_RUN_ID from sequence</li>
-                    <li>Bulk insert into STG_* staging tables</li>
-                    <li>Call SP_PROCESS_ETL_BATCH orchestrator</li>
-                    <li>Return results to UI</li>
-                </ol>
-            </div>
-            <div class="col-md-6">
-                <h6 class="text-primary">Step 2: Oracle Orchestrator (All Logic)</h6>
-                <ol>
-                    <li><strong>Deduplication</strong>: Remove duplicates using ROW_NUMBER()</li>
-                    <li><strong>Validation</strong>: Check business rules, mark invalid records</li>
-                    <li><strong>SCD2 Processing</strong>: Apply temporal logic (5 sub-steps)</li>
-                    <li><strong>Reconciliation</strong>: Count source vs target records</li>
-                    <li><strong>COMMIT</strong>: Single atomic transaction</li>
-                </ol>
-            </div>
+            <!-- ETL Process Flow -->
+            <details class="mb-3">
+                <summary class="h6 text-success" style="cursor: pointer;">
+                    <i class="bi bi-diagram-3"></i> ETL Process Flow
+                </summary>
+                <div class="mt-2 ps-3">
+                    <h6>When you click "Load" buttons:</h6>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-primary">Step 1: C# Service (Data Movement)</h6>
+                            <ol>
+                                <li>Fetch data from TR2000 API</li>
+                                <li>Insert RAW_JSON for audit trail</li>
+                                <li>Get next ETL_RUN_ID from sequence</li>
+                                <li>Bulk insert into STG_* staging tables</li>
+                                <li>Call SP_PROCESS_ETL_BATCH orchestrator</li>
+                                <li>Return results to UI</li>
+                            </ol>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-primary">Step 2: Oracle Orchestrator (Business Logic)</h6>
+                            <ol>
+                                <li><strong>Deduplication</strong>: Remove duplicates using STG_ID</li>
+                                <li><strong>Validation</strong>: Check business rules</li>
+                                <li><strong>SCD2 Processing</strong>: Apply temporal logic</li>
+                                <li><strong>Reconciliation</strong>: Count source vs target</li>
+                                <li><strong>Cleanup</strong>: Purge old history/logs</li>
+                                <li><strong>COMMIT</strong>: Single atomic transaction</li>
+                            </ol>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning mt-3">
+                        <strong>Key Safety Features:</strong>
+                        <ul class="mb-0">
+                            <li>API data fetched BEFORE starting transaction (prevents locks)</li>
+                            <li>Autonomous error logging (survives rollbacks)</li>
+                            <li>All-or-nothing: Complete success or complete rollback</li>
+                            <li>RAW_JSON audit trail with 30-day retention</li>
+                        </ul>
+                    </div>
+                </div>
+            </details>
+
+            <!-- Oracle Database Objects -->
+            <details class="mb-3">
+                <summary class="h6 text-warning" style="cursor: pointer;">
+                    <i class="bi bi-database"></i> Oracle Database Objects
+                </summary>
+                <div class="mt-2 ps-3">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <h6>Staging Tables</h6>
+                            <ul class="small">
+                                <li><code>STG_OPERATORS</code></li>
+                                <li><code>STG_PLANTS</code></li>
+                                <li><code>STG_ISSUES</code></li>
+                                <li class="text-muted">Auto-cleared after ETL</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-3">
+                            <h6>Dimension Tables (SCD2)</h6>
+                            <ul class="small">
+                                <li><code>OPERATORS</code></li>
+                                <li><code>PLANTS</code></li>
+                                <li><code>ISSUES</code></li>
+                                <li class="text-muted">Full history forever</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-3">
+                            <h6>Control & Audit</h6>
+                            <ul class="small">
+                                <li><code>ETL_CONTROL</code></li>
+                                <li><code>ETL_ERROR_LOG</code></li>
+                                <li><code>ETL_PLANT_LOADER</code></li>
+                                <li><code>RAW_JSON</code></li>
+                                <li class="text-muted">Auto-cleanup</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-3">
+                            <h6>Key Procedures</h6>
+                            <ul class="small">
+                                <li><code>SP_PROCESS_ETL_BATCH</code></li>
+                                <li><code>PKG_OPERATORS_ETL</code></li>
+                                <li><code>PKG_PLANTS_ETL</code></li>
+                                <li><code>PKG_ISSUES_ETL</code></li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <h6 class="mt-3">Data Retention Policies:</h6>
+                    <ul>
+                        <li><strong>Dimension Tables</strong>: <span class="badge bg-success">PERMANENT</span> - Full history forever</li>
+                        <li><strong>Staging Tables</strong>: <span class="badge bg-secondary">TEMPORARY</span> - Cleared after each run</li>
+                        <li><strong>ETL_CONTROL</strong>: <span class="badge bg-secondary">10 RUNS</span> - Auto-cleanup</li>
+                        <li><strong>ETL_ERROR_LOG</strong>: <span class="badge bg-secondary">30 DAYS</span> - Auto-cleanup</li>
+                        <li><strong>RAW_JSON</strong>: <span class="badge bg-secondary">30 DAYS</span> - Auto-cleanup</li>
+                    </ul>
+                </div>
+            </details>
         </div>
-
-        <div class="alert alert-warning mt-3">
-            <strong>Key Safety Features:</strong>
-            <ul class="mb-0">
-                <li>API data fetched BEFORE starting transaction (prevents locks)</li>
-                <li>Autonomous error logging (survives rollbacks)</li>
-                <li>All-or-nothing: Complete success or complete rollback</li>
-                <li>No partial updates possible</li>
-            </ul>
-        </div>
-    </div>
+    }
 </div>
 
 @if (!string.IsNullOrEmpty(statusMessage))
@@ -105,11 +164,11 @@
     <div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
-                <div class="modal-header bg-info text-white">
+                <div class="modal-header">
                     <h5 class="modal-title">
-                        <i class="bi bi-code-slash"></i> @currentSqlPreview.Title
+                        @currentSqlPreview.Title
                     </h5>
-                    <button type="button" class="btn-close btn-close-white" @onclick="() => showSqlPreview = false"></button>
+                    <button type="button" class="btn-close" @onclick="() => showSqlPreview = false"></button>
                 </div>
                 <div class="modal-body">
                     <div class="alert alert-info">
@@ -147,10 +206,10 @@
                         <h6><i class="bi bi-clock-history"></i> Data Retention Policies:</h6>
                         <ul>
                             <li><strong>Dimension Tables (OPERATORS, PLANTS, ISSUES)</strong>: <span class="badge bg-success">PERMANENT</span> - Full history forever</li>
-                            <li><strong>Staging Tables (STG_*)</strong>: <span class="badge bg-warning">TEMPORARY</span> - Cleared after each successful run</li>
-                            <li><strong>ETL_CONTROL</strong>: <span class="badge bg-info">10 RUNS</span> - Cleaned after each ETL (automatic)</li>
-                            <li><strong>ETL_ERROR_LOG</strong>: <span class="badge bg-danger">30 DAYS</span> - Cleaned after each ETL (automatic)</li>
-                            <li><strong>RAW_JSON</strong>: <span class="badge bg-info">30 DAYS</span> - Cleaned after each ETL (automatic)</li>
+                            <li><strong>Staging Tables (STG_*)</strong>: <span class="badge bg-secondary">TEMPORARY</span> - Cleared after each successful run</li>
+                            <li><strong>ETL_CONTROL</strong>: <span class="badge bg-secondary">10 RUNS</span> - Cleaned after each ETL (automatic)</li>
+                            <li><strong>ETL_ERROR_LOG</strong>: <span class="badge bg-secondary">30 DAYS</span> - Cleaned after each ETL (automatic)</li>
+                            <li><strong>RAW_JSON</strong>: <span class="badge bg-secondary">30 DAYS</span> - Cleaned after each ETL (automatic)</li>
                         </ul>
                     </div>
                 </div>
@@ -171,64 +230,154 @@
     <!-- Section 1: Database Setup -->
     <div class="col-md-6">
         <div class="card mb-3">
-            <div class="card-header bg-primary text-white">
-                <h5>1. Database Setup</h5>
+            <div class="card-header" style="background-color: #00346a; color: white;">
+                <h6 class="mb-0">1. Database Setup</h6>
             </div>
             <div class="card-body">
-                <button class="btn btn-info mb-2" @onclick="TestConnection" disabled="@isLoading">
+                <button class="btn btn-outline-primary mb-2" @onclick="TestConnection" disabled="@isLoading">
                     Test Connection
                 </button>
                 
                 @if (connectionStatus)
                 {
-                    <div class="alert alert-success">✅ Connected to Oracle</div>
+                    <small class="text-success d-block">✅ Connected to Oracle</small>
                 }
             </div>
         </div>
     </div>
 
-    <!-- Section 2: Master Data ETL -->
+    <!-- Section 2: Plant Loader Configuration -->
     <div class="col-md-6">
         <div class="card mb-3">
-            <div class="card-header bg-success text-white">
-                <h5>2. Master Data ETL</h5>
+            <div class="card-header" style="background-color: #00346a; color: white;">
+                <h6 class="mb-0">2. Plant Loader Configuration</h6>
             </div>
             <div class="card-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <button class="btn btn-primary mb-2" @onclick="LoadOperators" disabled="@isLoading">
-                            <i class="bi bi-play-fill"></i> Load Operators (SCD2)
-                        </button>
-                        <button class="btn btn-outline-info mb-2 ms-2" @onclick='() => ShowSqlPreview("operators")' disabled="@isLoading">
-                            <i class="bi bi-code-slash"></i> Preview SQL
-                        </button>
+                @if (!plantLoaderTableExists)
+                {
+                    <div class="alert alert-warning small">
+                        Plant loader table doesn't exist yet.
                     </div>
-                    <div class="col-md-6">
-                        <button class="btn btn-primary mb-2" @onclick="LoadPlants" disabled="@isLoading">
-                            <i class="bi bi-play-fill"></i> Load Plants (SCD2)
-                        </button>
-                        <button class="btn btn-outline-info mb-2 ms-2" @onclick='() => ShowSqlPreview("plants")' disabled="@isLoading">
-                            <i class="bi bi-code-slash"></i> Preview SQL
-                        </button>
+                    <button class="btn btn-outline-primary mb-2" @onclick="CreatePlantLoaderTable" disabled="@isLoading">
+                        Create Plant Loader Table
+                    </button>
+                }
+                else
+                {
+                    <div class="mb-3">
+                        <label class="form-label small">Add Plant to Loader:</label>
+                        <div class="input-group input-group-sm">
+                            <select class="form-select" @bind="selectedPlantToAdd" disabled="@isLoading">
+                                <option value="">-- Select Plant --</option>
+                                @foreach (var plant in availablePlants)
+                                {
+                                    <option value="@plant.PlantID">@plant.PlantName (@plant.PlantID)</option>
+                                }
+                            </select>
+                            <button class="btn btn-outline-primary" @onclick="AddPlantToLoader" disabled="@(isLoading || string.IsNullOrEmpty(selectedPlantToAdd))">
+                                Add
+                            </button>
+                        </div>
                     </div>
-                    <div class="col-md-12">
-                        <button class="btn btn-primary mb-2" @onclick="LoadIssues" disabled="@isLoading">
-                            <i class="bi bi-play-fill"></i> Load Issues (SCD2)
-                        </button>
-                        <button class="btn btn-outline-info mb-2 ms-2" @onclick='() => ShowSqlPreview("issues")' disabled="@isLoading">
-                            <i class="bi bi-code-slash"></i> Preview SQL
-                        </button>
-                    </div>
-                </div>
+
+                    @if (plantLoaderEntries != null && plantLoaderEntries.Any())
+                    {
+                        <h6 class="small">Active Plants for Issues ETL:</h6>
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Plant</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var entry in plantLoaderEntries)
+                                {
+                                    <tr>
+                                        <td class="small">@entry.PlantName (@entry.PlantID)</td>
+                                        <td>
+                                            @if (entry.IsActive)
+                                            {
+                                                <span class="badge bg-success">Active</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary">Inactive</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-link text-primary p-0 me-2" @onclick="() => TogglePlantActive(entry.PlantID)" disabled="@isLoading">
+                                                @(entry.IsActive ? "Deactivate" : "Activate")
+                                            </button>
+                                            <button class="btn btn-sm btn-link text-danger p-0" @onclick="() => RemovePlantFromLoader(entry.PlantID)" disabled="@isLoading">
+                                                Remove
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                        <small class="text-muted">
+                            @plantLoaderEntries.Count(p => p.IsActive) active plant(s) will be processed when loading issues.
+                        </small>
+                    }
+                    else
+                    {
+                        <p class="small text-muted">No plants configured yet. Add plants above to control which ones are processed during Issues ETL.</p>
+                    }
+                }
             </div>
         </div>
     </div>
 </div>
 
-<!-- Section 3: Current Table Status -->
+<!-- Section 3: Master Data ETL -->
 <div class="card mb-3">
-    <div class="card-header bg-info text-white">
-        <h5>3. Current Table Status</h5>
+    <div class="card-header" style="background-color: #00346a; color: white;">
+        <h6 class="mb-0">3. Master Data ETL</h6>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="d-flex gap-2 mb-2">
+                    <button class="btn btn-primary btn-sm" @onclick="LoadOperators" disabled="@isLoading">
+                        Load Operators
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" @onclick='() => ShowSqlPreview("operators")' disabled="@isLoading">
+                        Preview SQL
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="d-flex gap-2 mb-2">
+                    <button class="btn btn-primary btn-sm" @onclick="LoadPlants" disabled="@isLoading">
+                        Load Plants
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" @onclick='() => ShowSqlPreview("plants")' disabled="@isLoading">
+                        Preview SQL
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="d-flex gap-2 mb-2">
+                    <button class="btn btn-primary btn-sm" @onclick="LoadIssues" disabled="@isLoading">
+                        Load Issues
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" @onclick='() => ShowSqlPreview("issues")' disabled="@isLoading">
+                        Preview SQL
+                    </button>
+                </div>
+                <small class="text-muted">Uses plants from loader</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Section 4: Current Table Status -->
+<div class="card mb-3">
+    <div class="card-header" style="background-color: #00346a; color: white;">
+        <h6 class="mb-0">4. Current Table Status</h6>
     </div>
     <div class="card-body">
         <button class="btn btn-sm btn-secondary mb-2" @onclick="RefreshStatus" disabled="@isLoading">
@@ -264,123 +413,11 @@
     </div>
 </div>
 
-<!-- Educational Section: Oracle Database Objects -->
-<div class="card mb-3 border-warning">
-    <div class="card-header bg-warning text-dark">
-        <h5 class="mb-0">
-            <i class="bi bi-database"></i> Oracle Database Objects Used
-        </h5>
-    </div>
-    <div class="card-body">
-        <div class="row">
-            <div class="col-md-3">
-                <h6>Staging Tables (Temporary)</h6>
-                <ul class="small">
-                    <li><code>STG_OPERATORS</code></li>
-                    <li><code>STG_PLANTS</code></li>
-                    <li><code>STG_ISSUES</code></li>
-                    <li><code>STG_PCS_REFERENCES</code></li>
-                    <li><code>STG_SC_REFERENCES</code></li>
-                    <li><code>STG_VSM_REFERENCES</code></li>
-                    <li class="text-muted">Auto-cleared after ETL</li>
-                </ul>
-            </div>
-            <div class="col-md-3">
-                <h6>Dimension Tables (SCD2)</h6>
-                <ul class="small">
-                    <li><code>OPERATORS</code> (8 records)</li>
-                    <li><code>PLANTS</code> (130 records)</li>
-                    <li><code>ISSUES</code> (varies)</li>
-                    <li><code>PCS_REFERENCES</code></li>
-                    <li><code>SC_REFERENCES</code></li>
-                    <li><code>VSM_REFERENCES</code></li>
-                    <li class="text-muted">Full history forever</li>
-                </ul>
-            </div>
-            <div class="col-md-3">
-                <h6>Control & Audit</h6>
-                <ul class="small">
-                    <li><code>ETL_CONTROL</code> - Runs</li>
-                    <li><code>ETL_ERROR_LOG</code> - Errors</li>
-                    <li><code>ETL_RECONCILIATION</code> - Counts</li>
-                    <li><code>ETL_PLANT_LOADER</code> - Scope</li>
-                    <li><code>RAW_JSON</code> - API audit</li>
-                    <li class="text-muted">10-30 day retention</li>
-                </ul>
-            </div>
-            <div class="col-md-3">
-                <h6>Key Features</h6>
-                <ul class="small">
-                    <li><strong>VALID_FROM/TO</strong> - Time range</li>
-                    <li><strong>IS_CURRENT</strong> - Y/N flag</li>
-                    <li><strong>CHANGE_TYPE</strong> - Action</li>
-                    <li><strong>DELETE_DATE</strong> - Soft delete</li>
-                    <li><strong>SRC_HASH</strong> - SHA256</li>
-                    <li class="text-muted">100% audit trail</li>
-                </ul>
-            </div>
-        </div>
-        
-        <h6 class="mt-3">Key Stored Procedures & Packages:</h6>
-        <div class="row">
-            <div class="col-md-6">
-                <ul class="small">
-                    <li><code>SP_PROCESS_ETL_BATCH</code> - Master orchestrator</li>
-                    <li><code>SP_DEDUPLICATE_STAGING</code> - Remove duplicates</li>
-                    <li><code>SP_PURGE_RAW_JSON</code> - Cleanup audit trail</li>
-                    <li><code>SP_INSERT_RAW_JSON</code> - Store API responses</li>
-                    <li><code>SP_CLEANUP_ETL_HISTORY</code> - Maintain history</li>
-                    <li><code>LOG_ETL_ERROR</code> - Autonomous logging</li>
-                </ul>
-            </div>
-            <div class="col-md-6">
-                <ul class="small">
-                    <li><code>PKG_OPERATORS_ETL</code> - VALIDATE, PROCESS_SCD2, RECONCILE</li>
-                    <li><code>PKG_PLANTS_ETL</code> - VALIDATE, PROCESS_SCD2, RECONCILE</li>
-                    <li><code>PKG_ISSUES_ETL</code> - VALIDATE, PROCESS_SCD2, RECONCILE</li>
-                    <li class="text-muted mt-2">Each package handles:</li>
-                    <li class="text-muted">• Deletions, Reactivations, Updates, Inserts</li>
-                    <li class="text-muted">• Hash computation, Change detection</li>
-                </ul>
-            </div>
-        </div>
-    </div>
-</div>
 
-<!-- Educational Section: Testing SCD2 -->
-<div class="card mb-3 border-info">
-    <div class="card-header bg-info text-white">
-        <h5 class="mb-0">
-            <i class="bi bi-check2-square"></i> How to Test SCD2 is Working
-        </h5>
-    </div>
-    <div class="card-body">
-        <h6>Test Scenarios:</h6>
-        <ol>
-            <li><strong>First Load</strong>: Click "Load Operators" → All records show CHANGE_TYPE='INSERT'</li>
-            <li><strong>No Changes</strong>: Click "Load Operators" again → Records show as UNCHANGED (0 inserted)</li>
-            <li><strong>Manual Update</strong>: Update a record in Oracle → Next load creates new version with CHANGE_TYPE='UPDATE'</li>
-            <li><strong>Deletion Test</strong>: Delete from staging → Record marked with DELETE_DATE</li>
-            <li><strong>Reactivation</strong>: Re-add deleted record → New version with CHANGE_TYPE='REACTIVATE'</li>
-        </ol>
-        
-        <h6>SQL Queries to Verify:</h6>
-        <pre class="bg-light p-2"><code>-- View current records only
-SELECT * FROM V_OPERATORS_CURRENT;
-SELECT * FROM V_PLANTS_CURRENT;
-
--- View full audit trail
-SELECT * FROM V_AUDIT_TRAIL ORDER BY VALID_FROM DESC;
-
--- See changes for specific entity
-SELECT * FROM OPERATORS WHERE OPERATOR_ID = 1 ORDER BY VALID_FROM;</code></pre>
-    </div>
-</div>
-
-<!-- Section 4: ETL History -->
+<!-- Section 5: ETL History -->
 <div class="card mb-3">
-    <div class="card-header bg-dark text-white">
-        <h5>4. ETL Run History</h5>
+    <div class="card-header" style="background-color: #00346a; color: white;">
+        <h6 class="mb-0">5. ETL Run History</h6>
     </div>
     <div class="card-body">
         @if (etlHistory != null && etlHistory.Any())
@@ -449,8 +486,15 @@ SELECT * FROM OPERATORS WHERE OPERATOR_ID = 1 ORDER BY VALID_FROM;</code></pre>
     private string loadingMessage = "";
     private bool connectionStatus = false;
     private bool showSqlPreview = false;
+    private bool showKnowledgeSection = false;  // Start collapsed
     private ETLSqlPreview? currentSqlPreview = null;
     private string currentPreviewEntity = "";
+    
+    // Plant Loader variables
+    private bool plantLoaderTableExists = false;
+    private string selectedPlantToAdd = "";
+    private List<PlantLoaderEntry> plantLoaderEntries = new List<PlantLoaderEntry>();
+    private List<Plant> availablePlants = new List<Plant>();
     
     private List<TableStatus> tableStatuses = new List<TableStatus>();
     private List<ETLRunHistory> etlHistory = new List<ETLRunHistory>();
@@ -458,6 +502,134 @@ SELECT * FROM OPERATORS WHERE OPERATOR_ID = 1 ORDER BY VALID_FROM;</code></pre>
     protected override async Task OnInitializedAsync()
     {
         await RefreshStatus();
+        await CheckPlantLoaderStatus();
+    }
+    
+    private void ToggleKnowledgeSection()
+    {
+        showKnowledgeSection = !showKnowledgeSection;
+    }
+    
+    private async Task CheckPlantLoaderStatus()
+    {
+        try
+        {
+            plantLoaderTableExists = await ETLService.CheckPlantLoaderTableExists();
+            if (plantLoaderTableExists)
+            {
+                await LoadPlantLoaderData();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to check plant loader status");
+        }
+    }
+    
+    private async Task LoadPlantLoaderData()
+    {
+        try
+        {
+            plantLoaderEntries = await ETLService.GetPlantLoaderEntries();
+            availablePlants = await ETLService.GetAllPlants();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load plant loader data");
+        }
+    }
+    
+    private async Task CreatePlantLoaderTable()
+    {
+        isLoading = true;
+        loadingMessage = "Creating plant loader table...";
+        statusMessage = "";
+        
+        try
+        {
+            await ETLService.CreatePlantLoaderTable();
+            plantLoaderTableExists = true;
+            await LoadPlantLoaderData();
+            statusMessage = "✅ Plant loader table created successfully";
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error creating plant loader table: {ex.Message}";
+            Logger.LogError(ex, "Failed to create plant loader table");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+    
+    private async Task AddPlantToLoader()
+    {
+        if (string.IsNullOrEmpty(selectedPlantToAdd)) return;
+        
+        isLoading = true;
+        loadingMessage = "Adding plant to loader...";
+        
+        try
+        {
+            await ETLService.AddPlantToLoader(selectedPlantToAdd);
+            await LoadPlantLoaderData();
+            selectedPlantToAdd = "";
+            statusMessage = "✅ Plant added to loader successfully";
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error adding plant: {ex.Message}";
+            Logger.LogError(ex, "Failed to add plant to loader");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+    
+    private async Task TogglePlantActive(string plantId)
+    {
+        isLoading = true;
+        loadingMessage = "Toggling plant status...";
+        
+        try
+        {
+            await ETLService.TogglePlantActive(plantId);
+            await LoadPlantLoaderData();
+            statusMessage = "✅ Plant status updated";
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error toggling plant: {ex.Message}";
+            Logger.LogError(ex, "Failed to toggle plant status");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+    
+    private async Task RemovePlantFromLoader(string plantId)
+    {
+        isLoading = true;
+        loadingMessage = "Removing plant from loader...";
+        
+        try
+        {
+            await ETLService.RemovePlantFromLoader(plantId);
+            await LoadPlantLoaderData();
+            statusMessage = "✅ Plant removed from loader";
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error removing plant: {ex.Message}";
+            Logger.LogError(ex, "Failed to remove plant");
+        }
+        finally
+        {
+            isLoading = false;
+        }
     }
 
     private async Task TestConnection()

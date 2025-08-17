@@ -773,7 +773,7 @@ END LOOP;
                     SELECT PLANT_ID 
                     FROM ETL_PLANT_LOADER 
                     WHERE IS_ACTIVE = 'Y' 
-                    ORDER BY LOAD_PRIORITY, PLANT_ID"
+                    ORDER BY PLANT_ID"
                 );
 
                 if (!activePlants.Any())
@@ -825,10 +825,9 @@ END LOOP;
                                     new
                                     {
                                         PlantId = plantId,
-                                        IssueRevision = issue["Revision"]?.ToString(),
+                                        IssueRevision = issue["IssueRevision"]?.ToString(),  // Fixed: API returns IssueRevision not Revision
                                         UserName = issue["UserName"]?.ToString(),
-                                        UserEntryTime = issue.ContainsKey("UserEntryTime") ? 
-                                            Convert.ToDateTime(issue["UserEntryTime"]) : (DateTime?)null,
+                                        UserEntryTime = ParseDateTime(issue.ContainsKey("UserEntryTime") ? issue["UserEntryTime"] : null),
                                         UserProtected = issue["UserProtected"]?.ToString(),
                                         EtlRunId = etlRunId
                                     }
@@ -852,13 +851,22 @@ END LOOP;
                 // Call orchestrator
                 _logger.LogInformation($"Processing {totalRecords} issues through orchestrator...");
                 
-                using (var cmd = new OracleCommand("SP_PROCESS_ETL_BATCH", connection))
+                try
                 {
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.Add("p_etl_run_id", OracleDbType.Int32).Value = etlRunId;
-                    cmd.Parameters.Add("p_entity_type", OracleDbType.Varchar2).Value = "ISSUES";
-                    
-                    await cmd.ExecuteNonQueryAsync();
+                    using (var cmd = new OracleCommand("SP_PROCESS_ETL_BATCH", connection))
+                    {
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.Add("p_etl_run_id", OracleDbType.Int32).Value = etlRunId;
+                        cmd.Parameters.Add("p_entity_type", OracleDbType.Varchar2).Value = "ISSUES";
+                        
+                        await cmd.ExecuteNonQueryAsync();
+                    }
+                    _logger.LogInformation("Orchestrator completed successfully");
+                }
+                catch (OracleException oex)
+                {
+                    _logger.LogError($"Oracle error in orchestrator: {oex.Message} (Code: {oex.Number})");
+                    throw;
                 }
 
                 // Get results
@@ -980,6 +988,194 @@ END LOOP;
                 _logger.LogError(ex, "Failed to get table statuses");
                 return new List<TableStatus>();
             }
+        }
+
+        /// <summary>
+        /// Check if plant loader table exists
+        /// </summary>
+        public async Task<bool> CheckPlantLoaderTableExists()
+        {
+            try
+            {
+                using var connection = new OracleConnection(_connectionString);
+                var count = await connection.QuerySingleAsync<int>(@"
+                    SELECT COUNT(*) 
+                    FROM USER_TABLES 
+                    WHERE TABLE_NAME = 'ETL_PLANT_LOADER'"
+                );
+                return count > 0;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to check plant loader table");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Create plant loader table
+        /// </summary>
+        public async Task CreatePlantLoaderTable()
+        {
+            using var connection = new OracleConnection(_connectionString);
+            await connection.ExecuteAsync(@"
+                CREATE TABLE ETL_PLANT_LOADER (
+                    PLANT_ID VARCHAR2(20) PRIMARY KEY,
+                    PLANT_NAME VARCHAR2(200),
+                    IS_ACTIVE CHAR(1) DEFAULT 'Y' CHECK (IS_ACTIVE IN ('Y', 'N')),
+                    CREATED_DATE DATE DEFAULT SYSDATE,
+                    MODIFIED_DATE DATE DEFAULT SYSDATE
+                )"
+            );
+        }
+
+        /// <summary>
+        /// Get all plants from database
+        /// </summary>
+        public async Task<List<Plant>> GetAllPlants()
+        {
+            try
+            {
+                using var connection = new OracleConnection(_connectionString);
+                var plants = await connection.QueryAsync<Plant>(@"
+                    SELECT PLANT_ID as PlantID, 
+                           PLANT_NAME as PlantName,
+                           LONG_DESCRIPTION as LongDescription,
+                           OPERATOR_ID as OperatorID
+                    FROM PLANTS 
+                    WHERE IS_CURRENT = 'Y'
+                    ORDER BY PLANT_NAME"
+                );
+                return plants.ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get all plants");
+                return new List<Plant>();
+            }
+        }
+
+        /// <summary>
+        /// Get plant loader entries
+        /// </summary>
+        public async Task<List<PlantLoaderEntry>> GetPlantLoaderEntries()
+        {
+            try
+            {
+                using var connection = new OracleConnection(_connectionString);
+                var entries = await connection.QueryAsync<PlantLoaderEntry>(@"
+                    SELECT PLANT_ID as PlantID,
+                           PLANT_NAME as PlantName,
+                           CASE WHEN IS_ACTIVE = 'Y' THEN 1 ELSE 0 END as IsActive,
+                           CREATED_DATE as CreatedDate,
+                           MODIFIED_DATE as ModifiedDate
+                    FROM ETL_PLANT_LOADER
+                    ORDER BY PLANT_NAME"
+                );
+                return entries.ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get plant loader entries");
+                return new List<PlantLoaderEntry>();
+            }
+        }
+
+        /// <summary>
+        /// Add plant to loader
+        /// </summary>
+        public async Task AddPlantToLoader(string plantId)
+        {
+            using var connection = new OracleConnection(_connectionString);
+            
+            // Get plant details
+            var plant = await connection.QuerySingleOrDefaultAsync<Plant>(@"
+                SELECT PLANT_ID as PlantID, PLANT_NAME as PlantName
+                FROM PLANTS 
+                WHERE IS_CURRENT = 'Y' AND PLANT_ID = :plantId",
+                new { plantId }
+            );
+            
+            if (plant == null)
+                throw new Exception($"Plant {plantId} not found");
+            
+            // Insert into loader
+            await connection.ExecuteAsync(@"
+                INSERT INTO ETL_PLANT_LOADER (PLANT_ID, PLANT_NAME, IS_ACTIVE)
+                VALUES (:plantId, :plantName, 'Y')",
+                new { plantId = plant.PlantID, plantName = plant.PlantName }
+            );
+        }
+
+        /// <summary>
+        /// Toggle plant active status
+        /// </summary>
+        public async Task TogglePlantActive(string plantId)
+        {
+            using var connection = new OracleConnection(_connectionString);
+            await connection.ExecuteAsync(@"
+                UPDATE ETL_PLANT_LOADER 
+                SET IS_ACTIVE = CASE WHEN IS_ACTIVE = 'Y' THEN 'N' ELSE 'Y' END,
+                    MODIFIED_DATE = SYSDATE
+                WHERE PLANT_ID = :plantId",
+                new { plantId }
+            );
+        }
+
+        /// <summary>
+        /// Remove plant from loader
+        /// </summary>
+        public async Task RemovePlantFromLoader(string plantId)
+        {
+            using var connection = new OracleConnection(_connectionString);
+            await connection.ExecuteAsync(@"
+                DELETE FROM ETL_PLANT_LOADER 
+                WHERE PLANT_ID = :plantId",
+                new { plantId }
+            );
+        }
+
+        /// <summary>
+        /// Parse datetime from various formats safely
+        /// </summary>
+        private DateTime? ParseDateTime(object? value)
+        {
+            if (value == null) return null;
+            
+            var dateStr = value.ToString();
+            if (string.IsNullOrWhiteSpace(dateStr)) return null;
+            
+            // Try multiple common formats
+            string[] formats = new[] 
+            {
+                "dd.MM.yyyy HH:mm:ss",
+                "dd.MM.yyyy HH:mm",
+                "yyyy-MM-dd HH:mm:ss",
+                "yyyy-MM-dd HH:mm",
+                "MM/dd/yyyy HH:mm:ss",
+                "MM/dd/yyyy HH:mm",
+                "yyyy-MM-ddTHH:mm:ss",
+                "yyyy-MM-ddTHH:mm:ssZ"
+            };
+            
+            foreach (var format in formats)
+            {
+                if (DateTime.TryParseExact(dateStr, format, 
+                    System.Globalization.CultureInfo.InvariantCulture, 
+                    System.Globalization.DateTimeStyles.None, out var result))
+                {
+                    return result;
+                }
+            }
+            
+            // Try general parse as fallback
+            if (DateTime.TryParse(dateStr, out var fallbackResult))
+            {
+                return fallbackResult;
+            }
+            
+            _logger.LogWarning($"Could not parse date: {dateStr}");
+            return null;
         }
 
     }

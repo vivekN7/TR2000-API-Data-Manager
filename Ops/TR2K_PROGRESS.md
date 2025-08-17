@@ -1,9 +1,96 @@
 # TR2000 API Data Manager - Development Progress Log
 
 ## 🔴 CRITICAL: This file must be updated after EVERY major change
-Last Updated: 2025-08-17 (Session 12 - UI Text Correction)
+Last Updated: 2025-08-17 (Session 13 - UI Cleanup & Plant Loader)
 
-## Current Session Summary (2025-08-17 - Session 12)
+## Current Session Summary (2025-08-17 - Session 13 Final)
+
+### 1. Major UI Cleanup Following Material Design:
+- **Removed color vomit**: Eliminated excessive use of bg-primary, bg-success, bg-warning, bg-info, bg-dark
+- **Simplified color scheme**: 
+  - Headers now use plain card-header with h6 text
+  - Buttons use btn-primary for actions, btn-outline-secondary for secondary actions
+  - Minimal use of badges (only bg-success/bg-secondary for status)
+- **Cleaner layout**:
+  - Smaller font sizes with "small" class
+  - Consistent spacing with Bootstrap utilities
+  - Less visual noise overall
+
+### 2. Plant Loader Configuration UI:
+- **Added Plant Loader Configuration section** as Section 2 in the UI
+- **Fixed button issues**: Replaced icon-only buttons with text labels
+  - "Activate/Deactivate" instead of blue outline button
+  - "Remove" instead of red outline button  
+  - Used btn-link style for cleaner appearance
+- **Features**:
+  - Checks if ETL_PLANT_LOADER table exists
+  - Create table button if not exists
+  - Dropdown to select and add plants
+  - Table showing active/inactive plants with clear text actions
+  - Shows count of active plants
+
+### 3. Fixed Load Issues Bugs:
+- **First Issue**: API returns field as "IssueRevision" not "Revision"
+  - Fixed: Updated field name on line 828
+- **Second Issue**: Date format parsing error ('30.04.2025 09:50' format)
+  - Fixed: Created flexible ParseDateTime() method that tries multiple formats
+  - Supports: European (dd.MM.yyyy), ISO (yyyy-MM-dd), US (MM/dd/yyyy), and more
+  - Falls back to general parse if specific formats fail
+  - Much safer than region-specific parsing
+
+### 4. Applied Corporate Color Theme (#00346a) Throughout:
+- **Fixed all pages**: Home, OracleETL (v1), OracleETLV2, PipeSizes
+- **Updated all section headers** to use #00346a background with white text
+- **Updated navbar** in NavMenu.razor to use #00346a
+- **Fixed sidebar** in both MainLayout.razor.css AND app.css (removed purple gradient)
+- **Knowledge Articles section** now uses #00346a header
+- **Standardized badges**: Removed confusing colors (red for error log, blue for info)
+  - Now using: green for permanent/success, secondary (gray) for temporary/info
+- **Result**: Clean, consistent corporate branding with minimal color palette
+
+### 5. Backend Implementation:
+- **Created PlantLoaderEntry.cs and Plant.cs models**
+- **Added 7 methods to OracleETLServiceV2.cs** for plant loader management
+- **Fixed LoadIssuesForSelectedPlants()**: Removed LOAD_PRIORITY reference
+
+### 6. Documentation Updates:
+- **Updated TR2K_START_HERE.md**: Added rule #7 about maintaining knowledge articles
+- **Key principle**: Always update UI knowledge articles when functionality changes
+
+### 7. Files Modified:
+- `/TR2KApp/Components/Pages/OracleETLV2.razor` - Complete UI redesign with #00346a headers
+- `/TR2KApp/Components/Pages/OracleETL.razor` - Applied #00346a theme
+- `/TR2KApp/Components/Pages/Home.razor` - Applied #00346a theme
+- `/TR2KApp/Components/Pages/PipeSizes.razor` - Applied #00346a theme
+- `/TR2KBlazorLibrary/Logic/Services/OracleETLServiceV2.cs` - Fixed Issues field names and flexible date parsing
+- `/TR2KBlazorLibrary/Models/PlantLoaderEntry.cs` - New model file
+- `/TR2KApp/Components/Layout/NavMenu.razor` - Applied #00346a theme
+- `/TR2KApp/Components/Layout/MainLayout.razor.css` - Applied #00346a to sidebar
+- `/TR2KApp/wwwroot/app.css` - Fixed sidebar gradient to #00346a
+- `/Ops/TR2K_START_HERE.md` - Added knowledge article maintenance rule
+
+### 8. CRITICAL FIX - Load Issues Not Working:
+- **Root Cause Found**: PKG_ISSUES_ETL.PROCESS_SCD2 was just a placeholder with NULL!
+- **Investigation Steps**:
+  1. Checked console logs - showed "Processing 9 issues through orchestrator"
+  2. Added better error handling to catch Oracle exceptions
+  3. Examined DDL file - found PKG_ISSUES_ETL had empty implementation
+- **Solution**: Fully implemented PKG_ISSUES_ETL package:
+  - PROCESS_SCD2: Handles INSERT, UPDATE, DELETE, REACTIVATE for issues
+  - RECONCILE: Counts and validates all changes
+- **Action Required**: Redeploy Oracle_DDL_SCD2_FINAL.sql to database
+- **Files Updated**:
+  - Oracle_DDL_SCD2_FINAL.sql - Added full PKG_ISSUES_ETL implementation
+  - OracleETLServiceV2.cs - Added Oracle exception handling
+
+### 9. Key Improvements Summary:
+- **Date Parsing**: Now handles multiple formats safely without region-specific issues
+- **UI Consistency**: Corporate blue (#00346a) applied throughout entire application
+- **Badge Standardization**: Green for permanent, gray for temporary/info (no confusing colors)
+- **Plant Loader**: Fully functional for controlling which plants to process
+- **Load Issues**: Fixed with proper PKG_ISSUES_ETL implementation and flexible date parsing
+
+## Previous Session Summary (2025-08-17 - Session 12)
 
 ### 1. UI Text Correction:
 - **Fixed**: Updated OracleETLV2.razor to accurately describe cleanup behavior

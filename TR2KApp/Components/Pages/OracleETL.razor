@@ -253,7 +253,7 @@
     @if (showSqlPreview && currentSqlPreview != null)
     {
         <div class="card mb-3">
-            <div class="card-header bg-info text-white">
+            <div class="card-header" style="background-color: #00346a; color: white;">
                 <h5 class="mb-0">
                     <i class="bi bi-code-slash"></i> @currentSqlPreview.Title
                 </h5>
@@ -310,7 +310,7 @@
     @if (lastETLResult != null && lastETLResult.SqlStatements.Any())
     {
         <div class="card mb-3">
-            <div class="card-header bg-success text-white">
+            <div class="card-header" style="background-color: #00346a; color: white;">
                 <h5 class="mb-0">
                     <i class="bi bi-check-circle"></i> Last ETL Operation Results
                 </h5>
@@ -321,10 +321,10 @@
                         <strong>Status:</strong> <span class="badge @(lastETLResult.Status == "SUCCESS" ? "bg-success" : "bg-danger")">@lastETLResult.Status</span>
                     </div>
                     <div class="col-md-2">
-                        <strong>Records:</strong> <span class="badge bg-dark">@lastETLResult.RecordsLoaded</span>
+                        <strong>Records:</strong> <span class="badge bg-secondary">@lastETLResult.RecordsLoaded</span>
                     </div>
                     <div class="col-md-2">
-                        <strong>API Calls:</strong> <span class="badge bg-info">@(lastETLResult.ApiCallCount > 0 ? lastETLResult.ApiCallCount : 1)</span>
+                        <strong>API Calls:</strong> <span class="badge bg-secondary">@(lastETLResult.ApiCallCount > 0 ? lastETLResult.ApiCallCount : 1)</span>
                     </div>
                     <div class="col-md-2">
                         <strong>Duration:</strong> @lastETLResult.FormattedDuration
@@ -341,7 +341,7 @@
                 {
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <strong>Plants Processed:</strong> <span class="badge bg-primary">@lastETLResult.PlantIterations</span>
+                            <strong>Plants Processed:</strong> <span class="badge bg-secondary">@lastETLResult.PlantIterations</span>
                         </div>
                         <div class="col-md-6">
                             <strong>Issues Processed:</strong> <span class="badge bg-secondary">@lastETLResult.IssueIterations</span>
@@ -356,7 +356,7 @@
                             <strong>New Records:</strong> <span class="badge bg-success">@lastETLResult.RecordsLoaded</span>
                         </div>
                         <div class="col-md-4">
-                            <strong>Updated:</strong> <span class="badge bg-warning text-dark">@lastETLResult.RecordsUpdated</span>
+                            <strong>Updated:</strong> <span class="badge bg-secondary">@lastETLResult.RecordsUpdated</span>
                         </div>
                         <div class="col-md-4">
                             <strong>Unchanged:</strong> <span class="badge bg-secondary">@lastETLResult.RecordsUnchanged</span>
@@ -376,7 +376,7 @@
     
     <!-- Plant Loader Configuration Section -->
     <div class="card mb-3">
-        <div class="card-header bg-warning text-dark">
+        <div class="card-header" style="background-color: #00346a; color: white;">
             <h5 class="mb-0">
                 <i class="bi bi-gear-fill"></i> 3. Plant Loader Configuration
             </h5>

@@ -24,6 +24,13 @@
    - **DDL deployment must ALWAYS be done manually by the user via SQL*Plus or similar tools**
    - **UI should only perform data operations (SELECT, INSERT via ETL procedures)**
    - **This is a SECURITY requirement - no exceptions!**
+7. **KNOWLEDGE ARTICLES & UI UPDATES - IMPORTANT**:
+   - **ALWAYS update knowledge articles in the UI when adding/changing functionality**
+   - **Update SQL Preview sections to reflect actual procedures being called**
+   - **Keep all educational content accurate with current implementation**
+   - **Update data retention policies if they change**
+   - **Ensure Oracle database objects lists are current**
+   - **This helps users understand what's happening behind the scenes**
 
 ## 🛡️ DATA INTEGRITY & TRANSACTION SAFETY REQUIREMENTS
 **ALL database operations MUST use transactions to ensure data integrity:**
@@ -66,10 +73,39 @@ catch
 - Update immediately after completing any significant feature
 - Include: what was done, how it works, any issues encountered
 
-## Current State (2025-08-17 - Session 11 Complete) - ✅ PRODUCTION-READY SCD2 WITH FULL EDUCATIONAL UI!
+## Current State (2025-08-17 - Session 13 Complete) - ✅ UI CLEANED UP, PLANT LOADER WORKING, ISSUES FIXED!
 The TR2000 API Data Manager is a Blazor Server application (.NET 9.0) that interfaces with the TR2000 API to manage piping specification data.
 
-### 🔥 LATEST ACCOMPLISHMENTS (2025-08-17 Session 11):
+### 🔥 LATEST ACCOMPLISHMENTS (2025-08-17 Session 13):
+
+#### Session 13 - MAJOR UI CLEANUP & PLANT LOADER IMPLEMENTATION:
+
+1. **UI Overhaul with Corporate Theme** ✅
+   - Applied #00346a color scheme throughout entire application
+   - Removed "color vomit" - standardized to minimal palette
+   - Fixed sidebar gradient in both MainLayout.css AND app.css
+   - Knowledge Articles section now collapsible with proper theme
+   - Standardized badges: green=permanent, gray=temporary
+
+2. **Plant Loader Configuration Working** ✅
+   - Full CRUD operations for managing plants
+   - Text-based buttons (fixed icon issues)
+   - Controls which plants are processed for Issues ETL
+   - Dramatically reduces API calls (only active plants processed)
+
+3. **CRITICAL FIX: Load Issues Now Working** 🔧
+   - **Problem**: PKG_ISSUES_ETL.PROCESS_SCD2 was empty placeholder!
+   - **Solution**: Fully implemented the package in Oracle_DDL_SCD2_FINAL.sql
+   - **Date Fix**: Created flexible ParseDateTime() handling multiple formats
+   - **Field Fix**: Changed "Revision" to "IssueRevision"
+   - **ACTION REQUIRED**: Must redeploy DDL to Oracle database!
+
+4. **Files That MUST Be Read Next Session**:
+   - `/workspace/TR2000/TR2K/Ops/NEXT_SESSION_CRITICAL.md` - Immediate tasks
+   - `/workspace/TR2000/TR2K/Ops/TR2K_PROGRESS.md` - Detailed progress
+   - `/workspace/TR2000/TR2K/Ops/Oracle_DDL_SCD2_FINAL.sql` - Deploy this!
+
+### 🔥 Previous Session 11 Accomplishments:
 
 #### Session 11 - PRODUCTION READY WITH FULL EDUCATIONAL UI:
 

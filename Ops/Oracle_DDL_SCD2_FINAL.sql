@@ -1216,15 +1216,179 @@ CREATE OR REPLACE PACKAGE BODY PKG_ISSUES_ETL AS
     END VALIDATE;
     
     PROCEDURE PROCESS_SCD2(p_etl_run_id NUMBER) AS
+        v_count NUMBER;
     BEGIN
-        -- Implementation follows same pattern as OPERATORS/PLANTS
-        NULL; -- Placeholder for brevity
+        -- Mark existing deleted if not in source
+        UPDATE ISSUES 
+        SET IS_CURRENT = 'N',
+            VALID_TO = SYSDATE,
+            DELETE_DATE = SYSDATE,
+            CHANGE_TYPE = 'DELETE'
+        WHERE IS_CURRENT = 'Y'
+        AND DELETE_DATE IS NULL
+        AND (PLANT_ID, ISSUE_REVISION) NOT IN (
+            SELECT DISTINCT PLANT_ID, ISSUE_REVISION 
+            FROM STG_ISSUES 
+            WHERE ETL_RUN_ID = p_etl_run_id
+            AND IS_VALID = 'Y'
+        );
+        
+        -- Handle reactivations
+        MERGE INTO ISSUES tgt
+        USING (
+            SELECT s.PLANT_ID, s.ISSUE_REVISION, s.USER_NAME, 
+                   s.USER_ENTRY_TIME, s.USER_PROTECTED
+            FROM STG_ISSUES s
+            WHERE s.ETL_RUN_ID = p_etl_run_id
+            AND s.IS_VALID = 'Y'
+            AND EXISTS (
+                SELECT 1 FROM ISSUES i
+                WHERE i.PLANT_ID = s.PLANT_ID
+                AND i.ISSUE_REVISION = s.ISSUE_REVISION
+                AND i.DELETE_DATE IS NOT NULL
+            )
+        ) src
+        ON (1=0) -- Always insert for reactivations
+        WHEN NOT MATCHED THEN
+            INSERT (PLANT_ID, ISSUE_REVISION, USER_NAME, USER_ENTRY_TIME, 
+                   USER_PROTECTED, IS_CURRENT, VALID_FROM, VALID_TO, 
+                   CHANGE_TYPE, ETL_RUN_ID)
+            VALUES (src.PLANT_ID, src.ISSUE_REVISION, src.USER_NAME,
+                   src.USER_ENTRY_TIME, src.USER_PROTECTED, 'Y', SYSDATE, 
+                   DATE '9999-12-31', 'REACTIVATE', p_etl_run_id);
+        
+        -- Handle updates
+        UPDATE ISSUES 
+        SET IS_CURRENT = 'N',
+            VALID_TO = SYSDATE
+        WHERE IS_CURRENT = 'Y'
+        AND DELETE_DATE IS NULL
+        AND (PLANT_ID, ISSUE_REVISION) IN (
+            SELECT s.PLANT_ID, s.ISSUE_REVISION
+            FROM STG_ISSUES s
+            WHERE s.ETL_RUN_ID = p_etl_run_id
+            AND s.IS_VALID = 'Y'
+            AND NVL(STANDARD_HASH(s.USER_NAME || s.USER_ENTRY_TIME || s.USER_PROTECTED, 'SHA256'), 'x') != 
+                NVL((SELECT SRC_HASH FROM ISSUES i 
+                     WHERE i.PLANT_ID = s.PLANT_ID 
+                     AND i.ISSUE_REVISION = s.ISSUE_REVISION
+                     AND i.IS_CURRENT = 'Y'), 'y')
+        );
+        
+        -- Insert new/updated records
+        INSERT INTO ISSUES (
+            PLANT_ID, ISSUE_REVISION, USER_NAME, USER_ENTRY_TIME, 
+            USER_PROTECTED, IS_CURRENT, VALID_FROM, VALID_TO, 
+            CHANGE_TYPE, SRC_HASH, ETL_RUN_ID
+        )
+        SELECT DISTINCT
+            s.PLANT_ID, s.ISSUE_REVISION, s.USER_NAME, s.USER_ENTRY_TIME,
+            s.USER_PROTECTED, 'Y', SYSDATE, DATE '9999-12-31',
+            CASE 
+                WHEN NOT EXISTS (
+                    SELECT 1 FROM ISSUES i 
+                    WHERE i.PLANT_ID = s.PLANT_ID 
+                    AND i.ISSUE_REVISION = s.ISSUE_REVISION
+                ) THEN 'INSERT'
+                ELSE 'UPDATE'
+            END,
+            STANDARD_HASH(s.USER_NAME || s.USER_ENTRY_TIME || s.USER_PROTECTED, 'SHA256'),
+            p_etl_run_id
+        FROM STG_ISSUES s
+        WHERE s.ETL_RUN_ID = p_etl_run_id
+        AND s.IS_VALID = 'Y'
+        AND NOT EXISTS (
+            SELECT 1 FROM ISSUES i
+            WHERE i.PLANT_ID = s.PLANT_ID
+            AND i.ISSUE_REVISION = s.ISSUE_REVISION
+            AND i.IS_CURRENT = 'Y'
+            AND i.SRC_HASH = STANDARD_HASH(s.USER_NAME || s.USER_ENTRY_TIME || s.USER_PROTECTED, 'SHA256')
+        );
+        
+        -- Count results
+        SELECT COUNT(*) INTO v_count
+        FROM ISSUES
+        WHERE ETL_RUN_ID = p_etl_run_id
+        AND CHANGE_TYPE = 'INSERT';
+        
+        UPDATE ETL_CONTROL
+        SET RECORDS_LOADED = v_count
+        WHERE ETL_RUN_ID = p_etl_run_id;
+        
+        SELECT COUNT(*) INTO v_count
+        FROM ISSUES
+        WHERE ETL_RUN_ID = p_etl_run_id
+        AND CHANGE_TYPE = 'UPDATE';
+        
+        UPDATE ETL_CONTROL
+        SET RECORDS_UPDATED = v_count
+        WHERE ETL_RUN_ID = p_etl_run_id;
+        
     END PROCESS_SCD2;
     
     PROCEDURE RECONCILE(p_etl_run_id NUMBER) AS
+        v_source_count NUMBER;
+        v_target_count NUMBER;
+        v_unchanged_count NUMBER;
+        v_deleted_count NUMBER;
+        v_reactivated_count NUMBER;
     BEGIN
-        -- Implementation follows same pattern
-        NULL; -- Placeholder for brevity
+        -- Count source records
+        SELECT COUNT(DISTINCT PLANT_ID || '~' || ISSUE_REVISION) 
+        INTO v_source_count
+        FROM STG_ISSUES
+        WHERE ETL_RUN_ID = p_etl_run_id
+        AND IS_VALID = 'Y';
+        
+        -- Count current target records
+        SELECT COUNT(*) INTO v_target_count
+        FROM ISSUES
+        WHERE IS_CURRENT = 'Y';
+        
+        -- Count unchanged records
+        SELECT COUNT(*) INTO v_unchanged_count
+        FROM STG_ISSUES s
+        WHERE ETL_RUN_ID = p_etl_run_id
+        AND IS_VALID = 'Y'
+        AND EXISTS (
+            SELECT 1 FROM ISSUES i
+            WHERE i.PLANT_ID = s.PLANT_ID
+            AND i.ISSUE_REVISION = s.ISSUE_REVISION
+            AND i.IS_CURRENT = 'Y'
+            AND i.SRC_HASH = STANDARD_HASH(s.USER_NAME || s.USER_ENTRY_TIME || s.USER_PROTECTED, 'SHA256')
+            AND i.ETL_RUN_ID != p_etl_run_id
+        );
+        
+        -- Count deleted records
+        SELECT COUNT(*) INTO v_deleted_count
+        FROM ISSUES
+        WHERE ETL_RUN_ID = p_etl_run_id
+        AND CHANGE_TYPE = 'DELETE';
+        
+        -- Count reactivated records
+        SELECT COUNT(*) INTO v_reactivated_count
+        FROM ISSUES
+        WHERE ETL_RUN_ID = p_etl_run_id
+        AND CHANGE_TYPE = 'REACTIVATE';
+        
+        -- Insert reconciliation record
+        INSERT INTO ETL_RECONCILIATION (
+            ETL_RUN_ID, TABLE_NAME, SOURCE_COUNT, TARGET_COUNT,
+            RECORDS_UNCHANGED, RECORDS_DELETED, RECORDS_REACTIVATED, 
+            RECONCILIATION_DATE
+        ) VALUES (
+            p_etl_run_id, 'ISSUES', v_source_count, v_target_count,
+            v_unchanged_count, v_deleted_count, v_reactivated_count,
+            SYSDATE
+        );
+        
+        -- Update ETL_CONTROL with counts
+        UPDATE ETL_CONTROL
+        SET RECORDS_UNCHANGED = v_unchanged_count,
+            RECORDS_DELETED = v_deleted_count,
+            RECORDS_REACTIVATED = v_reactivated_count
+        WHERE ETL_RUN_ID = p_etl_run_id;
+        
     END RECONCILE;
     
 END PKG_ISSUES_ETL;

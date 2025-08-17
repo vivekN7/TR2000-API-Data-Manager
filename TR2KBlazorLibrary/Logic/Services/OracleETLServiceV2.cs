@@ -1457,20 +1457,20 @@ END LOOP;
                 
                 var history = await connection.QueryAsync<ETLRunHistory>(@"
                     SELECT 
-                        ETL_RUN_ID as RunId,
-                        RUN_TYPE as RunType,
-                        STATUS as Status,
-                        START_TIME as StartTime,
-                        END_TIME as EndTime,
-                        PROCESSING_TIME_SEC as ProcessingTimeSeconds,
-                        RECORDS_LOADED as RecordsLoaded,
-                        RECORDS_UPDATED as RecordsUpdated,
-                        RECORDS_DELETED as RecordsDeleted,
-                        RECORDS_REACTIVATED as RecordsReactivated,
-                        RECORDS_UNCHANGED as RecordsUnchanged,
-                        ERROR_COUNT as ErrorCount,
-                        API_CALL_COUNT as ApiCallCount,
-                        COMMENTS as Comments
+                        ETL_RUN_ID,
+                        RUN_TYPE,
+                        STATUS,
+                        START_TIME,
+                        END_TIME,
+                        PROCESSING_TIME_SEC,
+                        RECORDS_LOADED,
+                        RECORDS_UPDATED,
+                        RECORDS_DELETED,
+                        RECORDS_REACTIVATED,
+                        RECORDS_UNCHANGED,
+                        ERROR_COUNT,
+                        API_CALL_COUNT,
+                        COMMENTS
                     FROM ETL_CONTROL
                     ORDER BY ETL_RUN_ID DESC
                     FETCH FIRST :maxRows ROWS ONLY",
@@ -1497,75 +1497,75 @@ END LOOP;
                 
                 var statuses = await connection.QueryAsync<TableStatus>(@"
                     SELECT 
-                        'OPERATORS' as TableName,
-                        COUNT(*) as TotalRows,
-                        SUM(CASE WHEN IS_CURRENT = 'Y' THEN 1 ELSE 0 END) as CurrentRows,
-                        SUM(CASE WHEN IS_CURRENT = 'N' THEN 1 ELSE 0 END) as HistoricalRows,
-                        MAX(VALID_FROM) as LastModified
+                        'OPERATORS' as TABLE_NAME,
+                        COUNT(*) as RECORD_COUNT,
+                        SUM(CASE WHEN IS_CURRENT = 'Y' THEN 1 ELSE 0 END) as CURRENT_COUNT,
+                        SUM(CASE WHEN IS_CURRENT = 'N' THEN 1 ELSE 0 END) as DELETED_COUNT,
+                        MAX(VALID_FROM) as LAST_UPDATE
                     FROM OPERATORS
                     UNION ALL
                     SELECT 
-                        'PLANTS' as TableName,
-                        COUNT(*) as TotalRows,
-                        SUM(CASE WHEN IS_CURRENT = 'Y' THEN 1 ELSE 0 END) as CurrentRows,
-                        SUM(CASE WHEN IS_CURRENT = 'N' THEN 1 ELSE 0 END) as HistoricalRows,
-                        MAX(VALID_FROM) as LastModified
+                        'PLANTS' as TABLE_NAME,
+                        COUNT(*) as RECORD_COUNT,
+                        SUM(CASE WHEN IS_CURRENT = 'Y' THEN 1 ELSE 0 END) as CURRENT_COUNT,
+                        SUM(CASE WHEN IS_CURRENT = 'N' THEN 1 ELSE 0 END) as DELETED_COUNT,
+                        MAX(VALID_FROM) as LAST_UPDATE
                     FROM PLANTS
                     UNION ALL
                     SELECT 
-                        'ISSUES' as TableName,
-                        COUNT(*) as TotalRows,
-                        SUM(CASE WHEN IS_CURRENT = 'Y' THEN 1 ELSE 0 END) as CurrentRows,
-                        SUM(CASE WHEN IS_CURRENT = 'N' THEN 1 ELSE 0 END) as HistoricalRows,
-                        MAX(VALID_FROM) as LastModified
+                        'ISSUES' as TABLE_NAME,
+                        COUNT(*) as RECORD_COUNT,
+                        SUM(CASE WHEN IS_CURRENT = 'Y' THEN 1 ELSE 0 END) as CURRENT_COUNT,
+                        SUM(CASE WHEN IS_CURRENT = 'N' THEN 1 ELSE 0 END) as DELETED_COUNT,
+                        MAX(VALID_FROM) as LAST_UPDATE
                     FROM ISSUES
                     UNION ALL
                     SELECT 
-                        'VDS_REFERENCES' as TableName,
-                        COUNT(*) as TotalRows,
-                        SUM(CASE WHEN IS_CURRENT = 'Y' THEN 1 ELSE 0 END) as CurrentRows,
-                        SUM(CASE WHEN IS_CURRENT = 'N' THEN 1 ELSE 0 END) as HistoricalRows,
-                        MAX(VALID_FROM) as LastModified
+                        'VDS_REFERENCES' as TABLE_NAME,
+                        COUNT(*) as RECORD_COUNT,
+                        SUM(CASE WHEN IS_CURRENT = 'Y' THEN 1 ELSE 0 END) as CURRENT_COUNT,
+                        SUM(CASE WHEN IS_CURRENT = 'N' THEN 1 ELSE 0 END) as DELETED_COUNT,
+                        MAX(VALID_FROM) as LAST_UPDATE
                     FROM VDS_REFERENCES
                     UNION ALL
                     SELECT 
-                        'EDS_REFERENCES' as TableName,
-                        COUNT(*) as TotalRows,
-                        SUM(CASE WHEN IS_CURRENT = 'Y' THEN 1 ELSE 0 END) as CurrentRows,
-                        SUM(CASE WHEN IS_CURRENT = 'N' THEN 1 ELSE 0 END) as HistoricalRows,
-                        MAX(VALID_FROM) as LastModified
+                        'EDS_REFERENCES' as TABLE_NAME,
+                        COUNT(*) as RECORD_COUNT,
+                        SUM(CASE WHEN IS_CURRENT = 'Y' THEN 1 ELSE 0 END) as CURRENT_COUNT,
+                        SUM(CASE WHEN IS_CURRENT = 'N' THEN 1 ELSE 0 END) as DELETED_COUNT,
+                        MAX(VALID_FROM) as LAST_UPDATE
                     FROM EDS_REFERENCES
                     UNION ALL
                     SELECT 
-                        'MDS_REFERENCES' as TableName,
-                        COUNT(*) as TotalRows,
-                        SUM(CASE WHEN IS_CURRENT = 'Y' THEN 1 ELSE 0 END) as CurrentRows,
-                        SUM(CASE WHEN IS_CURRENT = 'N' THEN 1 ELSE 0 END) as HistoricalRows,
-                        MAX(VALID_FROM) as LastModified
+                        'MDS_REFERENCES' as TABLE_NAME,
+                        COUNT(*) as RECORD_COUNT,
+                        SUM(CASE WHEN IS_CURRENT = 'Y' THEN 1 ELSE 0 END) as CURRENT_COUNT,
+                        SUM(CASE WHEN IS_CURRENT = 'N' THEN 1 ELSE 0 END) as DELETED_COUNT,
+                        MAX(VALID_FROM) as LAST_UPDATE
                     FROM MDS_REFERENCES
                     UNION ALL
                     SELECT 
-                        'VSK_REFERENCES' as TableName,
-                        COUNT(*) as TotalRows,
-                        SUM(CASE WHEN IS_CURRENT = 'Y' THEN 1 ELSE 0 END) as CurrentRows,
-                        SUM(CASE WHEN IS_CURRENT = 'N' THEN 1 ELSE 0 END) as HistoricalRows,
-                        MAX(VALID_FROM) as LastModified
+                        'VSK_REFERENCES' as TABLE_NAME,
+                        COUNT(*) as RECORD_COUNT,
+                        SUM(CASE WHEN IS_CURRENT = 'Y' THEN 1 ELSE 0 END) as CURRENT_COUNT,
+                        SUM(CASE WHEN IS_CURRENT = 'N' THEN 1 ELSE 0 END) as DELETED_COUNT,
+                        MAX(VALID_FROM) as LAST_UPDATE
                     FROM VSK_REFERENCES
                     UNION ALL
                     SELECT 
-                        'ESK_REFERENCES' as TableName,
-                        COUNT(*) as TotalRows,
-                        SUM(CASE WHEN IS_CURRENT = 'Y' THEN 1 ELSE 0 END) as CurrentRows,
-                        SUM(CASE WHEN IS_CURRENT = 'N' THEN 1 ELSE 0 END) as HistoricalRows,
-                        MAX(VALID_FROM) as LastModified
+                        'ESK_REFERENCES' as TABLE_NAME,
+                        COUNT(*) as RECORD_COUNT,
+                        SUM(CASE WHEN IS_CURRENT = 'Y' THEN 1 ELSE 0 END) as CURRENT_COUNT,
+                        SUM(CASE WHEN IS_CURRENT = 'N' THEN 1 ELSE 0 END) as DELETED_COUNT,
+                        MAX(VALID_FROM) as LAST_UPDATE
                     FROM ESK_REFERENCES
                     UNION ALL
                     SELECT 
-                        'PIPE_ELEMENT_REFERENCES' as TableName,
-                        COUNT(*) as TotalRows,
-                        SUM(CASE WHEN IS_CURRENT = 'Y' THEN 1 ELSE 0 END) as CurrentRows,
-                        SUM(CASE WHEN IS_CURRENT = 'N' THEN 1 ELSE 0 END) as HistoricalRows,
-                        MAX(VALID_FROM) as LastModified
+                        'PIPE_ELEMENT_REFERENCES' as TABLE_NAME,
+                        COUNT(*) as RECORD_COUNT,
+                        SUM(CASE WHEN IS_CURRENT = 'Y' THEN 1 ELSE 0 END) as CURRENT_COUNT,
+                        SUM(CASE WHEN IS_CURRENT = 'N' THEN 1 ELSE 0 END) as DELETED_COUNT,
+                        MAX(VALID_FROM) as LAST_UPDATE
                     FROM PIPE_ELEMENT_REFERENCES"
                 );
 

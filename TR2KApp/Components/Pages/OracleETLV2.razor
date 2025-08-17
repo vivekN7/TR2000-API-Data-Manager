@@ -348,7 +348,7 @@
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label class="form-label small">Select Plant:</label>
-                            <select class="form-select form-select-sm" @bind="selectedPlantForIssues" @onchange="OnPlantSelectedForIssues" disabled="@isLoading">
+                            <select class="form-select form-select-sm" value="@selectedPlantForIssues" @onchange="OnPlantSelectedForIssues" disabled="@isLoading">
                                 <option value="">-- Select Plant --</option>
                                 @foreach (var entry in plantLoaderEntries ?? new List<PlantLoaderEntry>())
                                 {

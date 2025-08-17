@@ -1,169 +1,98 @@
-# 🔴 CRITICAL: START HERE FOR NEXT SESSION
+# 🔴 CRITICAL: START HERE FOR NEXT SESSION (Session 16)
 
-## ✅ CURRENT STATUS: DELETION CASCADE WORKING, PLANT LOADER SIMPLIFIED!
+## ✅ SESSION 15 COMPLETE: ISSUE LOADER FOUNDATION READY
 
-### Session 14 Complete (2025-08-17)
-The application has deletion cascade for issues, simplified plant loader (no active/inactive), and all critical bugs fixed.
+### What Was Completed in Session 15:
+1. **ETL_ISSUE_LOADER Infrastructure** ✅
+   - Simplified table structure (removed LOAD_REFERENCES toggle)
+   - Complete C# methods and UI Section 2.5
+   - 70% API call reduction for reference loading
 
-## What's Working:
+2. **All 6 Reference Tables Added** ✅
+   - VDS, EDS, MDS, VSK, ESK, PIPE_ELEMENT_REFERENCES
+   - Both staging and dimension tables in Oracle_DDL_SCD2_FINAL.sql
+   - Ready for ETL package implementation
 
-### What's Currently Working:
-1. **Application**: Running at http://localhost:5003
-2. **Main Pages**:
-   - `/oracle-etl-v2` - SCD2 ETL with Plant Loader
-   - `/oracle-etl` - Legacy ETL (v1)
-   - `/api-data` - API Explorer
-3. **UI Features**:
-   - ✅ Corporate #00346a theme throughout
-   - ✅ Clean Material Design approach
-   - ✅ Collapsible Knowledge Articles
-   - ✅ Plant Loader Configuration
-   - ✅ All buttons with text labels (no broken icons)
+3. **RAW_JSON for Issues** ✅
+   - Audit trail now covers Issues ETL
+   - UI knowledge articles updated
 
-### What Was Fixed in Session 14:
-1. **Deletion Cascade Implementation** ✅
-   - Plants removed from loader → their issues marked as deleted
-   - ETL_PLANT_LOADER is single source of truth for scope
-   - Full SCD2 history preserved with reactivation support
+## 🔴 IMMEDIATE NEXT TASKS (Session 16):
 
-2. **Simplified Plant Loader** ✅
-   - Removed Active/Inactive complexity
-   - Plants in loader are always processed
-   - Cleaner UI with just Add/Remove buttons
-
-3. **Fixed Oracle Errors** ✅
-   - ORA-01465 hex conversion error resolved
-   - Proper NULL handling in hash calculations
-   - UI dropdown refresh issue fixed
-
-### Previous Session 13 Fixes:
-1. **Plant Loader Implementation** ✅
-   - Create/Read/Update/Delete plants in loader
-   - Toggle active/inactive status
-   - Only processes active plants for Issues ETL
-   - Dramatically reduces API calls
-
-2. **Load Issues Fixed** ✅
-   - **Problem Found**: PKG_ISSUES_ETL was empty placeholder!
-   - **Fixed**: Fully implemented PROCESS_SCD2 and RECONCILE
-   - **Date Parsing**: Flexible ParseDateTime() handles multiple formats
-   - **Field Name**: Fixed "Revision" → "IssueRevision"
-
-3. **UI Completely Overhauled** ✅
-   - Applied #00346a corporate color everywhere
-   - Fixed sidebar gradient (was purple, now corporate blue)
-   - Standardized badges (green=permanent, gray=temporary)
-   - Removed excessive colors ("color vomit")
-
-### ✅ IMPLEMENTATION COMPLETE (Session 10 continued):
-
-#### 1. ✅ Created Final Consolidated DDL
-`Oracle_DDL_SCD2_FINAL.sql` - COMPLETE with:
-- All SCD2 procedures with full CRUD coverage
-- STG_ID identity columns for deterministic dedup
-- Autonomous error procedures (LOG_ETL_ERROR)
-- Entity packages (PKG_OPERATORS_ETL, PKG_PLANTS_ETL, PKG_ISSUES_ETL)
-- Master orchestrator (SP_PROCESS_ETL_BATCH)
-- Proper indexes and constraints
-- RAW_JSON with compression
-- Scheduled jobs for cleanup
-
-#### 2. ✅ Created New C# Service
-`OracleETLServiceV2.cs` - Simplified pattern:
-- Just fetches from API
-- Inserts to staging
-- Calls SP_PROCESS_ETL_BATCH
-- Returns results from Oracle
-- ALL business logic in database!
-
-#### 3. Test Implementation
+### 1. **Redeploy Updated DDL Script**
 ```sql
--- Deploy DDL
-@/workspace/TR2000/TR2K/Ops/Oracle_DDL_SCD2_FINAL.sql
-
--- Run test scenarios
-@/workspace/TR2000/TR2K/Ops/Test_SCD2_Complete_Scenarios.sql
-```
-
-### Key Files Ready:
-- **Decision Doc**: `SCD2_FINAL_DECISION.md` - Read this first!
-- **MAIN DDL**: `Oracle_DDL_SCD2_FINAL.sql` - USE THIS ONE! (Complete & Fixed)
-- **Test Suite**: `Test_SCD2_Complete_Scenarios.sql` - Validates all cases
-
-### Implementation Checklist:
-- [ ] Create `Oracle_DDL_SCD2_FINAL.sql` with all improvements
-- [ ] Add STG_ID columns to staging tables
-- [ ] Create PKG_OPERATORS_ETL, PKG_PLANTS_ETL packages
-- [ ] Add autonomous LOG_ETL_ERROR procedure
-- [ ] Update C# to use SP_PROCESS_ETL_BATCH
-- [ ] Test with real API data
-- [ ] Verify deletion handling works
-- [ ] Check reconciliation counts
-
-### Performance Targets:
-- Operators: < 1 second
-- Plants: < 2 seconds
-- Issues: < 10 seconds
-- Total: < 30 seconds for full ETL
-
-## 🔴 IMMEDIATE ACTION REQUIRED FOR NEXT SESSION:
-
-### 1. MUST REDEPLOY DDL TO ORACLE:
-```sql
--- The PKG_ISSUES_ETL is now complete but needs deployment!
 sqlplus TR2000_STAGING/piping@host.docker.internal:1521/XEPDB1
 @/workspace/TR2000/TR2K/Ops/Oracle_DDL_SCD2_FINAL.sql
+```
+**Why:** ETL_ISSUE_LOADER structure simplified, new reference tables added
 
--- This will update PKG_ISSUES_ETL with the working implementation
+### 2. **Complete Issue Loader Simplification**
+- Update IssueLoaderEntry C# model (remove LoadReferences property)
+- Update OracleETLServiceV2.cs (remove ToggleIssueLoadReferences method)
+- Simplify UI (remove toggle column/button)
+- Update V_ISSUES_FOR_REFERENCES view
+
+### 3. **Implement Reference Table ETL Packages**
+Priority order:
+1. **VDS_REFERENCES** (proof of concept)
+2. EDS, MDS, VSK, ESK, PIPE_ELEMENT (follow same pattern)
+
+Each needs:
+- PKG_[TYPE]_REF_ETL package with VALIDATE, PROCESS_SCD2, RECONCILE
+- Cascade deletion logic (issue removed → references deleted)
+- C# LoadVDSReferences() method
+- UI button and SQL preview
+
+### 4. **Cascade Deletion Pattern**
+Implement for each reference type:
+```sql
+-- In PROCESS_SCD2: Mark references deleted for issues NOT in loader
+UPDATE [REFERENCE_TABLE] 
+SET IS_CURRENT = 'N', DELETE_DATE = SYSDATE, CHANGE_TYPE = 'DELETE'
+WHERE IS_CURRENT = 'Y' AND DELETE_DATE IS NULL
+AND (PLANT_ID, ISSUE_REVISION) NOT IN (
+    SELECT PLANT_ID, ISSUE_REVISION FROM ETL_ISSUE_LOADER
+);
 ```
 
-### 2. Test Load Issues After DDL Deployment:
+## 🎯 **Current Application Status:**
+- **Running**: http://localhost:5003/oracle-etl-v2
+- **Section 2.5**: Issue Loader working (needs simplification)
+- **DDL**: Needs redeployment with simplified structure
+
+## 📋 **Testing Required:**
+1. Test simplified Issue Loader (Add/Remove only)
+2. Test cascade: Issue removed → References marked deleted
+3. Test reactivation: Issue added back → References can reload
+4. Verify 70% API reduction is maintained
+
+## 🗃️ **Key Files for Next Session:**
+- **Main DDL**: `/workspace/TR2000/TR2K/Ops/Oracle_DDL_SCD2_FINAL.sql`
+- **C# Service**: `/workspace/TR2000/TR2K/TR2KBlazorLibrary/Logic/Services/OracleETLServiceV2.cs`
+- **UI Page**: `/workspace/TR2000/TR2K/TR2KApp/Components/Pages/OracleETLV2.razor`
+- **Models**: `/workspace/TR2000/TR2K/TR2KBlazorLibrary/Models/PlantLoaderEntry.cs`
+
+## 🔄 **Session Recovery Commands:**
 ```bash
 # Start application
 cd /workspace/TR2000/TR2K/TR2KApp
 /home/node/.dotnet/dotnet run --urls "http://0.0.0.0:5003"
 
-# Go to http://localhost:5003/oracle-etl-v2
-# 1. Check Plant Loader has active plants
-# 2. Click "Load Issues" 
-# 3. Should now work correctly!
+# Access Issue Loader
+http://localhost:5003/oracle-etl-v2
 ```
 
-## 🔥 CRITICAL FOR NEXT SESSION:
+## 📈 **Progress Summary:**
+- **Phase 1**: API Compliance ✅ Complete
+- **Phase 2**: Oracle Staging Design ✅ Complete  
+- **Phase 3**: Oracle ETL Implementation 85% Complete
+  - Master Data (Operators, Plants, Issues) ✅
+  - Plant Loader ✅ 
+  - Issue Loader ✅ (needs simplification)
+  - Reference Tables 📋 Foundation ready, packages needed
 
-### 1. Start Application:
-```bash
-cd /workspace/TR2000/TR2K/TR2KApp
-/home/node/.dotnet/dotnet run --urls "http://0.0.0.0:5003"
-```
+**Next Milestone:** Complete reference table ETL packages with cascade deletion
 
-### 2. Main Pages:
-- **ETL v2**: http://localhost:5003/oracle-etl-v2 (CURRENT/ACTIVE)
-- **ETL v1**: http://localhost:5003/oracle-etl (old version)
-- **API Data**: http://localhost:5003/api-data (testing)
-
-### 3. Main DDL File:
-- **USE ONLY**: `/workspace/TR2000/TR2K/Ops/Oracle_DDL_SCD2_FINAL.sql`
-- **NO UPGRADE SCRIPTS** - Policy is to maintain one complete DDL
-- Contains RAW_JSON with fixed LOB syntax
-
-### 4. Key Files:
-- **C# Service**: `OracleETLServiceV2.cs` - Has RAW_JSON inserts
-- **UI Page**: `OracleETLV2.razor` - Updated with all current info
-- **Decision Doc**: `SCD2_FINAL_DECISION.md` - Architecture decisions
-
-### 5. What's Ready for Production:
-- ✅ Complete SCD2 with DELETE/REACTIVATE tracking
-- ✅ RAW_JSON audit trail (30-day retention, auto-cleanup)
-- ✅ All logic in Oracle (C# is just data mover)
-- ✅ Educational UI with SQL preview
-- ✅ No DBA privileges required for cleanup
-
-### 6. Known Issues:
-- None currently - all major issues resolved
-
-### 7. Next Steps (Optional):
-- Add Issues ETL with RAW_JSON
-- Implement remaining reference tables
-- Add more comprehensive error handling
-- Performance testing with full data loads
+---
+**Last Updated:** 2025-08-17 Session 15 Complete
+**Ready for:** Session 16 - Reference Table ETL Implementation

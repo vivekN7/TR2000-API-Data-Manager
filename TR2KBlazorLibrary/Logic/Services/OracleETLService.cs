@@ -2760,6 +2760,8 @@ VALUES (:plantId, :plantName, :longDesc, :operatorId,
         public int RecordsLoaded { get; set; }
         public int RecordsUpdated { get; set; }  // New for SCD2
         public int RecordsUnchanged { get; set; }  // New for SCD2
+        public int RecordsDeleted { get; set; }  // New for complete SCD2
+        public int RecordsReactivated { get; set; }  // New for complete SCD2
         public int ErrorCount { get; set; }
         public DateTime StartTime { get; set; }
         public DateTime EndTime { get; set; }
@@ -2770,6 +2772,7 @@ VALUES (:plantId, :plantName, :longDesc, :operatorId,
         public int ApiCallCount { get; set; }
         public int PlantIterations { get; set; }
         public int IssueIterations { get; set; }
+        public double ProcessingTimeSeconds { get; set; }  // New for V2
         public double TotalSeconds => EndTime > StartTime ? (EndTime - StartTime).TotalSeconds : 0;
         public double RecordsPerSecond => TotalSeconds > 0 ? RecordsLoaded / TotalSeconds : 0;
         public string FormattedDuration => TotalSeconds > 0 ? $"{TotalSeconds:F2}s" : "N/A";
@@ -2780,7 +2783,11 @@ VALUES (:plantId, :plantName, :longDesc, :operatorId,
         public string TableName { get; set; } = string.Empty;
         public bool Exists { get; set; }
         public int RecordCount { get; set; }
+        public int TotalRows { get; set; }
+        public int CurrentRows { get; set; }
+        public int HistoricalRows { get; set; }
         public DateTime? LastLoadTime { get; set; }
+        public DateTime? LastModified { get; set; }
     }
     
     public class PlantLoaderConfig
@@ -2798,10 +2805,18 @@ VALUES (:plantId, :plantName, :longDesc, :operatorId,
     {
         public int RunId { get; set; }
         public DateTime RunDate { get; set; }
+        public DateTime? StartTime { get; set; }
+        public DateTime? EndTime { get; set; }
         public string RunType { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public int RecordsLoaded { get; set; }
+        public int RecordsUpdated { get; set; }
+        public int RecordsDeleted { get; set; }
+        public int RecordsReactivated { get; set; }
+        public int RecordsUnchanged { get; set; }
         public int ErrorCount { get; set; }
+        public int ApiCallCount { get; set; }
+        public double? ProcessingTimeSeconds { get; set; }
         public string? Comments { get; set; }
     }
 

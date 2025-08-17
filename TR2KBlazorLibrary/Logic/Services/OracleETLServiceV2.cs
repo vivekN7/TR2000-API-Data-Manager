@@ -566,49 +566,6 @@ namespace TR2KBlazorLibrary.Logic.Services
             }
         }
     }
-
-    // Supporting classes
-    public class ETLResult
-    {
-        public DateTime StartTime { get; set; }
-        public DateTime EndTime { get; set; }
-        public string EndpointName { get; set; }
-        public string Status { get; set; }
-        public string Message { get; set; }
-        public int RecordsLoaded { get; set; }
-        public int RecordsUpdated { get; set; }
-        public int RecordsUnchanged { get; set; }
-        public int RecordsDeleted { get; set; }
-        public int RecordsReactivated { get; set; }
-        public int ErrorCount { get; set; }
-        public int ApiCallCount { get; set; }
-        public double ProcessingTimeSeconds { get; set; }
-    }
-
-    public class ETLRunHistory
-    {
-        public int RunId { get; set; }
-        public string RunType { get; set; }
-        public string Status { get; set; }
-        public DateTime? StartTime { get; set; }
-        public DateTime? EndTime { get; set; }
-        public double? ProcessingTimeSeconds { get; set; }
-        public int RecordsLoaded { get; set; }
-        public int RecordsUpdated { get; set; }
-        public int RecordsDeleted { get; set; }
-        public int RecordsReactivated { get; set; }
-        public int RecordsUnchanged { get; set; }
-        public int ErrorCount { get; set; }
-        public int ApiCallCount { get; set; }
-        public string Comments { get; set; }
-    }
-
-    public class TableStatus
-    {
-        public string TableName { get; set; }
-        public int TotalRows { get; set; }
-        public int CurrentRows { get; set; }
-        public int HistoricalRows { get; set; }
-        public DateTime? LastModified { get; set; }
-    }
+    
+    // Note: Using ETLResult, ETLRunHistory, and TableStatus classes from OracleETLService
 }

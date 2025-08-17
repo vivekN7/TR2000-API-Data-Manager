@@ -1,9 +1,9 @@
 # 🔴 CRITICAL: START HERE FOR NEXT SESSION
 
-## ✅ CURRENT STATUS: UI CLEANED, PLANT LOADER WORKING, ISSUES PACKAGE FIXED!
+## ✅ CURRENT STATUS: DELETION CASCADE WORKING, PLANT LOADER SIMPLIFIED!
 
-### Session 13 Complete (2025-08-17)
-The application has clean corporate UI, working Plant Loader, and fixed Issues ETL - but needs DDL redeployment.
+### Session 14 Complete (2025-08-17)
+The application has deletion cascade for issues, simplified plant loader (no active/inactive), and all critical bugs fixed.
 
 ## What's Working:
 
@@ -20,7 +20,23 @@ The application has clean corporate UI, working Plant Loader, and fixed Issues E
    - ✅ Plant Loader Configuration
    - ✅ All buttons with text labels (no broken icons)
 
-### What Was Fixed in Session 13:
+### What Was Fixed in Session 14:
+1. **Deletion Cascade Implementation** ✅
+   - Plants removed from loader → their issues marked as deleted
+   - ETL_PLANT_LOADER is single source of truth for scope
+   - Full SCD2 history preserved with reactivation support
+
+2. **Simplified Plant Loader** ✅
+   - Removed Active/Inactive complexity
+   - Plants in loader are always processed
+   - Cleaner UI with just Add/Remove buttons
+
+3. **Fixed Oracle Errors** ✅
+   - ORA-01465 hex conversion error resolved
+   - Proper NULL handling in hash calculations
+   - UI dropdown refresh issue fixed
+
+### Previous Session 13 Fixes:
 1. **Plant Loader Implementation** ✅
    - Create/Read/Update/Delete plants in loader
    - Toggle active/inactive status

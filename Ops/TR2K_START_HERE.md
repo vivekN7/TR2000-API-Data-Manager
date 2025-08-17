@@ -73,10 +73,30 @@ catch
 - Update immediately after completing any significant feature
 - Include: what was done, how it works, any issues encountered
 
-## Current State (2025-08-17 - Session 13 Complete) - ✅ UI CLEANED UP, PLANT LOADER WORKING, ISSUES FIXED!
+## Current State (2025-08-17 - Session 14 Complete) - ✅ DELETION CASCADE IMPLEMENTED, PLANT LOADER SIMPLIFIED!
 The TR2000 API Data Manager is a Blazor Server application (.NET 9.0) that interfaces with the TR2000 API to manage piping specification data.
 
-### 🔥 LATEST ACCOMPLISHMENTS (2025-08-17 Session 13):
+### 🔥 LATEST ACCOMPLISHMENTS (2025-08-17 Session 14):
+
+#### Session 14 - DELETION CASCADE & SIMPLIFIED PLANT LOADER:
+
+1. **Simplified Plant Loader** ✅
+   - Removed Active/Inactive complexity - plants in loader are always processed
+   - Cleaner UI with just Add/Remove functionality
+   - ETL_PLANT_LOADER is now the single source of truth for scope
+
+2. **Deletion Cascade Implementation** ✅
+   - When plant removed from loader, its issues are marked as deleted
+   - Prevents orphaned data and unnecessary downstream API calls
+   - Full SCD2 history preserved, reactivation supported
+   - Clean scope control for all downstream processing
+
+3. **Fixed Critical Bugs** ✅
+   - Oracle hex conversion error (ORA-01465) resolved
+   - UI dropdown refresh issue fixed with StateHasChanged()
+   - Proper NULL handling in hash calculations
+
+### Previous Session 13 Accomplishments:
 
 #### Session 13 - MAJOR UI CLEANUP & PLANT LOADER IMPLEMENTATION:
 

@@ -39,10 +39,17 @@
                     <ol>
                         <li><strong>INSERT</strong>: New records from API → Create with IS_CURRENT='Y'</li>
                         <li><strong>UPDATE</strong>: Changed records → Close old (IS_CURRENT='N'), create new version</li>
-                        <li><strong>DELETE</strong>: Missing from API → Mark with DELETE_DATE, IS_CURRENT='N'</li>
+                        <li><strong>DELETE</strong>: Missing from API or plant removed from loader → Mark with DELETE_DATE, IS_CURRENT='N'</li>
                         <li><strong>REACTIVATE</strong>: Deleted record returns → Create new version with CHANGE_TYPE='REACTIVATE'</li>
                         <li><strong>UNCHANGED</strong>: No changes detected → Skip processing</li>
                     </ol>
+                    
+                    <div class="alert alert-warning mt-2">
+                        <strong>🔄 Deletion Cascade:</strong> When a plant is removed from the Plant Loader, 
+                        all its issues are automatically marked as deleted during the next Issues ETL run. 
+                        This ensures downstream reference tables only process relevant data. If the plant 
+                        is added back to the loader, its issues will be reactivated automatically.
+                    </div>
                 </div>
             </details>
 
@@ -250,7 +257,7 @@
     <div class="col-md-6">
         <div class="card mb-3">
             <div class="card-header" style="background-color: #00346a; color: white;">
-                <h6 class="mb-0">2. Plant Loader Configuration</h6>
+                <h6 class="mb-0">2. Plant Loader Configuration (Scope Control)</h6>
             </div>
             <div class="card-body">
                 @if (!plantLoaderTableExists)
@@ -282,12 +289,11 @@
 
                     @if (plantLoaderEntries != null && plantLoaderEntries.Any())
                     {
-                        <h6 class="small">Active Plants for Issues ETL:</h6>
+                        <h6 class="small">Plants to Process for Issues ETL:</h6>
                         <table class="table table-sm">
                             <thead>
                                 <tr>
                                     <th>Plant</th>
-                                    <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -297,19 +303,6 @@
                                     <tr>
                                         <td class="small">@entry.PlantName (@entry.PlantID)</td>
                                         <td>
-                                            @if (entry.IsActive)
-                                            {
-                                                <span class="badge bg-success">Active</span>
-                                            }
-                                            else
-                                            {
-                                                <span class="badge bg-secondary">Inactive</span>
-                                            }
-                                        </td>
-                                        <td>
-                                            <button class="btn btn-sm btn-link text-primary p-0 me-2" @onclick="() => TogglePlantActive(entry.PlantID)" disabled="@isLoading">
-                                                @(entry.IsActive ? "Deactivate" : "Activate")
-                                            </button>
                                             <button class="btn btn-sm btn-link text-danger p-0" @onclick="() => RemovePlantFromLoader(entry.PlantID)" disabled="@isLoading">
                                                 Remove
                                             </button>
@@ -319,7 +312,7 @@
                             </tbody>
                         </table>
                         <small class="text-muted">
-                            @plantLoaderEntries.Count(p => p.IsActive) active plant(s) will be processed when loading issues.
+                            @plantLoaderEntries.Count plant(s) will be processed when loading issues.
                         </small>
                     }
                     else
@@ -588,27 +581,12 @@
         }
     }
     
-    private async Task TogglePlantActive(string plantId)
-    {
-        isLoading = true;
-        loadingMessage = "Toggling plant status...";
-        
-        try
-        {
-            await ETLService.TogglePlantActive(plantId);
-            await LoadPlantLoaderData();
-            statusMessage = "✅ Plant status updated";
-        }
-        catch (Exception ex)
-        {
-            statusMessage = $"Error toggling plant: {ex.Message}";
-            Logger.LogError(ex, "Failed to toggle plant status");
-        }
-        finally
-        {
-            isLoading = false;
-        }
-    }
+    // REMOVED: Active/Inactive concept removed for simplicity
+    // All plants in the loader are processed - simpler design
+    // private async Task TogglePlantActive(string plantId)
+    // {
+    //     // Method removed - no longer needed
+    // }
     
     private async Task RemovePlantFromLoader(string plantId)
     {
@@ -701,6 +679,12 @@
             if (result.Status == "SUCCESS")
             {
                 statusMessage = $"✅ Success: {result.Message}";
+                // Refresh plant loader dropdown after successful plant load
+                if (plantLoaderTableExists)
+                {
+                    await LoadPlantLoaderData();
+                    StateHasChanged(); // Force UI refresh
+                }
             }
             else
             {

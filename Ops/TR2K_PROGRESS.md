@@ -1,9 +1,43 @@
 # TR2000 API Data Manager - Development Progress Log
 
 ## 🔴 CRITICAL: This file must be updated after EVERY major change
-Last Updated: 2025-08-17 (Session 13 - UI Cleanup & Plant Loader)
+Last Updated: 2025-08-17 (Session 14 - Deletion Cascade & Plant Loader Simplification)
 
-## Current Session Summary (2025-08-17 - Session 13 Final)
+## Current Session Summary (2025-08-17 - Session 14 COMPLETE)
+
+### Session 14 Major Improvements:
+
+#### 1. **Simplified Plant Loader - Removed Active/Inactive Complexity**
+- **Before**: Plants had IS_ACTIVE flag, users had to toggle active/inactive status
+- **After**: Plants in the loader are always processed - much simpler!
+- **UI Changes**: Removed Status column and Activate/Deactivate buttons
+- **Benefits**: Less confusion, cleaner code, clear scope control
+
+#### 2. **Implemented Deletion Cascade for Issues**
+- **Problem**: When plants removed from loader, their issues remained active causing unnecessary downstream API calls
+- **Solution**: Added deletion cascade in PKG_ISSUES_ETL.PROCESS_SCD2
+- **How it works**: 
+  - Plants removed from ETL_PLANT_LOADER → their issues marked as deleted
+  - Plants added back → issues automatically reactivated
+  - ETL_PLANT_LOADER is now the single source of truth for scope
+- **Benefits**: No orphaned data, clean downstream processing, full history preserved
+
+#### 3. **Fixed UI Refresh Issues**
+- **Problem**: Plant dropdown didn't refresh after loading plants
+- **Solution**: Added StateHasChanged() after LoadPlantLoaderData()
+- **Result**: Dropdown updates immediately without page refresh
+
+#### 4. **Fixed Oracle Hex Conversion Error**
+- **Problem**: ORA-01465 invalid hex number when comparing RAW with string literals
+- **Solution**: Rewrote hash comparison logic to avoid NVL with 'x' and 'y' strings
+- **Added**: Proper NULL handling with NVL and separators in hash calculations
+
+#### 5. **Documentation Updates**
+- Updated UI knowledge articles with deletion cascade explanation
+- Updated SCD2_FINAL_DECISION.md with new pattern
+- Added clear documentation about ETL_PLANT_LOADER as scope control
+
+## Previous Session Summary (2025-08-17 - Session 13 Final)
 
 ### 1. Major UI Cleanup Following Material Design:
 - **Removed color vomit**: Eliminated excessive use of bg-primary, bg-success, bg-warning, bg-info, bg-dark

@@ -532,6 +532,21 @@ SELECT
 FROM ISSUES
 WHERE IS_CURRENT = 'Y';
 
+-- NEW VIEW: Issues for active plants only (use this for downstream processing)
+CREATE OR REPLACE VIEW V_ISSUES_ACTIVE_PLANTS AS
+SELECT 
+    i.PLANT_ID,
+    i.ISSUE_REVISION,
+    i.USER_NAME,
+    i.USER_ENTRY_TIME,
+    i.USER_PROTECTED,
+    i.VALID_FROM,
+    i.CHANGE_TYPE,
+    i.ETL_RUN_ID
+FROM ISSUES i
+INNER JOIN ETL_PLANT_LOADER pl ON i.PLANT_ID = pl.PLANT_ID
+WHERE i.IS_CURRENT = 'Y';
+
 -- Audit trail view (with consistent datatypes)
 CREATE OR REPLACE VIEW V_AUDIT_TRAIL AS
 SELECT 
@@ -1217,8 +1232,27 @@ CREATE OR REPLACE PACKAGE BODY PKG_ISSUES_ETL AS
     
     PROCEDURE PROCESS_SCD2(p_etl_run_id NUMBER) AS
         v_count NUMBER;
+        v_deleted_out_of_scope NUMBER;
     BEGIN
-        -- Mark existing deleted if not in source
+        -- Step 1: Mark issues deleted for plants NOT in the loader (deletion cascade)
+        UPDATE ISSUES 
+        SET IS_CURRENT = 'N',
+            VALID_TO = SYSDATE,
+            DELETE_DATE = SYSDATE,
+            CHANGE_TYPE = 'DELETE',
+            ETL_RUN_ID = p_etl_run_id
+        WHERE IS_CURRENT = 'Y'
+        AND DELETE_DATE IS NULL
+        AND PLANT_ID NOT IN (
+            SELECT PLANT_ID FROM ETL_PLANT_LOADER
+        );
+        v_deleted_out_of_scope := SQL%ROWCOUNT;
+        
+        IF v_deleted_out_of_scope > 0 THEN
+            DBMS_OUTPUT.PUT_LINE('Marked ' || v_deleted_out_of_scope || ' issues as deleted (plants removed from loader)');
+        END IF;
+        
+        -- Step 2: Mark existing deleted if not in source (only for plants being processed)
         UPDATE ISSUES 
         SET IS_CURRENT = 'N',
             VALID_TO = SYSDATE,
@@ -1226,6 +1260,11 @@ CREATE OR REPLACE PACKAGE BODY PKG_ISSUES_ETL AS
             CHANGE_TYPE = 'DELETE'
         WHERE IS_CURRENT = 'Y'
         AND DELETE_DATE IS NULL
+        AND PLANT_ID IN (
+            SELECT DISTINCT PLANT_ID 
+            FROM STG_ISSUES 
+            WHERE ETL_RUN_ID = p_etl_run_id
+        )
         AND (PLANT_ID, ISSUE_REVISION) NOT IN (
             SELECT DISTINCT PLANT_ID, ISSUE_REVISION 
             FROM STG_ISSUES 
@@ -1233,7 +1272,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_ISSUES_ETL AS
             AND IS_VALID = 'Y'
         );
         
-        -- Handle reactivations
+        -- Handle reactivations (for issues that were deleted but now coming back)
         MERGE INTO ISSUES tgt
         USING (
             SELECT s.PLANT_ID, s.ISSUE_REVISION, s.USER_NAME, 
@@ -1246,16 +1285,19 @@ CREATE OR REPLACE PACKAGE BODY PKG_ISSUES_ETL AS
                 WHERE i.PLANT_ID = s.PLANT_ID
                 AND i.ISSUE_REVISION = s.ISSUE_REVISION
                 AND i.DELETE_DATE IS NOT NULL
+                AND i.IS_CURRENT = 'N'
             )
         ) src
         ON (1=0) -- Always insert for reactivations
         WHEN NOT MATCHED THEN
             INSERT (PLANT_ID, ISSUE_REVISION, USER_NAME, USER_ENTRY_TIME, 
                    USER_PROTECTED, IS_CURRENT, VALID_FROM, VALID_TO, 
-                   CHANGE_TYPE, ETL_RUN_ID)
+                   CHANGE_TYPE, SRC_HASH, ETL_RUN_ID)
             VALUES (src.PLANT_ID, src.ISSUE_REVISION, src.USER_NAME,
                    src.USER_ENTRY_TIME, src.USER_PROTECTED, 'Y', SYSDATE, 
-                   DATE '9999-12-31', 'REACTIVATE', p_etl_run_id);
+                   DATE '9999-12-31', 'REACTIVATE', 
+                   STANDARD_HASH(NVL(src.USER_NAME, '~') || '|' || NVL(TO_CHAR(src.USER_ENTRY_TIME, 'YYYY-MM-DD HH24:MI:SS'), '~') || '|' || NVL(src.USER_PROTECTED, '~'), 'SHA256'),
+                   p_etl_run_id);
         
         -- Handle updates
         UPDATE ISSUES 
@@ -1263,16 +1305,17 @@ CREATE OR REPLACE PACKAGE BODY PKG_ISSUES_ETL AS
             VALID_TO = SYSDATE
         WHERE IS_CURRENT = 'Y'
         AND DELETE_DATE IS NULL
-        AND (PLANT_ID, ISSUE_REVISION) IN (
-            SELECT s.PLANT_ID, s.ISSUE_REVISION
-            FROM STG_ISSUES s
-            WHERE s.ETL_RUN_ID = p_etl_run_id
+        AND EXISTS (
+            SELECT 1 FROM STG_ISSUES s
+            WHERE s.PLANT_ID = ISSUES.PLANT_ID
+            AND s.ISSUE_REVISION = ISSUES.ISSUE_REVISION
+            AND s.ETL_RUN_ID = p_etl_run_id
             AND s.IS_VALID = 'Y'
-            AND NVL(STANDARD_HASH(s.USER_NAME || s.USER_ENTRY_TIME || s.USER_PROTECTED, 'SHA256'), 'x') != 
-                NVL((SELECT SRC_HASH FROM ISSUES i 
-                     WHERE i.PLANT_ID = s.PLANT_ID 
-                     AND i.ISSUE_REVISION = s.ISSUE_REVISION
-                     AND i.IS_CURRENT = 'Y'), 'y')
+            AND (ISSUES.SRC_HASH IS NULL 
+                OR ISSUES.SRC_HASH != STANDARD_HASH(
+                    NVL(s.USER_NAME, '~') || '|' || 
+                    NVL(TO_CHAR(s.USER_ENTRY_TIME, 'YYYY-MM-DD HH24:MI:SS'), '~') || '|' || 
+                    NVL(s.USER_PROTECTED, '~'), 'SHA256'))
         );
         
         -- Insert new/updated records
@@ -1292,7 +1335,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_ISSUES_ETL AS
                 ) THEN 'INSERT'
                 ELSE 'UPDATE'
             END,
-            STANDARD_HASH(s.USER_NAME || s.USER_ENTRY_TIME || s.USER_PROTECTED, 'SHA256'),
+            STANDARD_HASH(NVL(s.USER_NAME, '~') || '|' || NVL(TO_CHAR(s.USER_ENTRY_TIME, 'YYYY-MM-DD HH24:MI:SS'), '~') || '|' || NVL(s.USER_PROTECTED, '~'), 'SHA256'),
             p_etl_run_id
         FROM STG_ISSUES s
         WHERE s.ETL_RUN_ID = p_etl_run_id
@@ -1302,7 +1345,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_ISSUES_ETL AS
             WHERE i.PLANT_ID = s.PLANT_ID
             AND i.ISSUE_REVISION = s.ISSUE_REVISION
             AND i.IS_CURRENT = 'Y'
-            AND i.SRC_HASH = STANDARD_HASH(s.USER_NAME || s.USER_ENTRY_TIME || s.USER_PROTECTED, 'SHA256')
+            AND i.SRC_HASH = STANDARD_HASH(NVL(s.USER_NAME, '~') || '|' || NVL(TO_CHAR(s.USER_ENTRY_TIME, 'YYYY-MM-DD HH24:MI:SS'), '~') || '|' || NVL(s.USER_PROTECTED, '~'), 'SHA256')
         );
         
         -- Count results
@@ -1355,7 +1398,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_ISSUES_ETL AS
             WHERE i.PLANT_ID = s.PLANT_ID
             AND i.ISSUE_REVISION = s.ISSUE_REVISION
             AND i.IS_CURRENT = 'Y'
-            AND i.SRC_HASH = STANDARD_HASH(s.USER_NAME || s.USER_ENTRY_TIME || s.USER_PROTECTED, 'SHA256')
+            AND i.SRC_HASH = STANDARD_HASH(NVL(s.USER_NAME, '~') || '|' || NVL(TO_CHAR(s.USER_ENTRY_TIME, 'YYYY-MM-DD HH24:MI:SS'), '~') || '|' || NVL(s.USER_PROTECTED, '~'), 'SHA256')
             AND i.ETL_RUN_ID != p_etl_run_id
         );
         
@@ -1373,13 +1416,10 @@ CREATE OR REPLACE PACKAGE BODY PKG_ISSUES_ETL AS
         
         -- Insert reconciliation record
         INSERT INTO ETL_RECONCILIATION (
-            ETL_RUN_ID, TABLE_NAME, SOURCE_COUNT, TARGET_COUNT,
-            RECORDS_UNCHANGED, RECORDS_DELETED, RECORDS_REACTIVATED, 
-            RECONCILIATION_DATE
+            ETL_RUN_ID, ENTITY_TYPE, SOURCE_COUNT, TARGET_COUNT, DIFF_COUNT
         ) VALUES (
             p_etl_run_id, 'ISSUES', v_source_count, v_target_count,
-            v_unchanged_count, v_deleted_count, v_reactivated_count,
-            SYSDATE
+            ABS(v_source_count - v_target_count)
         );
         
         -- Update ETL_CONTROL with counts
@@ -1644,6 +1684,25 @@ BEGIN
 END;
 /
 */
+
+-- =====================================================
+-- IMPORTANT: DOWNSTREAM PROCESSING PATTERN
+-- =====================================================
+-- When loading reference tables (PCS_REFERENCES, SC_REFERENCES, etc.),
+-- ALWAYS use V_ISSUES_ACTIVE_PLANTS view instead of ISSUES table directly.
+-- This ensures you only process issues for plants currently in ETL_PLANT_LOADER.
+--
+-- Example for future reference table loading:
+-- INSERT INTO STG_PCS_REFERENCES (...)
+-- SELECT ... 
+-- FROM V_ISSUES_ACTIVE_PLANTS i  -- Use this view, not ISSUES table
+-- WHERE ...
+--
+-- This pattern ensures:
+-- 1. No unnecessary API calls for removed plants
+-- 2. Full history preservation (SCD2 intact)
+-- 3. Clean scope control via ETL_PLANT_LOADER
+-- =====================================================
 
 -- =====================================================
 -- STEP 16: VERIFICATION QUERIES

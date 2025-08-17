@@ -768,22 +768,21 @@ END LOOP;
                 using var connection = new OracleConnection(_connectionString);
                 await connection.OpenAsync();
 
-                // Get active plants from loader
-                var activePlants = await connection.QueryAsync<string>(@"
+                // Get all plants from loader (no active/inactive - if it's in the loader, we process it)
+                var plantsToProcess = await connection.QueryAsync<string>(@"
                     SELECT PLANT_ID 
                     FROM ETL_PLANT_LOADER 
-                    WHERE IS_ACTIVE = 'Y' 
                     ORDER BY PLANT_ID"
                 );
 
-                if (!activePlants.Any())
+                if (!plantsToProcess.Any())
                 {
                     result.Status = "NO_PLANTS";
-                    result.Message = "No active plants in loader";
+                    result.Message = "No plants in loader. Add plants to process.";
                     return result;
                 }
 
-                _logger.LogInformation($"Loading issues for {activePlants.Count()} active plants");
+                _logger.LogInformation($"Loading issues for {plantsToProcess.Count()} plants");
 
                 // Get ETL Run ID
                 var etlRunId = await connection.QuerySingleAsync<int>(
@@ -800,7 +799,7 @@ END LOOP;
                 int apiCalls = 0;
 
                 // Fetch issues for each plant
-                foreach (var plantId in activePlants)
+                foreach (var plantId in plantsToProcess)
                 {
                     try
                     {
@@ -890,7 +889,7 @@ END LOOP;
                 result.ProcessingTimeSeconds = Convert.ToDouble(controlRecord.PROCESSING_TIME_SEC ?? 0);
                 
                 result.EndTime = DateTime.Now;
-                result.Message = $"Processed {activePlants.Count()} plants: {result.RecordsLoaded} inserted, " +
+                result.Message = $"Processed {plantsToProcess.Count()} plants: {result.RecordsLoaded} inserted, " +
                                $"{result.RecordsUpdated} updated, {result.RecordsDeleted} deleted";
 
                 return result;
@@ -1107,20 +1106,22 @@ END LOOP;
             );
         }
 
-        /// <summary>
-        /// Toggle plant active status
-        /// </summary>
-        public async Task TogglePlantActive(string plantId)
-        {
-            using var connection = new OracleConnection(_connectionString);
-            await connection.ExecuteAsync(@"
-                UPDATE ETL_PLANT_LOADER 
-                SET IS_ACTIVE = CASE WHEN IS_ACTIVE = 'Y' THEN 'N' ELSE 'Y' END,
-                    MODIFIED_DATE = SYSDATE
-                WHERE PLANT_ID = :plantId",
-                new { plantId }
-            );
-        }
+        // REMOVED: Active/Inactive concept removed for simplicity
+        // Plants in the loader are always processed
+        // /// <summary>
+        // /// Toggle plant active status
+        // /// </summary>
+        // public async Task TogglePlantActive(string plantId)
+        // {
+        //     using var connection = new OracleConnection(_connectionString);
+        //     await connection.ExecuteAsync(@"
+        //         UPDATE ETL_PLANT_LOADER 
+        //         SET IS_ACTIVE = CASE WHEN IS_ACTIVE = 'Y' THEN 'N' ELSE 'Y' END,
+        //             MODIFIED_DATE = SYSDATE
+        //         WHERE PLANT_ID = :plantId",
+        //         new { plantId }
+        //     );
+        // }
 
         /// <summary>
         /// Remove plant from loader

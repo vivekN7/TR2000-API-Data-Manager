@@ -23,6 +23,7 @@ After extensive analysis and consultation, we have reached consensus on a produc
 5. Audit logging
 6. Reconciliation
 7. Data transformations
+8. Deletion cascade based on ETL_PLANT_LOADER scope
 
 ## Core Components
 
@@ -100,6 +101,32 @@ SP_PROCESS_ETL_BATCH
 3. **ILM Policies** - Simple DELETE job sufficient
 4. **Separate REJECT Tables** - ETL_ERROR_LOG handles this
 5. **Row-by-Row Processing** - Always use set-based
+
+## Deletion Cascade Pattern (Session 14 Addition)
+
+### ETL_PLANT_LOADER as Single Source of Truth
+The ETL_PLANT_LOADER table defines the scope of all ETL operations. Plants in this table are considered "active" and their data is processed. When a plant is removed from the loader:
+
+1. **Issues Deletion Cascade**: All issues for removed plants are marked as deleted
+2. **Downstream Impact**: Reference tables only process issues with IS_CURRENT='Y'
+3. **Reactivation**: Adding a plant back to the loader will reactivate its issues
+
+### Implementation in PKG_ISSUES_ETL
+```sql
+-- Step 1: Mark issues deleted for plants NOT in loader
+UPDATE ISSUES 
+SET IS_CURRENT = 'N', DELETE_DATE = SYSDATE, CHANGE_TYPE = 'DELETE'
+WHERE IS_CURRENT = 'Y'
+AND PLANT_ID NOT IN (SELECT PLANT_ID FROM ETL_PLANT_LOADER)
+
+-- Step 2: Process issues for plants IN loader (existing logic)
+```
+
+### Benefits
+- **Clean Scope Control**: ETL_PLANT_LOADER defines what's in scope
+- **No Orphaned Data**: Removed plants don't cause unnecessary API calls
+- **Full History**: All changes tracked with SCD2
+- **Reversible**: Plants can be added back, issues reactivated
 
 ## Performance Expectations
 

@@ -381,7 +381,6 @@
                                 <tr>
                                     <th>Plant</th>
                                     <th>Issue Revision</th>
-                                    <th>Load Refs</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -392,14 +391,6 @@
                                         <td class="small">@entry.PlantName (@entry.PlantID)</td>
                                         <td class="small">@entry.IssueRevision</td>
                                         <td>
-                                            <span class="badge @(entry.LoadReferences ? "bg-success" : "bg-secondary")">
-                                                @(entry.LoadReferences ? "Yes" : "No")
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <button class="btn btn-sm btn-link text-primary p-0 me-2" @onclick="() => ToggleIssueLoadReferences(entry.PlantID, entry.IssueRevision)" disabled="@isLoading">
-                                                Toggle
-                                            </button>
                                             <button class="btn btn-sm btn-link text-danger p-0" @onclick="() => RemoveIssueFromLoader(entry.PlantID, entry.IssueRevision)" disabled="@isLoading">
                                                 Remove
                                             </button>
@@ -409,7 +400,7 @@
                             </tbody>
                         </table>
                         <small class="text-muted">
-                            @issueLoaderEntries.Count(e => e.LoadReferences) issue(s) will have their reference tables loaded (API optimization: ~70% fewer calls).
+                            @issueLoaderEntries.Count issue(s) selected. When present in this table, their reference tables will be loaded (API optimization: ~70% fewer calls).
                         </small>
                     }
                     else
@@ -464,10 +455,144 @@
     </div>
 </div>
 
-<!-- Section 4: Current Table Status -->
+<!-- Section 4: Reference Data ETL -->
 <div class="card mb-3">
     <div class="card-header" style="background-color: #00346a; color: white;">
-        <h6 class="mb-0">4. Current Table Status</h6>
+        <h6 class="mb-0">4. Reference Data ETL</h6>
+    </div>
+    <div class="card-body">
+        <!-- VDS References -->
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <div class="d-flex gap-2 mb-2">
+                    <button class="btn btn-success btn-sm" @onclick="LoadVDSReferences" disabled="@isLoading">
+                        Load VDS References
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" @onclick='() => ShowSqlPreview("vds_references")' disabled="@isLoading">
+                        Preview SQL
+                    </button>
+                </div>
+                <small class="text-muted">Uses issues from Issue Loader (70% fewer API calls)</small>
+            </div>
+            <div class="col-md-8">
+                <div class="alert alert-info small mb-0">
+                    <strong>VDS References:</strong> Loads Valve Data Sheet references for all issues in the Issue Loader. 
+                    Includes cascade deletion - references for removed issues are automatically marked as deleted.
+                </div>
+            </div>
+        </div>
+        
+        <!-- EDS References -->
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <div class="d-flex gap-2 mb-2">
+                    <button class="btn btn-success btn-sm" @onclick="LoadEDSReferences" disabled="@isLoading">
+                        Load EDS References
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" @onclick='() => ShowSqlPreview("eds_references")' disabled="@isLoading">
+                        Preview SQL
+                    </button>
+                </div>
+                <small class="text-muted">Uses issues from Issue Loader (70% fewer API calls)</small>
+            </div>
+            <div class="col-md-8">
+                <div class="alert alert-info small mb-0">
+                    <strong>EDS References:</strong> Loads Equipment Data Sheet references for all issues in the Issue Loader. 
+                    Includes cascade deletion - references for removed issues are automatically marked as deleted.
+                </div>
+            </div>
+        </div>
+        
+        <!-- MDS References -->
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <div class="d-flex gap-2 mb-2">
+                    <button class="btn btn-success btn-sm" @onclick="LoadMDSReferences" disabled="@isLoading">
+                        Load MDS References
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" @onclick='() => ShowSqlPreview("mds_references")' disabled="@isLoading">
+                        Preview SQL
+                    </button>
+                </div>
+                <small class="text-muted">Uses issues from Issue Loader (70% fewer API calls)</small>
+            </div>
+            <div class="col-md-8">
+                <div class="alert alert-info small mb-0">
+                    <strong>MDS References:</strong> Loads Material Data Sheet references for all issues in the Issue Loader (includes Area field). 
+                    Includes cascade deletion - references for removed issues are automatically marked as deleted.
+                </div>
+            </div>
+        </div>
+        
+        <!-- VSK References -->
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <div class="d-flex gap-2 mb-2">
+                    <button class="btn btn-success btn-sm" @onclick="LoadVSKReferences" disabled="@isLoading">
+                        Load VSK References
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" @onclick='() => ShowSqlPreview("vsk_references")' disabled="@isLoading">
+                        Preview SQL
+                    </button>
+                </div>
+                <small class="text-muted">Uses issues from Issue Loader (70% fewer API calls)</small>
+            </div>
+            <div class="col-md-8">
+                <div class="alert alert-info small mb-0">
+                    <strong>VSK References:</strong> Loads Valve Sketch references for all issues in the Issue Loader. 
+                    Includes cascade deletion - references for removed issues are automatically marked as deleted.
+                </div>
+            </div>
+        </div>
+        
+        <!-- ESK References -->
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <div class="d-flex gap-2 mb-2">
+                    <button class="btn btn-success btn-sm" @onclick="LoadESKReferences" disabled="@isLoading">
+                        Load ESK References
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" @onclick='() => ShowSqlPreview("esk_references")' disabled="@isLoading">
+                        Preview SQL
+                    </button>
+                </div>
+                <small class="text-muted">Uses issues from Issue Loader (70% fewer API calls)</small>
+            </div>
+            <div class="col-md-8">
+                <div class="alert alert-info small mb-0">
+                    <strong>ESK References:</strong> Loads Equipment Sketch references for all issues in the Issue Loader. 
+                    Includes cascade deletion - references for removed issues are automatically marked as deleted.
+                </div>
+            </div>
+        </div>
+        
+        <!-- Pipe Element References -->
+        <div class="row">
+            <div class="col-md-4">
+                <div class="d-flex gap-2 mb-2">
+                    <button class="btn btn-success btn-sm" @onclick="LoadPipeElementReferences" disabled="@isLoading">
+                        Load Pipe Element References
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" @onclick='() => ShowSqlPreview("pipe_element_references")' disabled="@isLoading">
+                        Preview SQL
+                    </button>
+                </div>
+                <small class="text-muted">Uses issues from Issue Loader (70% fewer API calls)</small>
+            </div>
+            <div class="col-md-8">
+                <div class="alert alert-info small mb-0">
+                    <strong>Pipe Element References:</strong> Loads Pipe Element references for all issues in the Issue Loader (different structure with Tag, Type, Size, Rating, Material). 
+                    Includes cascade deletion - references for removed issues are automatically marked as deleted.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Section 5: Current Table Status -->
+<div class="card mb-3">
+    <div class="card-header" style="background-color: #00346a; color: white;">
+        <h6 class="mb-0">5. Current Table Status</h6>
     </div>
     <div class="card-body">
         <button class="btn btn-sm btn-secondary mb-2" @onclick="RefreshStatus" disabled="@isLoading">
@@ -504,10 +629,10 @@
 </div>
 
 
-<!-- Section 5: ETL History -->
+<!-- Section 6: ETL History -->
 <div class="card mb-3">
     <div class="card-header" style="background-color: #00346a; color: white;">
-        <h6 class="mb-0">5. ETL Run History</h6>
+        <h6 class="mb-0">6. ETL Run History</h6>
     </div>
     <div class="card-body">
         @if (etlHistory != null && etlHistory.Any())
@@ -702,7 +827,12 @@
         {
             await ETLService.RemovePlantFromLoader(plantId);
             await LoadPlantLoaderData();
-            statusMessage = "✅ Plant removed from loader";
+            // Refresh Issue Loader to show cascade deletion in UI
+            if (issueLoaderTableExists)
+            {
+                await LoadIssueLoaderData();
+            }
+            statusMessage = "✅ Plant removed from loader (issues cascade deleted)";
         }
         catch (Exception ex)
         {
@@ -839,27 +969,6 @@
         }
     }
 
-    private async Task ToggleIssueLoadReferences(string plantId, string issueRevision)
-    {
-        isLoading = true;
-        loadingMessage = "Toggling reference loading...";
-        
-        try
-        {
-            await ETLService.ToggleIssueLoadReferences(plantId, issueRevision);
-            await LoadIssueLoaderData();
-            statusMessage = "✅ Reference loading toggled";
-        }
-        catch (Exception ex)
-        {
-            statusMessage = $"Error toggling reference loading: {ex.Message}";
-            Logger.LogError(ex, "Failed to toggle reference loading");
-        }
-        finally
-        {
-            isLoading = false;
-        }
-    }
 
     #endregion
 
@@ -989,6 +1098,138 @@
         }
     }
 
+    private async Task LoadVDSReferences()
+    {
+        isLoading = true;
+        loadingMessage = "Loading VDS references...";
+        
+        try
+        {
+            var result = await ETLService.LoadVDSReferences();
+            statusMessage = result.Status == "SUCCESS" ? $"✅ {result.Message}" : $"❌ {result.Message}";
+            await RefreshStatus();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error: {ex.Message}";
+            Logger.LogError(ex, "Failed to load VDS references");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+    
+    private async Task LoadEDSReferences()
+    {
+        isLoading = true;
+        loadingMessage = "Loading EDS references...";
+        
+        try
+        {
+            var result = await ETLService.LoadEDSReferences();
+            statusMessage = result.Status == "SUCCESS" ? $"✅ {result.Message}" : $"❌ {result.Message}";
+            await RefreshStatus();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error: {ex.Message}";
+            Logger.LogError(ex, "Failed to load EDS references");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+    
+    private async Task LoadMDSReferences()
+    {
+        isLoading = true;
+        loadingMessage = "Loading MDS references...";
+        
+        try
+        {
+            var result = await ETLService.LoadMDSReferences();
+            statusMessage = result.Status == "SUCCESS" ? $"✅ {result.Message}" : $"❌ {result.Message}";
+            await RefreshStatus();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error: {ex.Message}";
+            Logger.LogError(ex, "Failed to load MDS references");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+    
+    private async Task LoadVSKReferences()
+    {
+        isLoading = true;
+        loadingMessage = "Loading VSK references...";
+        
+        try
+        {
+            var result = await ETLService.LoadVSKReferences();
+            statusMessage = result.Status == "SUCCESS" ? $"✅ {result.Message}" : $"❌ {result.Message}";
+            await RefreshStatus();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error: {ex.Message}";
+            Logger.LogError(ex, "Failed to load VSK references");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+    
+    private async Task LoadESKReferences()
+    {
+        isLoading = true;
+        loadingMessage = "Loading ESK references...";
+        
+        try
+        {
+            var result = await ETLService.LoadESKReferences();
+            statusMessage = result.Status == "SUCCESS" ? $"✅ {result.Message}" : $"❌ {result.Message}";
+            await RefreshStatus();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error: {ex.Message}";
+            Logger.LogError(ex, "Failed to load ESK references");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+    
+    private async Task LoadPipeElementReferences()
+    {
+        isLoading = true;
+        loadingMessage = "Loading Pipe Element references...";
+        
+        try
+        {
+            var result = await ETLService.LoadPipeElementReferences();
+            statusMessage = result.Status == "SUCCESS" ? $"✅ {result.Message}" : $"❌ {result.Message}";
+            await RefreshStatus();
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error: {ex.Message}";
+            Logger.LogError(ex, "Failed to load Pipe Element references");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
     private async Task RefreshStatus()
     {
         try
@@ -1012,6 +1253,12 @@
             "operators" => ETLService.GetOperatorsSqlPreview(),
             "plants" => ETLService.GetPlantsSqlPreview(),
             "issues" => ETLService.GetIssuesSqlPreview(),
+            "vds_references" => ETLService.GetVDSReferencesSqlPreview(),
+            "eds_references" => ETLService.GetEDSReferencesSqlPreview(),
+            "mds_references" => ETLService.GetMDSReferencesSqlPreview(),
+            "vsk_references" => ETLService.GetVSKReferencesSqlPreview(),
+            "esk_references" => ETLService.GetESKReferencesSqlPreview(),
+            "pipe_element_references" => ETLService.GetPipeElementReferencesSqlPreview(),
             _ => null
         };
     }
@@ -1032,6 +1279,9 @@
                 break;
             case "issues":
                 await LoadIssues();
+                break;
+            case "vds_references":
+                await LoadVDSReferences();
                 break;
         }
     }

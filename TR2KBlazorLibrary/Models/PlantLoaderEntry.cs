@@ -22,10 +22,7 @@ namespace TR2KBlazorLibrary.Models
         public string PlantID { get; set; } = "";
         public string IssueRevision { get; set; } = "";
         public string PlantName { get; set; } = "";
-        public bool LoadReferences { get; set; }
-        public string? Notes { get; set; }
         public DateTime? CreatedDate { get; set; }
-        public DateTime? ModifiedDate { get; set; }
     }
     
     public class Issue

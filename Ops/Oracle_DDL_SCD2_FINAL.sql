@@ -25,6 +25,15 @@ SET PAGESIZE 50;
 -- =====================================================
 
 BEGIN
+    -- Drop any old invalid functions from previous attempts
+    FOR f IN (SELECT object_name FROM user_objects WHERE object_type = 'FUNCTION' AND status = 'INVALID') LOOP
+        BEGIN
+            EXECUTE IMMEDIATE 'DROP FUNCTION ' || f.object_name;
+            DBMS_OUTPUT.PUT_LINE('Dropped invalid function: ' || f.object_name);
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+    
     -- Drop all views
     FOR v IN (SELECT view_name FROM user_views WHERE view_name NOT LIKE 'USER_%') LOOP
         BEGIN
@@ -1116,10 +1125,14 @@ END SP_CLEANUP_ETL_HISTORY;
 /
 
 -- =====================================================
--- STEP 14: CREATE SCHEDULED JOBS
+-- STEP 14: CREATE SCHEDULED JOBS (OPTIONAL - Requires DBMS_SCHEDULER privileges)
 -- =====================================================
+-- Note: These require CREATE JOB privilege. If you get ORA-27486, 
+-- you can skip these and run the cleanup procedures manually.
 
 -- Job to purge old RAW_JSON (30 days)
+-- Uncomment if you have scheduler privileges:
+/*
 BEGIN
     DBMS_SCHEDULER.CREATE_JOB(
         job_name        => 'PURGE_RAW_JSON_30D',
@@ -1131,8 +1144,11 @@ BEGIN
     );
 END;
 /
+*/
 
 -- Job to cleanup ETL history
+-- Uncomment if you have scheduler privileges:
+/*
 BEGIN
     DBMS_SCHEDULER.CREATE_JOB(
         job_name        => 'CLEANUP_ETL_HISTORY',
@@ -1144,12 +1160,21 @@ BEGIN
     );
 END;
 /
+*/
+
+-- Manual cleanup alternatives (run these periodically):
+-- EXEC SP_CLEANUP_ETL_HISTORY;
+-- DELETE FROM RAW_JSON WHERE LOAD_TS < SYSTIMESTAMP - 30;
 
 -- =====================================================
--- STEP 15: CREATE SECURITY TRIGGERS (Optional)
+-- STEP 15: CREATE SECURITY TRIGGERS (OPTIONAL - Requires CREATE TRIGGER privilege)
 -- =====================================================
+-- Note: These require CREATE TRIGGER privilege. If you get ORA-01031,
+-- you can skip these and rely on database roles/grants for security.
 
 -- Block manual DML on critical tables
+-- Uncomment if you have trigger privileges and want extra protection:
+/*
 CREATE OR REPLACE TRIGGER OPERATORS_BLOCK_MANUAL_DML
 BEFORE INSERT OR UPDATE OR DELETE ON OPERATORS
 BEGIN
@@ -1167,6 +1192,7 @@ BEGIN
     END IF;
 END;
 /
+*/
 
 -- =====================================================
 -- STEP 16: VERIFICATION QUERIES

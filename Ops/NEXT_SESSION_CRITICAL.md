@@ -1,9 +1,9 @@
 # 🔴 CRITICAL: START HERE FOR NEXT SESSION
 
-## ✅ CURRENT STATUS: PRODUCTION READY!
+## ✅ CURRENT STATUS: PRODUCTION READY WITH RAW_JSON!
 
-### Session 11 Complete (2025-08-17)
-The SCD2 ETL system is now production-ready with full educational UI.
+### Session 12 Complete (2025-08-17)
+The SCD2 ETL system is production-ready with RAW_JSON audit trail (zero privileges required).
 
 ## What's Working:
 
@@ -17,15 +17,22 @@ The SCD2 ETL system is now production-ready with full educational UI.
    - SQL Preview ✅ Shows all steps
    - Auto Cleanup ✅ No DBA needed
 
-### What Was Fixed in Session 11:
-1. **Final Consensus Reached** with GPT-5 review
-2. **Production-Ready Design** documented in `SCD2_FINAL_DECISION.md`
-3. **All Improvements Incorporated**:
-   - ✅ Oracle-centric (all logic in DB)
-   - ✅ Atomic transactions (single COMMIT)
-   - ✅ Autonomous error logging
-   - ✅ Deterministic deduplication
-   - ✅ Minimal RAW_JSON with compression
+### What Was Added in Session 12:
+1. **RAW_JSON Implementation** (Phase 1 - No DBA Required!)
+   - ✅ Table with SECUREFILE compression (60-80% reduction)
+   - ✅ SP_PURGE_RAW_JSON - Cleanup after each ETL (not scheduled)
+   - ✅ SP_INSERT_RAW_JSON - Best-effort audit trail
+   - ✅ C# inserts API responses for Operators/Plants
+   - ✅ Fixed LOB storage syntax error in DDL
+
+2. **UI Updates**:
+   - ✅ SQL Preview shows RAW_JSON insertion (Step 3)
+   - ✅ Oracle Database Objects section fully updated
+   - ✅ Data retention policies accurate (auto-cleanup)
+
+3. **Documentation**:
+   - ✅ SCD2_FINAL_DECISION.md marked RAW_JSON complete
+   - ✅ All progress tracked in TR2K_PROGRESS.md
 
 ### ✅ IMPLEMENTATION COMPLETE (Session 10 continued):
 
@@ -78,9 +85,41 @@ The SCD2 ETL system is now production-ready with full educational UI.
 - Issues: < 10 seconds
 - Total: < 30 seconds for full ETL
 
-### Application Status:
-- Running at: http://localhost:5003
-- Oracle ETL page: http://localhost:5003/oracle-etl
-- API Data page: http://localhost:5003/api-data
+## 🔥 CRITICAL FOR NEXT SESSION:
 
-## 🚀 Ready to Build Production ETL!
+### 1. Start Application:
+```bash
+cd /workspace/TR2000/TR2K/TR2KApp
+/home/node/.dotnet/dotnet run --urls "http://0.0.0.0:5003"
+```
+
+### 2. Main Pages:
+- **ETL v2**: http://localhost:5003/oracle-etl-v2 (CURRENT/ACTIVE)
+- **ETL v1**: http://localhost:5003/oracle-etl (old version)
+- **API Data**: http://localhost:5003/api-data (testing)
+
+### 3. Main DDL File:
+- **USE ONLY**: `/workspace/TR2000/TR2K/Ops/Oracle_DDL_SCD2_FINAL.sql`
+- **NO UPGRADE SCRIPTS** - Policy is to maintain one complete DDL
+- Contains RAW_JSON with fixed LOB syntax
+
+### 4. Key Files:
+- **C# Service**: `OracleETLServiceV2.cs` - Has RAW_JSON inserts
+- **UI Page**: `OracleETLV2.razor` - Updated with all current info
+- **Decision Doc**: `SCD2_FINAL_DECISION.md` - Architecture decisions
+
+### 5. What's Ready for Production:
+- ✅ Complete SCD2 with DELETE/REACTIVATE tracking
+- ✅ RAW_JSON audit trail (30-day retention, auto-cleanup)
+- ✅ All logic in Oracle (C# is just data mover)
+- ✅ Educational UI with SQL preview
+- ✅ No DBA privileges required for cleanup
+
+### 6. Known Issues:
+- None currently - all major issues resolved
+
+### 7. Next Steps (Optional):
+- Add Issues ETL with RAW_JSON
+- Implement remaining reference tables
+- Add more comprehensive error handling
+- Performance testing with full data loads

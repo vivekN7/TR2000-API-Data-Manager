@@ -14,6 +14,7 @@
         <li>All logic in Oracle stored procedures</li>
         <li>C# only fetches data and calls orchestrator</li>
         <li>Atomic transactions with automatic rollback</li>
+        <li>RAW_JSON audit trail with automatic 30-day cleanup (no DBA required)</li>
     </ul>
 </div>
 
@@ -147,9 +148,9 @@
                         <ul>
                             <li><strong>Dimension Tables (OPERATORS, PLANTS, ISSUES)</strong>: <span class="badge bg-success">PERMANENT</span> - Full history forever</li>
                             <li><strong>Staging Tables (STG_*)</strong>: <span class="badge bg-warning">TEMPORARY</span> - Cleared after each successful run</li>
-                            <li><strong>ETL_CONTROL</strong>: <span class="badge bg-info">10 RUNS</span> - Rolling window retention</li>
-                            <li><strong>ETL_ERROR_LOG</strong>: <span class="badge bg-danger">30 DAYS</span> - Auto-purged nightly</li>
-                            <li><strong>RAW_JSON (if used)</strong>: <span class="badge bg-secondary">30 DAYS</span> - Compressed, auto-purged</li>
+                            <li><strong>ETL_CONTROL</strong>: <span class="badge bg-info">10 RUNS</span> - Cleaned after each ETL (automatic)</li>
+                            <li><strong>ETL_ERROR_LOG</strong>: <span class="badge bg-danger">30 DAYS</span> - Cleaned after each ETL (automatic)</li>
+                            <li><strong>RAW_JSON</strong>: <span class="badge bg-info">30 DAYS</span> - Cleaned after each ETL (automatic)</li>
                         </ul>
                     </div>
                 </div>
@@ -272,49 +273,74 @@
     </div>
     <div class="card-body">
         <div class="row">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <h6>Staging Tables (Temporary)</h6>
                 <ul class="small">
                     <li><code>STG_OPERATORS</code></li>
                     <li><code>STG_PLANTS</code></li>
                     <li><code>STG_ISSUES</code></li>
-                    <li>Include: STG_ID, IS_DUPLICATE, IS_VALID</li>
+                    <li><code>STG_PCS_REFERENCES</code></li>
+                    <li><code>STG_SC_REFERENCES</code></li>
+                    <li><code>STG_VSM_REFERENCES</code></li>
+                    <li class="text-muted">Auto-cleared after ETL</li>
                 </ul>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <h6>Dimension Tables (SCD2)</h6>
                 <ul class="small">
-                    <li><code>OPERATORS</code></li>
-                    <li><code>PLANTS</code></li>
-                    <li><code>ISSUES</code></li>
-                    <li>Track: VALID_FROM/TO, IS_CURRENT, CHANGE_TYPE</li>
+                    <li><code>OPERATORS</code> (8 records)</li>
+                    <li><code>PLANTS</code> (130 records)</li>
+                    <li><code>ISSUES</code> (varies)</li>
+                    <li><code>PCS_REFERENCES</code></li>
+                    <li><code>SC_REFERENCES</code></li>
+                    <li><code>VSM_REFERENCES</code></li>
+                    <li class="text-muted">Full history forever</li>
                 </ul>
             </div>
-            <div class="col-md-4">
-                <h6>Control Tables</h6>
+            <div class="col-md-3">
+                <h6>Control & Audit</h6>
                 <ul class="small">
-                    <li><code>ETL_CONTROL</code> - Run tracking</li>
-                    <li><code>ETL_ERROR_LOG</code> - Error logging</li>
-                    <li><code>ETL_RECONCILIATION</code> - Count checks</li>
-                    <li><code>ETL_PLANT_LOADER</code> - Scope control</li>
+                    <li><code>ETL_CONTROL</code> - Runs</li>
+                    <li><code>ETL_ERROR_LOG</code> - Errors</li>
+                    <li><code>ETL_RECONCILIATION</code> - Counts</li>
+                    <li><code>ETL_PLANT_LOADER</code> - Scope</li>
+                    <li><code>RAW_JSON</code> - API audit</li>
+                    <li class="text-muted">10-30 day retention</li>
+                </ul>
+            </div>
+            <div class="col-md-3">
+                <h6>Key Features</h6>
+                <ul class="small">
+                    <li><strong>VALID_FROM/TO</strong> - Time range</li>
+                    <li><strong>IS_CURRENT</strong> - Y/N flag</li>
+                    <li><strong>CHANGE_TYPE</strong> - Action</li>
+                    <li><strong>DELETE_DATE</strong> - Soft delete</li>
+                    <li><strong>SRC_HASH</strong> - SHA256</li>
+                    <li class="text-muted">100% audit trail</li>
                 </ul>
             </div>
         </div>
         
-        <h6 class="mt-3">Key Stored Procedures:</h6>
+        <h6 class="mt-3">Key Stored Procedures & Packages:</h6>
         <div class="row">
             <div class="col-md-6">
                 <ul class="small">
                     <li><code>SP_PROCESS_ETL_BATCH</code> - Master orchestrator</li>
                     <li><code>SP_DEDUPLICATE_STAGING</code> - Remove duplicates</li>
-                    <li><code>LOG_ETL_ERROR</code> - Autonomous error logging</li>
+                    <li><code>SP_PURGE_RAW_JSON</code> - Cleanup audit trail</li>
+                    <li><code>SP_INSERT_RAW_JSON</code> - Store API responses</li>
+                    <li><code>SP_CLEANUP_ETL_HISTORY</code> - Maintain history</li>
+                    <li><code>LOG_ETL_ERROR</code> - Autonomous logging</li>
                 </ul>
             </div>
             <div class="col-md-6">
                 <ul class="small">
-                    <li><code>PKG_OPERATORS_ETL.*</code> - Operators processing</li>
-                    <li><code>PKG_PLANTS_ETL.*</code> - Plants processing</li>
-                    <li><code>PKG_ISSUES_ETL.*</code> - Issues processing</li>
+                    <li><code>PKG_OPERATORS_ETL</code> - VALIDATE, PROCESS_SCD2, RECONCILE</li>
+                    <li><code>PKG_PLANTS_ETL</code> - VALIDATE, PROCESS_SCD2, RECONCILE</li>
+                    <li><code>PKG_ISSUES_ETL</code> - VALIDATE, PROCESS_SCD2, RECONCILE</li>
+                    <li class="text-muted mt-2">Each package handles:</li>
+                    <li class="text-muted">• Deletions, Reactivations, Updates, Inserts</li>
+                    <li class="text-muted">• Hash computation, Change detection</li>
                 </ul>
             </div>
         </div>

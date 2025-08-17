@@ -72,10 +72,11 @@ SP_PROCESS_ETL_BATCH
    - DELETE: Soft delete when missing from source
    - REACTIVATE: Deleted records that return
 
-3. **Minimal RAW_JSON Layer**
+3. **Minimal RAW_JSON Layer** ✅ IMPLEMENTED
    - SecureFiles compression (60-80% reduction)
-   - 30-day retention with auto-purge
-   - Parse only when needed
+   - 30-day retention with auto-purge (no DBA required!)
+   - Best-effort inserts (failures don't break ETL)
+   - Cleanup runs after each ETL (not scheduled job)
 
 4. **RBAC Security**
    - Role-based access control
@@ -112,17 +113,18 @@ API calls dominate (95% of time), not database operations (5%).
 
 ## Implementation Checklist
 
-### Phase 1: Foundation (Immediate)
-- [ ] Deploy new DDL with complete SCD2 structure
-- [ ] Add STG_ID identity columns to staging tables
-- [ ] Create entity-specific packages (PKG_*_ETL)
-- [ ] Implement master orchestrator procedure
-- [ ] Set up autonomous error logging
+### Phase 1: Foundation ✅ COMPLETE
+- [x] Deploy new DDL with complete SCD2 structure
+- [x] Add STG_ID identity columns to staging tables
+- [x] Create entity-specific packages (PKG_*_ETL)
+- [x] Implement master orchestrator procedure
+- [x] Add RAW_JSON with zero-privilege cleanup
+- [x] Implement SP_PURGE_RAW_JSON and SP_INSERT_RAW_JSON
+- [x] Update C# to insert into RAW_JSON
+- [x] Set up autonomous error logging (LOG_ETL_ERROR)
 
 ### Phase 2: Safety (Next Sprint)
 - [ ] Configure RBAC roles
-- [ ] Add RAW_JSON with compression
-- [ ] Set up 30-day purge job
 - [ ] Add reconciliation views
 - [ ] Enable DBMS_APPLICATION_INFO instrumentation
 

@@ -70,6 +70,29 @@ VALUES (:etlRunId, 'OPERATORS', 'RUNNING', SYSTIMESTAMP, 1);"
                     new ETLStep
                     {
                         StepNumber = 3,
+                        Title = "Save to RAW_JSON (Audit Trail)",
+                        Description = "Store raw API response for audit/forensics/replay",
+                        SqlStatement = @"-- C# calls SP_INSERT_RAW_JSON (best-effort, non-critical)
+BEGIN
+    SP_INSERT_RAW_JSON(
+        p_endpoint      => '/operators',
+        p_key_string    => 'all-operators',
+        p_etl_run_id    => :etlRunId,
+        p_http_status   => 200,
+        p_duration_ms   => :elapsedMs,
+        p_headers_json  => :headers_json,
+        p_payload       => :apiResponse  -- Complete JSON from API
+    );
+END;
+
+-- Purpose: Audit trail, forensics, replay capability
+-- Storage: SECUREFILE with COMPRESS MEDIUM (60-80% reduction)
+-- Retention: 30 days (auto-purged after each ETL run)
+-- If insert fails: ETL continues (non-critical)"
+                    },
+                    new ETLStep
+                    {
+                        StepNumber = 4,
                         Title = "Load to Staging",
                         Description = "Insert API data into staging table (temporary holding area)",
                         SqlStatement = @"-- C# performs bulk insert (8 records)
@@ -81,7 +104,7 @@ VALUES (:OperatorId, :OperatorName, :EtlRunId);
                     },
                     new ETLStep
                     {
-                        StepNumber = 4,
+                        StepNumber = 5,
                         Title = "Call Orchestrator",
                         Description = "Oracle SP_PROCESS_ETL_BATCH handles ALL business logic",
                         SqlStatement = @"BEGIN
@@ -191,7 +214,7 @@ WHERE NOT EXISTS (
                     },
                     new ETLStep
                     {
-                        StepNumber = 10,
+                        StepNumber = 11,
                         Title = "Update Control & Commit",
                         Description = "Record metrics and commit transaction",
                         SqlStatement = @"UPDATE ETL_CONTROL
@@ -212,7 +235,7 @@ COMMIT; -- Single atomic commit
                     },
                     new ETLStep
                     {
-                        StepNumber = 11,
+                        StepNumber = 12,
                         Title = "Post-ETL Cleanup (Automatic)",
                         Description = "Cleanup runs AFTER successful ETL - no DBA required",
                         SqlStatement = @"-- Cleanup executes AFTER COMMIT (non-critical)
@@ -271,6 +294,20 @@ Returns: 130 plants with:
                     new ETLStep
                     {
                         StepNumber = 2,
+                        Title = "Save to RAW_JSON",
+                        Description = "Store raw API response for audit trail",
+                        SqlStatement = @"BEGIN
+    SP_INSERT_RAW_JSON(
+        p_endpoint => '/plants', p_key_string => 'all-plants',
+        p_etl_run_id => :etlRunId, p_http_status => 200,
+        p_duration_ms => :elapsedMs, p_payload => :apiResponse
+    );
+END;
+-- Compressed storage, 30-day retention, auto-purged"
+                    },
+                    new ETLStep
+                    {
+                        StepNumber = 3,
                         Title = "Load to Staging",
                         Description = "Bulk insert 130 plants to staging",
                         SqlStatement = @"INSERT INTO STG_PLANTS (
@@ -329,7 +366,7 @@ LOG_ETL_ERROR(run_id, source, code, message);
                     },
                     new ETLStep
                     {
-                        StepNumber = 5,
+                        StepNumber = 6,
                         Title = "Reconciliation",
                         Description = "Verify data consistency",
                         SqlStatement = @"INSERT INTO ETL_RECONCILIATION (
@@ -418,6 +455,51 @@ END LOOP;
         }
 
         /// <summary>
+        /// Insert raw JSON response to audit table (optional, best-effort)
+        /// </summary>
+        private async Task InsertRawJson(
+            OracleConnection connection, 
+            int etlRunId, 
+            string endpoint, 
+            string keyString,
+            string apiResponse,
+            int httpStatus = 200,
+            int? durationMs = null)
+        {
+            try
+            {
+                await connection.ExecuteAsync(@"
+                    BEGIN
+                        SP_INSERT_RAW_JSON(
+                            p_endpoint      => :endpoint,
+                            p_key_string    => :keyString,
+                            p_etl_run_id    => :etlRunId,
+                            p_http_status   => :httpStatus,
+                            p_duration_ms   => :durationMs,
+                            p_headers_json  => :headers,
+                            p_payload       => :payload
+                        );
+                    END;",
+                    new 
+                    { 
+                        endpoint,
+                        keyString,
+                        etlRunId,
+                        httpStatus,
+                        durationMs = durationMs ?? 0,
+                        headers = "{\"Content-Type\": \"application/json\"}",
+                        payload = apiResponse
+                    });
+                _logger.LogDebug($"RAW_JSON inserted for {endpoint}");
+            }
+            catch (Exception ex)
+            {
+                // Non-critical - log and continue
+                _logger.LogWarning($"RAW_JSON insert failed (non-critical): {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Load Operators using new orchestrator pattern
         /// </summary>
         public async Task<ETLResult> LoadOperators()
@@ -432,7 +514,9 @@ END LOOP;
             {
                 // STEP 1: Fetch from API
                 _logger.LogInformation("Fetching operators from API...");
+                var sw = System.Diagnostics.Stopwatch.StartNew();
                 var apiResponse = await _apiService.FetchDataAsync("operators");
+                sw.Stop();
                 var apiData = _deserializer.DeserializeApiResponse(apiResponse, "operators");
                 
                 result.ApiCallCount = 1;
@@ -459,6 +543,17 @@ END LOOP;
                     INSERT INTO ETL_CONTROL (ETL_RUN_ID, RUN_TYPE, STATUS, START_TIME, API_CALL_COUNT)
                     VALUES (:etlRunId, :runType, 'RUNNING', SYSTIMESTAMP, :apiCalls)",
                     new { etlRunId, runType = "OPERATORS", apiCalls = result.ApiCallCount }
+                );
+
+                // Optional: Insert RAW_JSON for audit trail
+                await InsertRawJson(
+                    connection, 
+                    etlRunId, 
+                    "/operators", 
+                    "all-operators",
+                    apiResponse,
+                    200,
+                    (int)sw.ElapsedMilliseconds
                 );
 
                 // STEP 3: Bulk insert to staging
@@ -542,7 +637,9 @@ END LOOP;
             {
                 // STEP 1: Fetch from API
                 _logger.LogInformation("Fetching plants from API...");
+                var sw = System.Diagnostics.Stopwatch.StartNew();
                 var apiResponse = await _apiService.FetchDataAsync("plants");
+                sw.Stop();
                 var apiData = _deserializer.DeserializeApiResponse(apiResponse, "plants");
                 
                 result.ApiCallCount = 1;
@@ -568,6 +665,17 @@ END LOOP;
                     INSERT INTO ETL_CONTROL (ETL_RUN_ID, RUN_TYPE, STATUS, START_TIME, API_CALL_COUNT)
                     VALUES (:etlRunId, :runType, 'RUNNING', SYSTIMESTAMP, :apiCalls)",
                     new { etlRunId, runType = "PLANTS", apiCalls = result.ApiCallCount }
+                );
+
+                // Optional: Insert RAW_JSON for audit trail
+                await InsertRawJson(
+                    connection, 
+                    etlRunId, 
+                    "/plants", 
+                    "all-plants",
+                    apiResponse,
+                    200,
+                    (int)sw.ElapsedMilliseconds
                 );
 
                 // STEP 3: Bulk insert to staging

@@ -1,9 +1,50 @@
 # TR2000 API Data Manager - Development Progress Log
 
 ## 🔴 CRITICAL: This file must be updated after EVERY major change
-Last Updated: 2025-08-17 (Session 11 - PRODUCTION READY WITH EDUCATIONAL UI)
+Last Updated: 2025-08-17 (Session 12 - UI Text Correction)
 
-## Current Session Summary (2025-08-17 - Session 11 COMPLETE)
+## Current Session Summary (2025-08-17 - Session 12)
+
+### 1. UI Text Correction:
+- **Fixed**: Updated OracleETLV2.razor to accurately describe cleanup behavior
+- **Changed From**: "ETL_ERROR_LOG: 30 DAYS - Auto-purged nightly"
+- **Changed To**: "ETL_ERROR_LOG: 30 DAYS - Cleaned after each ETL (automatic)"
+- **Reason**: Cleanup actually runs after each ETL (in SP_PROCESS_ETL_BATCH), not as a scheduled nightly job
+- **Verified**: SP_PROCESS_ETL_BATCH includes cleanup block after COMMIT (lines 1243-1278)
+
+### 2. RAW_JSON Implementation (Phase 1 - No DBA Required!):
+Based on GPT-5 feedback, implemented RAW_JSON audit trail with zero-privilege approach:
+
+#### What Was Added:
+- **RAW_JSON Table**: Stores compressed API responses for audit/forensics
+- **SP_PURGE_RAW_JSON**: Cleanup procedure (no scheduler needed)
+- **SP_INSERT_RAW_JSON**: Helper for easy inserts from C#
+- **Automatic Cleanup**: Runs after each ETL (no DBA privileges required)
+
+#### Key Features:
+- **No Scheduled Jobs**: Cleanup runs in SP_PROCESS_ETL_BATCH after commit
+- **Compressed Storage**: SECUREFILE with COMPRESS MEDIUM DEDUPLICATE
+- **Best-Effort**: Failures don't affect ETL (non-critical)
+- **30-Day Retention**: Automatically purged, no manual intervention
+
+#### Files Modified:
+- `Oracle_DDL_SCD2_FINAL.sql` - Added RAW_JSON table and procedures (FIXED LOB syntax)
+- `OracleETLServiceV2.cs` - Added InsertRawJson() method, calls for Operators/Plants
+- `OracleETLV2.razor` - Updated UI to show RAW_JSON is active
+
+#### DDL Fix Applied:
+- **Issue**: RAW_JSON table creation failed with ORA-00907 (missing parenthesis)
+- **Cause**: Incorrect LOB storage syntax - can't put STORE AS inside column definition
+- **Fix**: Moved LOB storage clauses outside the CREATE TABLE parentheses
+- **NO UPGRADE SCRIPTS** - Only update the main DDL per policy!
+
+#### Why This Matters:
+- **Audit Trail**: Can replay/investigate what API sent on any date
+- **Zero Complexity**: Just one extra insert, cleanup is automatic
+- **No DBA Required**: Works with regular user permissions
+- **Production Ready**: Aligned with final architecture but implemented now
+
+## Previous Session Summary (2025-08-17 - Session 11 COMPLETE)
 
 ### 🎯 PRODUCTION READY WITH FULL EDUCATIONAL UI!
 

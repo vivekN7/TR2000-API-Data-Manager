@@ -1146,30 +1146,28 @@ END LOOP;
             var result = new ETLResult 
             { 
                 StartTime = DateTime.Now, 
-                EndpointName = "PLANTS" 
+                EndpointName = "PLANTS_ENHANCED" 
             };
 
             try
             {
-                // STEP 1: Fetch from API
-                _logger.LogInformation("Fetching plants from API...");
+                // STEP 1: Fetch basic plant data from /plants endpoint
+                _logger.LogInformation("Fetching plants from API (basic data)...");
                 var sw = System.Diagnostics.Stopwatch.StartNew();
-                var apiResponse = await _apiService.FetchDataAsync("plants");
-                sw.Stop();
-                var apiData = _deserializer.DeserializeApiResponse(apiResponse, "plants");
+                var plantsApiResponse = await _apiService.FetchDataAsync("plants");
+                var plantsApiData = _deserializer.DeserializeApiResponse(plantsApiResponse, "plants");
                 
-                result.ApiCallCount = 1;
-                
-                if (apiData == null || !apiData.Any())
+                if (plantsApiData == null || !plantsApiData.Any())
                 {
                     result.Status = "NO_DATA";
-                    result.Message = "No data returned from API";
+                    result.Message = "No data returned from plants API";
                     return result;
                 }
 
-                _logger.LogInformation($"Fetched {apiData.Count} plants from API");
+                _logger.LogInformation($"Fetched {plantsApiData.Count} plants from basic API");
+                result.ApiCallCount = 1;
 
-                // STEP 2: Get ETL Run ID
+                // STEP 2: Get ETL Run ID and setup
                 using var connection = new OracleConnection(_connectionString);
                 await connection.OpenAsync();
                 
@@ -1179,41 +1177,149 @@ END LOOP;
 
                 await connection.ExecuteAsync(@"
                     INSERT INTO ETL_CONTROL (ETL_RUN_ID, RUN_TYPE, STATUS, START_TIME, API_CALL_COUNT)
-                    VALUES (:etlRunId, :runType, 'RUNNING', SYSTIMESTAMP, :apiCalls)",
-                    new { etlRunId, runType = "PLANTS", apiCalls = result.ApiCallCount }
+                    VALUES (:etlRunId, :runType, 'RUNNING', SYSDATE, :apiCalls)",
+                    new { etlRunId, runType = "PLANTS_ENHANCED", apiCalls = 1 }
                 );
 
-                // Optional: Insert RAW_JSON for audit trail
+                // Insert RAW_JSON for basic plants data
                 await InsertRawJson(
                     connection, 
                     etlRunId, 
                     "/plants", 
                     "all-plants",
-                    apiResponse,
+                    plantsApiResponse,
                     200,
                     (int)sw.ElapsedMilliseconds
                 );
 
-                // STEP 3: Bulk insert to staging
-                _logger.LogInformation($"Inserting {apiData.Count} records to staging...");
+                // STEP 3: For each plant, fetch detailed data from /plants/{plantid} endpoint
+                _logger.LogInformation("Fetching detailed plant data for enhanced fields...");
+                var enhancedPlantsData = new List<Dictionary<string, object>>();
+
+                foreach (var basicPlant in plantsApiData)
+                {
+                    var plantId = basicPlant["PlantID"]?.ToString();
+                    if (string.IsNullOrEmpty(plantId)) continue;
+
+                    try
+                    {
+                        // Fetch detailed plant data
+                        var detailApiResponse = await _apiService.FetchDataAsync($"plants/{plantId}");
+                        var detailApiData = _deserializer.DeserializeApiResponse(detailApiResponse, $"plants/{plantId}");
+                        result.ApiCallCount++;
+
+                        if (detailApiData != null && detailApiData.Any())
+                        {
+                            var detailPlant = detailApiData.First();
+                            
+                            // Merge basic + detailed data
+                            var enhancedPlant = new Dictionary<string, object>();
+                            
+                            // Add basic fields from /plants endpoint
+                            foreach (var kvp in basicPlant)
+                            {
+                                enhancedPlant[kvp.Key] = kvp.Value;
+                            }
+                            
+                            // Add detailed fields from /plants/{plantid} endpoint
+                            foreach (var kvp in detailPlant)
+                            {
+                                if (!enhancedPlant.ContainsKey(kvp.Key))
+                                {
+                                    enhancedPlant[kvp.Key] = kvp.Value;
+                                }
+                            }
+                            
+                            enhancedPlantsData.Add(enhancedPlant);
+
+                            // Insert RAW_JSON for detailed plant data
+                            await InsertRawJson(
+                                connection, 
+                                etlRunId, 
+                                $"/plants/{plantId}", 
+                                plantId,
+                                detailApiResponse,
+                                200,
+                                0
+                            );
+                        }
+                        else
+                        {
+                            // If detailed fetch fails, use basic data only
+                            enhancedPlantsData.Add(basicPlant);
+                            _logger.LogWarning($"Could not fetch detailed data for plant {plantId}, using basic data only");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning($"Error fetching detailed data for plant {plantId}: {ex.Message}");
+                        enhancedPlantsData.Add(basicPlant); // Use basic data only
+                    }
+                }
+
+                sw.Stop();
+                _logger.LogInformation($"Enhanced plant data collection complete. Total API calls: {result.ApiCallCount}");
+
+                // Update ETL_CONTROL with final API call count
+                await connection.ExecuteAsync(@"
+                    UPDATE ETL_CONTROL SET API_CALL_COUNT = :apiCalls 
+                    WHERE ETL_RUN_ID = :etlRunId",
+                    new { apiCalls = result.ApiCallCount, etlRunId }
+                );
+
+                // STEP 4: Bulk insert to staging with ALL 24+ fields
+                _logger.LogInformation($"Inserting {enhancedPlantsData.Count} enhanced plant records to staging...");
                 
-                foreach (var row in apiData)
+                foreach (var plant in enhancedPlantsData)
                 {
                     await connection.ExecuteAsync(@"
                         INSERT INTO STG_PLANTS (
-                            PLANT_ID, PLANT_NAME, LONG_DESCRIPTION, 
-                            OPERATOR_ID, COMMON_LIB_PLANT_CODE, ETL_RUN_ID
+                            -- Core Plant Fields (from /plants endpoint)
+                            OPERATOR_ID, OPERATOR_NAME, PLANT_ID, SHORT_DESCRIPTION, PROJECT, 
+                            LONG_DESCRIPTION, COMMON_LIB_PLANT_CODE, INITIAL_REVISION, AREA_ID, AREA,
+                            -- Extended Plant Configuration Fields (from /plants/{plantid} endpoint)
+                            ENABLE_EMBEDDED_NOTE, CATEGORY_ID, CATEGORY, DOCUMENT_SPACE_LINK, 
+                            ENABLE_COPY_PCS_FROM_PLANT, OVER_LENGTH, PCS_QA, EDS_MJ, CELSIUS_BAR,
+                            WEB_INFO_TEXT, BOLT_TENSION_TEXT, VISIBLE, WINDOWS_REMARK_TEXT, USER_PROTECTED,
+                            -- ETL Control Fields
+                            ETL_RUN_ID
                         ) VALUES (
-                            :PlantId, :PlantName, :LongDescription, 
-                            :OperatorId, :CommonLibPlantCode, :EtlRunId
+                            :OperatorId, :OperatorName, :PlantId, :ShortDescription, :Project,
+                            :LongDescription, :CommonLibPlantCode, :InitialRevision, :AreaId, :Area,
+                            :EnableEmbeddedNote, :CategoryId, :Category, :DocumentSpaceLink,
+                            :EnableCopyPcsFromPlant, :OverLength, :PcsQa, :EdsMj, :CelsiusBar,
+                            :WebInfoText, :BoltTensionText, :Visible, :WindowsRemarkText, :UserProtected,
+                            :EtlRunId
                         )",
                         new 
                         { 
-                            PlantId = row["PlantID"]?.ToString(),  // Fixed: PlantID with capital ID
-                            PlantName = row.ContainsKey("PlantName") ? row["PlantName"]?.ToString() : row["ShortDescription"]?.ToString(),  // Use ShortDescription as PlantName
-                            LongDescription = row["LongDescription"]?.ToString(),
-                            OperatorId = row.ContainsKey("OperatorID") ? Convert.ToInt32(row["OperatorID"]) : (int?)null,  // Fixed: OperatorID with capital ID
-                            CommonLibPlantCode = row["CommonLibPlantCode"]?.ToString(),
+                            // Core Plant Fields
+                            OperatorId = plant.ContainsKey("OperatorID") && plant["OperatorID"] != null ? Convert.ToInt32(plant["OperatorID"]) : (int?)null,
+                            OperatorName = plant["OperatorName"]?.ToString(),
+                            PlantId = plant["PlantID"]?.ToString(),
+                            ShortDescription = plant["ShortDescription"]?.ToString(),
+                            Project = plant["Project"]?.ToString(),
+                            LongDescription = plant["LongDescription"]?.ToString(),
+                            CommonLibPlantCode = plant["CommonLibPlantCode"]?.ToString(),
+                            InitialRevision = plant["InitialRevision"]?.ToString(),
+                            AreaId = plant.ContainsKey("AreaID") && plant["AreaID"] != null ? Convert.ToInt32(plant["AreaID"]) : (int?)null,
+                            Area = plant["Area"]?.ToString(),
+                            // Extended Plant Configuration Fields
+                            EnableEmbeddedNote = plant["EnableEmbeddedNote"]?.ToString(),
+                            CategoryId = plant["CategoryID"]?.ToString(),
+                            Category = plant["Category"]?.ToString(),
+                            DocumentSpaceLink = plant["DocumentSpaceLink"]?.ToString(),
+                            EnableCopyPcsFromPlant = plant["EnableCopyPCSFromPlant"]?.ToString(),
+                            OverLength = plant["OverLength"]?.ToString(),
+                            PcsQa = plant["PCSQA"]?.ToString(),
+                            EdsMj = plant["EDSMJ"]?.ToString(),
+                            CelsiusBar = plant["CelsiusBar"]?.ToString(),
+                            WebInfoText = plant["WebInfoText"]?.ToString(),
+                            BoltTensionText = plant["BoltTensionText"]?.ToString(),
+                            Visible = plant["Visible"]?.ToString(),
+                            WindowsRemarkText = plant["WindowsRemarkText"]?.ToString(),
+                            UserProtected = plant["UserProtected"]?.ToString(),
+                            // ETL Control
                             EtlRunId = etlRunId
                         }
                     );
@@ -1276,7 +1382,7 @@ END LOOP;
             var result = new ETLResult 
             { 
                 StartTime = DateTime.Now, 
-                EndpointName = "ISSUES" 
+                EndpointName = "ISSUES_ENHANCED" 
             };
 
             try
@@ -1307,8 +1413,8 @@ END LOOP;
 
                 await connection.ExecuteAsync(@"
                     INSERT INTO ETL_CONTROL (ETL_RUN_ID, RUN_TYPE, STATUS, START_TIME)
-                    VALUES (:etlRunId, :runType, 'RUNNING', SYSTIMESTAMP)",
-                    new { etlRunId, runType = "ISSUES" }
+                    VALUES (:etlRunId, :runType, 'RUNNING', SYSDATE)",
+                    new { etlRunId, runType = "ISSUES_ENHANCED" }
                 );
 
                 int totalRecords = 0;
@@ -1356,19 +1462,64 @@ END LOOP;
                             {
                                 await connection.ExecuteAsync(@"
                                     INSERT INTO STG_ISSUES (
-                                        PLANT_ID, ISSUE_REVISION, USER_NAME, 
-                                        USER_ENTRY_TIME, USER_PROTECTED, ETL_RUN_ID
+                                        PLANT_ID, ISSUE_REVISION, 
+                                        -- Issue Status and Dates
+                                        STATUS, REV_DATE, PROTECT_STATUS,
+                                        -- General Revision Info
+                                        GENERAL_REVISION, GENERAL_REV_DATE,
+                                        -- Specific Component Revisions and Dates (16 fields)
+                                        PCS_REVISION, PCS_REV_DATE, EDS_REVISION, EDS_REV_DATE,
+                                        VDS_REVISION, VDS_REV_DATE, VSK_REVISION, VSK_REV_DATE,
+                                        MDS_REVISION, MDS_REV_DATE, ESK_REVISION, ESK_REV_DATE,
+                                        SC_REVISION, SC_REV_DATE, VSM_REVISION, VSM_REV_DATE,
+                                        -- User Audit Fields
+                                        USER_NAME, USER_ENTRY_TIME, USER_PROTECTED,
+                                        -- ETL Control Fields
+                                        ETL_RUN_ID
                                     ) VALUES (
-                                        :PlantId, :IssueRevision, :UserName,
-                                        :UserEntryTime, :UserProtected, :EtlRunId
+                                        :PlantId, :IssueRevision,
+                                        :Status, :RevDate, :ProtectStatus,
+                                        :GeneralRevision, :GeneralRevDate,
+                                        :PcsRevision, :PcsRevDate, :EdsRevision, :EdsRevDate,
+                                        :VdsRevision, :VdsRevDate, :VskRevision, :VskRevDate,
+                                        :MdsRevision, :MdsRevDate, :EskRevision, :EskRevDate,
+                                        :ScRevision, :ScRevDate, :VsmRevision, :VsmRevDate,
+                                        :UserName, :UserEntryTime, :UserProtected,
+                                        :EtlRunId
                                     )",
                                     new
                                     {
                                         PlantId = plantId,
-                                        IssueRevision = issue["IssueRevision"]?.ToString(),  // Fixed: API returns IssueRevision not Revision
+                                        IssueRevision = issue["IssueRevision"]?.ToString(),
+                                        // Issue Status and Dates
+                                        Status = issue["Status"]?.ToString(),
+                                        RevDate = ParseDateTimeFromString(issue["RevDate"]?.ToString()),
+                                        ProtectStatus = issue["ProtectStatus"]?.ToString(),
+                                        // General Revision Info
+                                        GeneralRevision = issue["GeneralRevision"]?.ToString(),
+                                        GeneralRevDate = ParseDateTimeFromString(issue["GeneralRevDate"]?.ToString()),
+                                        // Specific Component Revisions and Dates (16 fields)
+                                        PcsRevision = issue["PCSRevision"]?.ToString(),
+                                        PcsRevDate = ParseDateTimeFromString(issue["PCSRevDate"]?.ToString()),
+                                        EdsRevision = issue["EDSRevision"]?.ToString(),
+                                        EdsRevDate = ParseDateTimeFromString(issue["EDSRevDate"]?.ToString()),
+                                        VdsRevision = issue["VDSRevision"]?.ToString(),
+                                        VdsRevDate = ParseDateTimeFromString(issue["VDSRevDate"]?.ToString()),
+                                        VskRevision = issue["VSKRevision"]?.ToString(),
+                                        VskRevDate = ParseDateTimeFromString(issue["VSKRevDate"]?.ToString()),
+                                        MdsRevision = issue["MDSRevision"]?.ToString(),
+                                        MdsRevDate = ParseDateTimeFromString(issue["MDSRevDate"]?.ToString()),
+                                        EskRevision = issue["ESKRevision"]?.ToString(),
+                                        EskRevDate = ParseDateTimeFromString(issue["ESKRevDate"]?.ToString()),
+                                        ScRevision = issue["SCRevision"]?.ToString(),
+                                        ScRevDate = ParseDateTimeFromString(issue["SCRevDate"]?.ToString()),
+                                        VsmRevision = issue["VSMRevision"]?.ToString(),
+                                        VsmRevDate = ParseDateTimeFromString(issue["VSMRevDate"]?.ToString()),
+                                        // User Audit Fields
                                         UserName = issue["UserName"]?.ToString(),
                                         UserEntryTime = ParseDateTime(issue.ContainsKey("UserEntryTime") ? issue["UserEntryTime"] : null),
                                         UserProtected = issue["UserProtected"]?.ToString(),
+                                        // ETL Control
                                         EtlRunId = etlRunId
                                     }
                                 );
@@ -1950,22 +2101,19 @@ END LOOP;
                                 await connection.ExecuteAsync(@"
                                     INSERT INTO STG_VDS_REFERENCES (
                                         PLANT_ID, ISSUE_REVISION, VDS_NAME, VDS_REVISION,
-                                        OFFICIAL_REVISION, DELTA, USER_NAME, USER_ENTRY_TIME, USER_PROTECTED,
-                                        ETL_RUN_ID
+                                        REV_DATE, STATUS, OFFICIAL_REVISION, DELTA, ETL_RUN_ID
                                     ) VALUES (
                                         :plantId, :issueRev, :vdsName, :vdsRev,
-                                        :officialRev, :delta, :userName, :userTime, :userProtected,
-                                        :etlRunId
+                                        :revDate, :status, :officialRev, :delta, :etlRunId
                                     )", new {
                                         plantId = issue.PlantID,
                                         issueRev = issue.IssueRevision,
                                         vdsName = item["VDS"]?.ToString(),
                                         vdsRev = item["Revision"]?.ToString(),
+                                        revDate = ParseDateTimeFromString(item["RevDate"]?.ToString()),
+                                        status = item["Status"]?.ToString(),
                                         officialRev = item["OfficialRevision"]?.ToString(),
                                         delta = item["Delta"]?.ToString(),
-                                        userName = issue.UserName,
-                                        userTime = issue.UserEntryTime,
-                                        userProtected = issue.UserProtected,
                                         etlRunId
                                     });
                             }
@@ -2101,22 +2249,19 @@ END LOOP;
                                 await connection.ExecuteAsync(@"
                                     INSERT INTO STG_EDS_REFERENCES (
                                         PLANT_ID, ISSUE_REVISION, EDS_NAME, EDS_REVISION,
-                                        OFFICIAL_REVISION, DELTA, USER_NAME, USER_ENTRY_TIME, USER_PROTECTED,
-                                        ETL_RUN_ID
+                                        REV_DATE, STATUS, OFFICIAL_REVISION, DELTA, ETL_RUN_ID
                                     ) VALUES (
                                         :plantId, :issueRev, :edsName, :edsRev,
-                                        :officialRev, :delta, :userName, :userTime, :userProtected,
-                                        :etlRunId
+                                        :revDate, :status, :officialRev, :delta, :etlRunId
                                     )", new {
                                         plantId = issue.PlantID,
                                         issueRev = issue.IssueRevision,
                                         edsName = item["EDS"]?.ToString(),
                                         edsRev = item["Revision"]?.ToString(),
+                                        revDate = ParseDateTimeFromString(item["RevDate"]?.ToString()),
+                                        status = item["Status"]?.ToString(),
                                         officialRev = item["OfficialRevision"]?.ToString(),
                                         delta = item["Delta"]?.ToString(),
-                                        userName = issue.UserName,
-                                        userTime = issue.UserEntryTime,
-                                        userProtected = issue.UserProtected,
                                         etlRunId
                                     });
                             }
@@ -2252,23 +2397,20 @@ END LOOP;
                                 await connection.ExecuteAsync(@"
                                     INSERT INTO STG_MDS_REFERENCES (
                                         PLANT_ID, ISSUE_REVISION, MDS_NAME, MDS_REVISION,
-                                        OFFICIAL_REVISION, DELTA, AREA, USER_NAME, USER_ENTRY_TIME, USER_PROTECTED,
-                                        ETL_RUN_ID
+                                        AREA, REV_DATE, STATUS, OFFICIAL_REVISION, DELTA, ETL_RUN_ID
                                     ) VALUES (
                                         :plantId, :issueRev, :mdsName, :mdsRev,
-                                        :officialRev, :delta, :area, :userName, :userTime, :userProtected,
-                                        :etlRunId
+                                        :area, :revDate, :status, :officialRev, :delta, :etlRunId
                                     )", new {
                                         plantId = issue.PlantID,
                                         issueRev = issue.IssueRevision,
                                         mdsName = item["MDS"]?.ToString(),
                                         mdsRev = item["Revision"]?.ToString(),
+                                        area = item["Area"]?.ToString(), // Special field for MDS only
+                                        revDate = ParseDateTimeFromString(item["RevDate"]?.ToString()),
+                                        status = item["Status"]?.ToString(),
                                         officialRev = item["OfficialRevision"]?.ToString(),
                                         delta = item["Delta"]?.ToString(),
-                                        area = item["Area"]?.ToString(),
-                                        userName = issue.UserName,
-                                        userTime = issue.UserEntryTime,
-                                        userProtected = issue.UserProtected,
                                         etlRunId
                                     });
                             }
@@ -2404,22 +2546,19 @@ END LOOP;
                                 await connection.ExecuteAsync(@"
                                     INSERT INTO STG_VSK_REFERENCES (
                                         PLANT_ID, ISSUE_REVISION, VSK_NAME, VSK_REVISION,
-                                        OFFICIAL_REVISION, DELTA, USER_NAME, USER_ENTRY_TIME, USER_PROTECTED,
-                                        ETL_RUN_ID
+                                        REV_DATE, STATUS, OFFICIAL_REVISION, DELTA, ETL_RUN_ID
                                     ) VALUES (
                                         :plantId, :issueRev, :vskName, :vskRev,
-                                        :officialRev, :delta, :userName, :userTime, :userProtected,
-                                        :etlRunId
+                                        :revDate, :status, :officialRev, :delta, :etlRunId
                                     )", new {
                                         plantId = issue.PlantID,
                                         issueRev = issue.IssueRevision,
                                         vskName = item["VSK"]?.ToString(),
                                         vskRev = item["Revision"]?.ToString(),
+                                        revDate = ParseDateTimeFromString(item["RevDate"]?.ToString()),
+                                        status = item["Status"]?.ToString(),
                                         officialRev = item["OfficialRevision"]?.ToString(),
                                         delta = item["Delta"]?.ToString(),
-                                        userName = issue.UserName,
-                                        userTime = issue.UserEntryTime,
-                                        userProtected = issue.UserProtected,
                                         etlRunId
                                     });
                             }
@@ -2555,22 +2694,19 @@ END LOOP;
                                 await connection.ExecuteAsync(@"
                                     INSERT INTO STG_ESK_REFERENCES (
                                         PLANT_ID, ISSUE_REVISION, ESK_NAME, ESK_REVISION,
-                                        OFFICIAL_REVISION, DELTA, USER_NAME, USER_ENTRY_TIME, USER_PROTECTED,
-                                        ETL_RUN_ID
+                                        REV_DATE, STATUS, OFFICIAL_REVISION, DELTA, ETL_RUN_ID
                                     ) VALUES (
                                         :plantId, :issueRev, :eskName, :eskRev,
-                                        :officialRev, :delta, :userName, :userTime, :userProtected,
-                                        :etlRunId
+                                        :revDate, :status, :officialRev, :delta, :etlRunId
                                     )", new {
                                         plantId = issue.PlantID,
                                         issueRev = issue.IssueRevision,
                                         eskName = item["ESK"]?.ToString(),
                                         eskRev = item["Revision"]?.ToString(),
+                                        revDate = ParseDateTimeFromString(item["RevDate"]?.ToString()),
+                                        status = item["Status"]?.ToString(),
                                         officialRev = item["OfficialRevision"]?.ToString(),
                                         delta = item["Delta"]?.ToString(),
-                                        userName = issue.UserName,
-                                        userTime = issue.UserEntryTime,
-                                        userProtected = issue.UserProtected,
                                         etlRunId
                                     });
                             }
@@ -2705,24 +2841,30 @@ END LOOP;
                             {
                                 await connection.ExecuteAsync(@"
                                     INSERT INTO STG_PIPE_ELEMENT_REFERENCES (
-                                        PLANT_ID, ISSUE_REVISION, TAG_NO, ELEMENT_TYPE,
-                                        ELEMENT_SIZE, RATING, MATERIAL, USER_NAME, USER_ENTRY_TIME, USER_PROTECTED,
-                                        ETL_RUN_ID
+                                        PLANT_ID, ISSUE_REVISION, 
+                                        ELEMENT_GROUP, DIMENSION_STANDARD, PRODUCT_FORM, MATERIAL_GRADE,
+                                        MDS, MDS_REVISION, AREA, ELEMENT_ID, REVISION,
+                                        REV_DATE, STATUS, DELTA, ETL_RUN_ID
                                     ) VALUES (
-                                        :plantId, :issueRev, :tagNo, :elementType,
-                                        :elementSize, :rating, :material, :userName, :userTime, :userProtected,
-                                        :etlRunId
+                                        :plantId, :issueRev,
+                                        :elementGroup, :dimensionStandard, :productForm, :materialGrade,
+                                        :mds, :mdsRevision, :area, :elementId, :revision,
+                                        :revDate, :status, :delta, :etlRunId
                                     )", new {
                                         plantId = issue.PlantID,
                                         issueRev = issue.IssueRevision,
-                                        tagNo = item["ElementID"]?.ToString(),
-                                        elementType = item["ElementGroup"]?.ToString(),
-                                        elementSize = item["DimensionStandard"]?.ToString(),
-                                        rating = item["ProductForm"]?.ToString(),
-                                        material = item["MaterialGrade"]?.ToString(),
-                                        userName = issue.UserName,
-                                        userTime = issue.UserEntryTime,
-                                        userProtected = issue.UserProtected,
+                                        elementGroup = item["ElementGroup"]?.ToString(),
+                                        dimensionStandard = item["DimensionStandard"]?.ToString(),
+                                        productForm = item["ProductForm"]?.ToString(),
+                                        materialGrade = item["MaterialGrade"]?.ToString(),
+                                        mds = item["MDS"]?.ToString(),
+                                        mdsRevision = item["MDSRevision"]?.ToString(),
+                                        area = item["Area"]?.ToString(),
+                                        elementId = item.ContainsKey("ElementID") && item["ElementID"] != null ? Convert.ToInt32(item["ElementID"]) : (int?)null,
+                                        revision = item["Revision"]?.ToString(),
+                                        revDate = ParseDateTimeFromString(item["RevDate"]?.ToString()),
+                                        status = item["Status"]?.ToString(),
+                                        delta = item["Delta"]?.ToString(),
                                         etlRunId
                                     });
                             }
@@ -2858,6 +3000,446 @@ END LOOP;
             _logger.LogWarning($"Could not parse date: {dateStr}");
             return null;
         }
+
+        /// <summary>
+        /// Parse date string for enhanced issues fields (date-only fields from API)
+        /// </summary>
+        private DateTime? ParseDateTimeFromString(string? dateStr)
+        {
+            if (string.IsNullOrWhiteSpace(dateStr)) return null;
+            
+            // Try date-only formats first (most common for revision dates)
+            string[] formats = new[] 
+            {
+                "dd.MM.yyyy",
+                "yyyy-MM-dd",
+                "MM/dd/yyyy",
+                "dd/MM/yyyy",
+                "dd-MM-yyyy",
+                "yyyy/MM/dd"
+            };
+            
+            foreach (var format in formats)
+            {
+                if (DateTime.TryParseExact(dateStr, format, 
+                    System.Globalization.CultureInfo.InvariantCulture, 
+                    System.Globalization.DateTimeStyles.None, out var result))
+                {
+                    return result;
+                }
+            }
+            
+            // Try general parse as fallback
+            if (DateTime.TryParse(dateStr, out var fallbackResult))
+            {
+                return fallbackResult;
+            }
+            
+            _logger.LogWarning($"Could not parse date string: {dateStr}");
+            return null;
+        }
+
+        #region New PCS Detail Loading Methods (Enhanced Implementation)
+
+        /// <summary>
+        /// Load PCS Header/Properties data for complete engineering specifications
+        /// API Endpoint: plants/{plantid}/pcs/{pcsname}/rev/{revision}
+        /// </summary>
+        public async Task<ETLResult> LoadPCSHeader()
+        {
+            var result = new ETLResult 
+            { 
+                StartTime = DateTime.Now, 
+                EndpointName = "PCS_HEADER_ENHANCED" 
+            };
+
+            try
+            {
+                _logger.LogInformation("Loading PCS Header data with complete field coverage...");
+
+                // Get PCS references to know which PCS to load details for
+                var pcsReferences = await GetPCSReferencesForDetailLoading();
+                if (!pcsReferences.Any())
+                {
+                    result.Status = "NO_DATA";
+                    result.Message = "No PCS references found for detail loading";
+                    result.EndTime = DateTime.Now;
+                    return result;
+                }
+
+                using var connection = new OracleConnection(_connectionString);
+                await connection.OpenAsync();
+                
+                var etlRunId = await connection.QuerySingleAsync<int>(
+                    "SELECT ETL_RUN_ID_SEQ.NEXTVAL FROM DUAL"
+                );
+
+                await connection.ExecuteAsync(@"
+                    INSERT INTO ETL_CONTROL (ETL_RUN_ID, RUN_TYPE, STATUS, START_TIME, API_CALL_COUNT)
+                    VALUES (:etlRunId, :runType, 'RUNNING', SYSDATE, 0)",
+                    new { etlRunId, runType = "PCS_HEADER_ENHANCED" }
+                );
+
+                int totalApiCalls = 0;
+                foreach (var pcs in pcsReferences)
+                {
+                    try
+                    {
+                        var apiUrl = $"plants/{pcs.PlantID}/pcs/{pcs.PCSName}/rev/{pcs.PCSRevision}";
+                        var apiResponse = await _apiService.FetchDataAsync(apiUrl);
+                        totalApiCalls++;
+                        
+                        var apiData = _deserializer.DeserializeApiResponse(apiResponse, apiUrl);
+
+                        if (apiData?.Any() == true)
+                        {
+                            var pcsData = apiData.First();
+                            
+                            await connection.ExecuteAsync(@"
+                                INSERT INTO STG_PCS_HEADER (
+                                    PLANT_ID, PCS_NAME, PCS_REVISION,
+                                    STATUS, REV_DATE, RATING_CLASS, TEST_PRESSURE, MATERIAL_GROUP,
+                                    DESIGN_CODE, LAST_UPDATE, LAST_UPDATE_BY, APPROVER, NOTEPAD,
+                                    SPECIAL_REQ_ID, TUBE_PCS, NEW_VDS_SECTION, ETL_RUN_ID
+                                ) VALUES (
+                                    :plantId, :pcsName, :pcsRevision,
+                                    :status, :revDate, :ratingClass, :testPressure, :materialGroup,
+                                    :designCode, :lastUpdate, :lastUpdateBy, :approver, :notepad,
+                                    :specialReqId, :tubePcs, :newVdsSection, :etlRunId
+                                )", new {
+                                    plantId = pcs.PlantID,
+                                    pcsName = pcs.PCSName,
+                                    pcsRevision = pcs.PCSRevision,
+                                    status = pcsData["Status"]?.ToString(),
+                                    revDate = ParseDateTimeFromString(pcsData["RevDate"]?.ToString()),
+                                    ratingClass = pcsData["RatingClass"]?.ToString(),
+                                    testPressure = pcsData["TestPressure"]?.ToString(),
+                                    materialGroup = pcsData["MaterialGroup"]?.ToString(),
+                                    designCode = pcsData["DesignCode"]?.ToString(),
+                                    lastUpdate = pcsData["LastUpdate"]?.ToString(),
+                                    lastUpdateBy = pcsData["LastUpdateBy"]?.ToString(),
+                                    approver = pcsData["Approver"]?.ToString(),
+                                    notepad = pcsData["Notepad"]?.ToString(),
+                                    specialReqId = pcsData.ContainsKey("SpecialReqID") && pcsData["SpecialReqID"] != null ? Convert.ToInt32(pcsData["SpecialReqID"]) : (int?)null,
+                                    tubePcs = pcsData["TubePCS"]?.ToString(),
+                                    newVdsSection = pcsData["NewVDSSection"]?.ToString(),
+                                    etlRunId
+                                });
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"Failed to fetch PCS header for {pcs.PlantID}/{pcs.PCSName}/{pcs.PCSRevision}");
+                    }
+                }
+
+                // Update API call count and call orchestrator
+                await connection.ExecuteAsync(@"
+                    UPDATE ETL_CONTROL SET API_CALL_COUNT = :apiCalls WHERE ETL_RUN_ID = :etlRunId",
+                    new { apiCalls = totalApiCalls, etlRunId }
+                );
+
+                await connection.ExecuteAsync(@"
+                    BEGIN SP_PROCESS_ETL_BATCH(:etlRunId, 'PCS_HEADER'); END;", 
+                    new { etlRunId }
+                );
+
+                // Get results
+                var controlRecord = await connection.QuerySingleAsync<dynamic>(@"
+                    SELECT STATUS, PROCESSING_TIME_SEC, RECORDS_LOADED, RECORDS_UPDATED, 
+                           RECORDS_UNCHANGED, RECORDS_DELETED, RECORDS_REACTIVATED, ERROR_COUNT
+                    FROM ETL_CONTROL WHERE ETL_RUN_ID = :etlRunId",
+                    new { etlRunId }
+                );
+
+                result.Status = controlRecord.STATUS;
+                result.ApiCallCount = totalApiCalls;
+                result.RecordsLoaded = Convert.ToInt32(controlRecord.RECORDS_LOADED ?? 0);
+                result.RecordsUpdated = Convert.ToInt32(controlRecord.RECORDS_UPDATED ?? 0);
+                result.RecordsUnchanged = Convert.ToInt32(controlRecord.RECORDS_UNCHANGED ?? 0);
+                result.RecordsDeleted = Convert.ToInt32(controlRecord.RECORDS_DELETED ?? 0);
+                result.RecordsReactivated = Convert.ToInt32(controlRecord.RECORDS_REACTIVATED ?? 0);
+                result.ErrorCount = Convert.ToInt32(controlRecord.ERROR_COUNT ?? 0);
+                result.EndTime = DateTime.Now;
+                result.Message = $"PCS Header ETL completed: {result.RecordsLoaded} loaded, {result.RecordsUpdated} updated";
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "PCS Header ETL failed");
+                result.Status = "FAILED";
+                result.Message = ex.Message;
+                result.EndTime = DateTime.Now;
+                return result;
+            }
+        }
+
+        /// <summary>
+        /// Load PCS Temperature/Pressure matrix with 70+ fields including 12-point temp/pressure data
+        /// API Endpoint: plants/{plantid}/pcs/{pcsname}/rev/{revision}/temp-pressures
+        /// </summary>
+        public async Task<ETLResult> LoadPCSTemperaturePressure()
+        {
+            var result = new ETLResult 
+            { 
+                StartTime = DateTime.Now, 
+                EndpointName = "PCS_TEMP_PRESSURE_ENHANCED" 
+            };
+
+            try
+            {
+                _logger.LogInformation("Loading PCS Temperature/Pressure matrix with complete field coverage...");
+
+                // Get PCS references to know which PCS to load temp/pressure for
+                var pcsReferences = await GetPCSReferencesForDetailLoading();
+                if (!pcsReferences.Any())
+                {
+                    result.Status = "NO_DATA";
+                    result.Message = "No PCS references found for temp/pressure loading";
+                    result.EndTime = DateTime.Now;
+                    return result;
+                }
+
+                using var connection = new OracleConnection(_connectionString);
+                await connection.OpenAsync();
+                
+                var etlRunId = await connection.QuerySingleAsync<int>(
+                    "SELECT ETL_RUN_ID_SEQ.NEXTVAL FROM DUAL"
+                );
+
+                await connection.ExecuteAsync(@"
+                    INSERT INTO ETL_CONTROL (ETL_RUN_ID, RUN_TYPE, STATUS, START_TIME, API_CALL_COUNT)
+                    VALUES (:etlRunId, :runType, 'RUNNING', SYSDATE, 0)",
+                    new { etlRunId, runType = "PCS_TEMP_PRESSURE_ENHANCED" }
+                );
+
+                int totalApiCalls = 0;
+                foreach (var pcs in pcsReferences)
+                {
+                    try
+                    {
+                        var apiUrl = $"plants/{pcs.PlantID}/pcs/{pcs.PCSName}/rev/{pcs.PCSRevision}/temp-pressures";
+                        var apiResponse = await _apiService.FetchDataAsync(apiUrl);
+                        totalApiCalls++;
+                        
+                        var apiData = _deserializer.DeserializeApiResponse(apiResponse, apiUrl);
+
+                        if (apiData?.Any() == true)
+                        {
+                            var tempPressData = apiData.First();
+                            
+                            await connection.ExecuteAsync(@"
+                                INSERT INTO STG_PCS_TEMP_PRESSURE (
+                                    PLANT_ID, PCS_NAME, PCS_REVISION,
+                                    STATUS, REV_DATE, RATING_CLASS, TEST_PRESSURE, MATERIAL_GROUP,
+                                    DESIGN_CODE, LAST_UPDATE, LAST_UPDATE_BY, APPROVER, NOTEPAD,
+                                    SC, VSM, DESIGN_CODE_REV_MARK, CORR_ALLOWANCE, CORR_ALLOWANCE_REV_MARK,
+                                    LONG_WELD_EFF, LONG_WELD_EFF_REV_MARK, WALL_THK_TOL, WALL_THK_TOL_REV_MARK,
+                                    SERVICE_REMARK, SERVICE_REMARK_REV_MARK,
+                                    -- 12-point Design Pressure Matrix
+                                    DESIGN_PRESS_01, DESIGN_PRESS_02, DESIGN_PRESS_03, DESIGN_PRESS_04,
+                                    DESIGN_PRESS_05, DESIGN_PRESS_06, DESIGN_PRESS_07, DESIGN_PRESS_08,
+                                    DESIGN_PRESS_09, DESIGN_PRESS_10, DESIGN_PRESS_11, DESIGN_PRESS_12,
+                                    DESIGN_PRESS_REV_MARK,
+                                    -- 12-point Design Temperature Matrix
+                                    DESIGN_TEMP_01, DESIGN_TEMP_02, DESIGN_TEMP_03, DESIGN_TEMP_04,
+                                    DESIGN_TEMP_05, DESIGN_TEMP_06, DESIGN_TEMP_07, DESIGN_TEMP_08,
+                                    DESIGN_TEMP_09, DESIGN_TEMP_10, DESIGN_TEMP_11, DESIGN_TEMP_12,
+                                    DESIGN_TEMP_REV_MARK,
+                                    -- Note ID Fields
+                                    NOTE_ID_CORR_ALLOWANCE, NOTE_ID_SERVICE_CODE, NOTE_ID_WALL_THK_TOL,
+                                    NOTE_ID_LONG_WELD_EFF, NOTE_ID_GENERAL_PCS, NOTE_ID_DESIGN_CODE,
+                                    NOTE_ID_PRESS_TEMP_TABLE, NOTE_ID_PIPE_SIZE_WTH_TABLE,
+                                    -- Additional Engineering Fields
+                                    PRESS_ELEMENT_CHANGE, TEMP_ELEMENT_CHANGE, MATERIAL_GROUP_ID,
+                                    SPECIAL_REQ_ID, SPECIAL_REQ, NEW_VDS_SECTION, TUBE_PCS,
+                                    EDS_MJ_MATRIX, MJ_REDUCTION_FACTOR, ETL_RUN_ID
+                                ) VALUES (
+                                    :plantId, :pcsName, :pcsRevision,
+                                    :status, :revDate, :ratingClass, :testPressure, :materialGroup,
+                                    :designCode, :lastUpdate, :lastUpdateBy, :approver, :notepad,
+                                    :sc, :vsm, :designCodeRevMark, :corrAllowance, :corrAllowanceRevMark,
+                                    :longWeldEff, :longWeldEffRevMark, :wallThkTol, :wallThkTolRevMark,
+                                    :serviceRemark, :serviceRemarkRevMark,
+                                    -- Design Pressures (SAFETY CRITICAL - require exact precision)
+                                    :designPress01, :designPress02, :designPress03, :designPress04,
+                                    :designPress05, :designPress06, :designPress07, :designPress08,
+                                    :designPress09, :designPress10, :designPress11, :designPress12,
+                                    :designPressRevMark,
+                                    -- Design Temperatures (SAFETY CRITICAL - require exact precision)
+                                    :designTemp01, :designTemp02, :designTemp03, :designTemp04,
+                                    :designTemp05, :designTemp06, :designTemp07, :designTemp08,
+                                    :designTemp09, :designTemp10, :designTemp11, :designTemp12,
+                                    :designTempRevMark,
+                                    -- Note IDs
+                                    :noteIdCorrAllowance, :noteIdServiceCode, :noteIdWallThkTol,
+                                    :noteIdLongWeldEff, :noteIdGeneralPcs, :noteIdDesignCode,
+                                    :noteIdPressTempTable, :noteIdPipeSizeWthTable,
+                                    -- Additional Fields
+                                    :pressElementChange, :tempElementChange, :materialGroupId,
+                                    :specialReqId, :specialReq, :newVdsSection, :tubePcs,
+                                    :edsMjMatrix, :mjReductionFactor, :etlRunId
+                                )", new {
+                                    plantId = pcs.PlantID,
+                                    pcsName = pcs.PCSName,
+                                    pcsRevision = pcs.PCSRevision,
+                                    status = tempPressData["Status"]?.ToString(),
+                                    revDate = ParseDateTimeFromString(tempPressData["RevDate"]?.ToString()),
+                                    ratingClass = tempPressData["RatingClass"]?.ToString(),
+                                    testPressure = tempPressData["TestPressure"]?.ToString(),
+                                    materialGroup = tempPressData["MaterialGroup"]?.ToString(),
+                                    designCode = tempPressData["DesignCode"]?.ToString(),
+                                    lastUpdate = tempPressData["LastUpdate"]?.ToString(),
+                                    lastUpdateBy = tempPressData["LastUpdateBy"]?.ToString(),
+                                    approver = tempPressData["Approver"]?.ToString(),
+                                    notepad = tempPressData["Notepad"]?.ToString(),
+                                    sc = tempPressData["SC"]?.ToString(),
+                                    vsm = tempPressData["VSM"]?.ToString(),
+                                    designCodeRevMark = tempPressData["DesignCodeRevMark"]?.ToString(),
+                                    corrAllowance = ParseDecimalSafely(tempPressData["CorrAllowance"]?.ToString()),
+                                    corrAllowanceRevMark = tempPressData["CorrAllowanceRevMark"]?.ToString(),
+                                    longWeldEff = tempPressData["LongWeldEff"]?.ToString(),
+                                    longWeldEffRevMark = tempPressData["LongWeldEffRevMark"]?.ToString(),
+                                    wallThkTol = tempPressData["WallThkTol"]?.ToString(),
+                                    wallThkTolRevMark = tempPressData["WallThkTolRevMark"]?.ToString(),
+                                    serviceRemark = tempPressData["ServiceRemark"]?.ToString(),
+                                    serviceRemarkRevMark = tempPressData["ServiceRemarkRevMark"]?.ToString(),
+                                    // SAFETY CRITICAL: Design pressure values (exact precision required)
+                                    designPress01 = ParseDecimalSafely(tempPressData["DesignPress01"]?.ToString()),
+                                    designPress02 = ParseDecimalSafely(tempPressData["DesignPress02"]?.ToString()),
+                                    designPress03 = ParseDecimalSafely(tempPressData["DesignPress03"]?.ToString()),
+                                    designPress04 = ParseDecimalSafely(tempPressData["DesignPress04"]?.ToString()),
+                                    designPress05 = ParseDecimalSafely(tempPressData["DesignPress05"]?.ToString()),
+                                    designPress06 = ParseDecimalSafely(tempPressData["DesignPress06"]?.ToString()),
+                                    designPress07 = ParseDecimalSafely(tempPressData["DesignPress07"]?.ToString()),
+                                    designPress08 = ParseDecimalSafely(tempPressData["DesignPress08"]?.ToString()),
+                                    designPress09 = ParseDecimalSafely(tempPressData["DesignPress09"]?.ToString()),
+                                    designPress10 = ParseDecimalSafely(tempPressData["DesignPress10"]?.ToString()),
+                                    designPress11 = ParseDecimalSafely(tempPressData["DesignPress11"]?.ToString()),
+                                    designPress12 = ParseDecimalSafely(tempPressData["DesignPress12"]?.ToString()),
+                                    designPressRevMark = tempPressData["DesignPressRevMark"]?.ToString(),
+                                    // SAFETY CRITICAL: Design temperature values (exact precision required)
+                                    designTemp01 = ParseDecimalSafely(tempPressData["DesignTemp01"]?.ToString()),
+                                    designTemp02 = ParseDecimalSafely(tempPressData["DesignTemp02"]?.ToString()),
+                                    designTemp03 = ParseDecimalSafely(tempPressData["DesignTemp03"]?.ToString()),
+                                    designTemp04 = ParseDecimalSafely(tempPressData["DesignTemp04"]?.ToString()),
+                                    designTemp05 = ParseDecimalSafely(tempPressData["DesignTemp05"]?.ToString()),
+                                    designTemp06 = ParseDecimalSafely(tempPressData["DesignTemp06"]?.ToString()),
+                                    designTemp07 = ParseDecimalSafely(tempPressData["DesignTemp07"]?.ToString()),
+                                    designTemp08 = ParseDecimalSafely(tempPressData["DesignTemp08"]?.ToString()),
+                                    designTemp09 = ParseDecimalSafely(tempPressData["DesignTemp09"]?.ToString()),
+                                    designTemp10 = ParseDecimalSafely(tempPressData["DesignTemp10"]?.ToString()),
+                                    designTemp11 = ParseDecimalSafely(tempPressData["DesignTemp11"]?.ToString()),
+                                    designTemp12 = ParseDecimalSafely(tempPressData["DesignTemp12"]?.ToString()),
+                                    designTempRevMark = tempPressData["DesignTempRevMark"]?.ToString(),
+                                    // Note IDs
+                                    noteIdCorrAllowance = tempPressData["NoteIDCorrAllowance"]?.ToString(),
+                                    noteIdServiceCode = tempPressData["NoteIDServiceCode"]?.ToString(),
+                                    noteIdWallThkTol = tempPressData["NoteIDWallThkTol"]?.ToString(),
+                                    noteIdLongWeldEff = tempPressData["NoteIDLongWeldEff"]?.ToString(),
+                                    noteIdGeneralPcs = tempPressData["NoteIDGeneralPCS"]?.ToString(),
+                                    noteIdDesignCode = tempPressData["NoteIDDesignCode"]?.ToString(),
+                                    noteIdPressTempTable = tempPressData["NoteIDPressTempTable"]?.ToString(),
+                                    noteIdPipeSizeWthTable = tempPressData["NoteIDPipeSizeWthTable"]?.ToString(),
+                                    // Additional Fields
+                                    pressElementChange = tempPressData["PressElementChange"]?.ToString(),
+                                    tempElementChange = tempPressData["TempElementChange"]?.ToString(),
+                                    materialGroupId = tempPressData.ContainsKey("MaterialGroupID") && tempPressData["MaterialGroupID"] != null ? Convert.ToInt32(tempPressData["MaterialGroupID"]) : (int?)null,
+                                    specialReqId = tempPressData.ContainsKey("SpecialReqID") && tempPressData["SpecialReqID"] != null ? Convert.ToInt32(tempPressData["SpecialReqID"]) : (int?)null,
+                                    specialReq = tempPressData["SpecialReq"]?.ToString(),
+                                    newVdsSection = tempPressData["NewVDSSection"]?.ToString(),
+                                    tubePcs = tempPressData["TubePCS"]?.ToString(),
+                                    edsMjMatrix = tempPressData["EDSMJMatrix"]?.ToString(),
+                                    mjReductionFactor = ParseDecimalSafely(tempPressData["MJReductionFactor"]?.ToString()),
+                                    etlRunId
+                                });
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"Failed to fetch PCS temp/pressure for {pcs.PlantID}/{pcs.PCSName}/{pcs.PCSRevision}");
+                    }
+                }
+
+                // Update API call count and call orchestrator
+                await connection.ExecuteAsync(@"
+                    UPDATE ETL_CONTROL SET API_CALL_COUNT = :apiCalls WHERE ETL_RUN_ID = :etlRunId",
+                    new { apiCalls = totalApiCalls, etlRunId }
+                );
+
+                await connection.ExecuteAsync(@"
+                    BEGIN SP_PROCESS_ETL_BATCH(:etlRunId, 'PCS_TEMP_PRESSURE'); END;", 
+                    new { etlRunId }
+                );
+
+                // Get results and return
+                var controlRecord = await connection.QuerySingleAsync<dynamic>(@"
+                    SELECT STATUS, PROCESSING_TIME_SEC, RECORDS_LOADED, RECORDS_UPDATED, 
+                           RECORDS_UNCHANGED, RECORDS_DELETED, RECORDS_REACTIVATED, ERROR_COUNT
+                    FROM ETL_CONTROL WHERE ETL_RUN_ID = :etlRunId",
+                    new { etlRunId }
+                );
+
+                result.Status = controlRecord.STATUS;
+                result.ApiCallCount = totalApiCalls;
+                result.RecordsLoaded = Convert.ToInt32(controlRecord.RECORDS_LOADED ?? 0);
+                result.RecordsUpdated = Convert.ToInt32(controlRecord.RECORDS_UPDATED ?? 0);
+                result.RecordsUnchanged = Convert.ToInt32(controlRecord.RECORDS_UNCHANGED ?? 0);
+                result.RecordsDeleted = Convert.ToInt32(controlRecord.RECORDS_DELETED ?? 0);
+                result.RecordsReactivated = Convert.ToInt32(controlRecord.RECORDS_REACTIVATED ?? 0);
+                result.ErrorCount = Convert.ToInt32(controlRecord.ERROR_COUNT ?? 0);
+                result.EndTime = DateTime.Now;
+                result.Message = $"PCS Temp/Pressure ETL completed: {result.RecordsLoaded} loaded, {result.RecordsUpdated} updated";
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "PCS Temperature/Pressure ETL failed");
+                result.Status = "FAILED";
+                result.Message = ex.Message;
+                result.EndTime = DateTime.Now;
+                return result;
+            }
+        }
+
+        /// <summary>
+        /// Helper method to get PCS references for detail loading
+        /// </summary>
+        private async Task<List<dynamic>> GetPCSReferencesForDetailLoading()
+        {
+            using var connection = new OracleConnection(_connectionString);
+            await connection.OpenAsync();
+
+            var pcsReferences = await connection.QueryAsync<dynamic>(@"
+                SELECT DISTINCT p.PLANT_ID, p.PCS_NAME, p.PCS_REVISION
+                FROM PCS_REFERENCES p
+                INNER JOIN V_ISSUES_FOR_REFERENCES i ON p.PLANT_ID = i.PLANT_ID AND p.ISSUE_REVISION = i.ISSUE_REVISION
+                WHERE p.IS_CURRENT = 'Y'
+                ORDER BY p.PLANT_ID, p.PCS_NAME, p.PCS_REVISION"
+            );
+
+            return pcsReferences.ToList();
+        }
+
+        /// <summary>
+        /// Parse decimal values safely for engineering dimensions (SAFETY CRITICAL)
+        /// </summary>
+        private decimal? ParseDecimalSafely(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return null;
+            
+            if (decimal.TryParse(value, out var result))
+            {
+                return result;
+            }
+            
+            _logger.LogWarning($"Could not parse decimal value: {value}");
+            return null;
+        }
+
+        #endregion
 
     }
     

@@ -1,164 +1,168 @@
-# 🔴 CRITICAL: START HERE FOR NEXT SESSION (Session 24)
+# 🔴 CRITICAL: START HERE FOR NEXT SESSION (Session 28)
 
-## ✅ SESSION 23 COMPLETE: ENHANCED API FIELD COVERAGE IMPLEMENTATION COMPLETE!
+## 🎯 SESSION 27 COMPLETE - DOCUMENTATION REFACTOR & RAW_JSON ARCHITECTURE ANALYSIS COMPLETE!
 
-### 🎯 **MAJOR ACHIEVEMENT: COMPLETE ENHANCED IMPLEMENTATION:**
-**Session 23 completed the major refactoring to implement 100% TR2000 API field coverage with complete C# service enhancement and DDL deployment!**
+### 🏆 **SESSION 27 ACHIEVEMENTS:**
+**Documentation Cleanup Complete:**
+- ✅ **Archived old documentation**: Moved 1000+ lines of Sessions 1-25 to `/backup_session26/`
+- ✅ **Streamlined current docs**: Clean, focused documentation on Sessions 24-27
+- ✅ **Identified critical architecture issue**: GPT-5 analysis revealed RAW_JSON is broken
+- ✅ **Ready for Session 28**: Clear priorities and implementation plan established
 
-## 🚀 **SESSION 23 MAJOR ACCOMPLISHMENTS:**
+### 📅 **CRITICAL ARCHITECTURE ISSUE IDENTIFIED:**
+**RAW_JSON Flow BROKEN - Industry Standards Violation:**
+- **Current (Wrong)**: API → STG_TABLES → ISSUES (bypassing RAW_JSON entirely)
+- **Should Be (GPT-5 Standard)**: API → RAW_JSON → STG_TABLES → ISSUES
+- **Root Cause**: C# sends 7 parameters, Oracle procedure expects 4 parameters
+- **Impact**: No audit trail, no replay capability, missing core ETL benefits
 
-### ✅ **ENHANCED MASTER DDL SUCCESSFULLY DEPLOYED:**
-- Master_DDL_Script.sql deployed to Oracle database with 100% API field coverage
-- Fixed SP_INSERT_RAW_JSON compilation error (CONVERTTOBLOB parameter issue)
-- Complete infrastructure: enhanced tables, indexes, views, procedures deployed
-- RAW_JSON audit trail with compression working correctly
-- All 25+ tables with complete field coverage ready for production use
+## ✅ **SESSION 27 COMPLETE - READY FOR RAW_JSON REFACTOR!**
 
-### ✅ **COMPLETE C# ETL SERVICE ENHANCEMENT:**
-- **LoadPlants()**: Enhanced for 24+ fields - calls both `/plants` AND `/plants/{plantid}` endpoints
-- **LoadIssues()**: Enhanced for 25+ fields - complete component revision matrix implemented  
-- **All 6 Reference Methods**: Enhanced with RevDate, Status fields (user audit removed per feedback)
-- **4 NEW PCS Detail Methods**: LoadPCSHeader() and LoadPCSTemperaturePressure() fully implemented
-- **Safety-Critical Data**: ParseDecimalSafely() method for precise engineering dimensions
+### **CURRENT PRODUCTION STATUS:**
+**Smart Workflow Working Perfectly:**
+- **Application**: ✅ http://localhost:5005/etl-operations
+- **Smart Workflow**: ✅ 98.5% API call reduction operational  
+- **LoadOperators**: ✅ Working (8 records)
+- **LoadPlants**: ✅ Working (130 records basic + enhanced selected)
+- **LoadIssues**: ✅ Working (validates Plant Loader → enhances plants → loads issues)
+- **Date Parsing**: ✅ All European formats handled with PARSE_TR2000_DATE()
+- **Plant Enhancement**: ✅ EnhancePlantsWithDetailedData() fully operational
+- **Documentation**: ✅ Clean, focused, current (Session 27 refactor complete)
 
-### ✅ **100% FIELD COVERAGE ACHIEVEMENT:**
-- **OPERATORS**: 2/2 fields (100%) ✅
-- **PLANTS**: 24/24 fields (100%) ✅ - 380% increase from basic implementation  
-- **ISSUES**: 25/25 fields (100%) ✅ - 400% increase with complete revision matrix
-- **Reference Tables**: 100% coverage with enhanced metadata ✅
-- **NEW PCS Tables**: 100+ engineering fields with safety-critical data ✅
+**Critical Issue:**
+- ❌ **RAW_JSON**: Broken architecture - bypassing audit layer entirely
 
-## 🎯 **CURRENT STATE AFTER SESSION 23:**
-- **Enhanced DDL**: ✅ **DEPLOYED** - Master_DDL_Script.sql successfully deployed to Oracle
-- **C# Services**: ✅ **ENHANCED** - All ETL methods updated for complete field coverage
-- **Field Coverage**: ✅ **100% IMPLEMENTED** - Every TR2000 API field mapped and coded
-- **Safety Testing**: ✅ **IMPLEMENTED** - ParseDecimalSafely() for critical engineering dimensions
-- **Application**: ✅ **Ready with Enhanced Services** at http://localhost:5003/etl-operations
+## 🚧 **SESSION 28 IMMEDIATE PRIORITIES:**
 
-## 📊 **PRODUCTION-READY STATE (Sessions 18-19) - WORKING WITH BASIC DDL:**
-- **Basic ETL**: ✅ All 6 reference types functional with minimal fields
-- **Preview SQL**: ✅ Working for all operations
-- **70% API Reduction**: ✅ Verified with Issue Loader
-- **Cascade Deletion**: ✅ Working throughout
-- **SCD2 Implementation**: ✅ Complete (INSERT, UPDATE, DELETE, REACTIVATE)
+### **PRIORITY #1: RAW_JSON Architecture Refactor** 🚨 **CRITICAL**
 
-## 🔄 **QUICK RECOVERY COMMANDS:**
+#### **1.1 Fix Oracle RAW_JSON Table Design**
+**Current Problems:**
+- Uses BLOB storage without JSON validation
+- Missing critical metadata (processed flag, hash, request context)
+- Only 4 parameters vs industry standard metadata capture
 
-```bash
-# 1. Deploy ENHANCED Master DDL (PRIORITY #1)
-sqlplus TR2000_STAGING/piping@host.docker.internal:1521/XEPDB1
-@/workspace/TR2000/TR2K/Ops/Master_DDL_Script.sql
-
-# 2. Start application
-cd /workspace/TR2000/TR2K/TR2KApp
-/home/node/.dotnet/dotnet run --urls "http://0.0.0.0:5003"
-
-# 3. Access application
-http://localhost:5003/etl-operations
+**GPT-5 Recommended Structure:**
+```sql
+CREATE TABLE RAW_JSON (
+  JSON_ID            NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  ETL_RUN_ID         NUMBER,
+  ENDPOINT_NAME      VARCHAR2(100) NOT NULL,
+  REQUEST_URL        VARCHAR2(1000),
+  REQUEST_PARAMS     CLOB,
+  RESPONSE_STATUS    NUMBER,
+  PLANT_ID           VARCHAR2(50),
+  CREATED_DATE       TIMESTAMP(6) DEFAULT SYSTIMESTAMP NOT NULL,
+  JSON_DATA          CLOB CHECK (JSON_DATA IS JSON),
+  RESP_HASH_SHA256   RAW(32) NOT NULL,
+  PROCESSED_FLAG     CHAR(1) DEFAULT 'N' CHECK (PROCESSED_FLAG IN ('Y','N'))
+);
 ```
 
-## 🗃️ **KEY FILES:**
+#### **1.2 Update SP_INSERT_RAW_JSON Procedure**
+**Fix Parameter Mismatch:**
+- **Current**: 4 parameters (ETL_RUN_ID, ENDPOINT_NAME, PLANT_ID, JSON_DATA)
+- **C# Expects**: 7 parameters (endpoint, keyString, etlRunId, httpStatus, durationMs, headers, payload)
+- **Solution**: Update Oracle procedure to accept comprehensive metadata
 
-### **Main Application Files:**
-- `/TR2KApp/Components/Pages/ETLOperations.razor` - Main ETL UI page (renamed from OracleETLV2)
-- `/TR2KBlazorLibrary/Logic/Services/OracleETLServiceV2.cs` - ETL service implementation
-- `/TR2KBlazorLibrary/Models/ETLModels.cs` - All ETL model classes
-- `/TR2KApp/Program.cs` - Cleaned up, only references V2 service
+#### **1.3 Implement Proper Data Flow**
+**Change Architecture From:**
+```
+C# API Service → STG_TABLES → Oracle SCD2 Processing
+```
 
-### **DDL & Analysis:**
-- `/Ops/Master_DDL_Script.sql` - **NEW MASTER DDL** with complete field coverage
-- `/Ops/FIELD_COVERAGE_ANALYSIS.md` - **CRITICAL** field gap analysis and implementation roadmap
-- `/Ops/old/Oracle_DDL_SCD2_FINAL_v1.sql` - Previous DDL (archived)
+**To Industry Standard:**
+```
+C# API Service → RAW_JSON → STG_TABLES (via JSON_TABLE) → Oracle SCD2 Processing
+```
 
-### **Documentation:**
-- `/Ops/TR2K_START_HERE.md` - Main project documentation
-- `/Ops/TR2K_PROGRESS.md` - Detailed progress tracking
-- `/Ops/SCD2_FINAL_DECISION.md` - Architecture decisions
+### **PRIORITY #2: Update C# ETL Flow** 🔧
 
-## 📈 **WHAT'S BEEN COMPLETED:**
+#### **2.1 Modify ETL Process**
+1. **Step 1**: API call → Insert to RAW_JSON (comprehensive metadata)
+2. **Step 2**: Parse RAW_JSON → STG_TABLES using Oracle JSON_TABLE
+3. **Step 3**: STG_TABLES → Final dimension tables (existing SCD2 process)
 
-### Session 18 (100% Complete):
-- ✅ Implemented all 5 remaining reference types (EDS, MDS, VSK, ESK, Pipe Element)
-- ✅ Added all DDL packages for reference types
-- ✅ Created C# methods for all reference types
-- ✅ Added UI buttons for all reference operations
-- ✅ Fixed UI cascade display refresh
-- ✅ Tested and confirmed all reference types loading data
+#### **2.2 Add Deduplication & Replay**
+- Hash-based deduplication in RAW_JSON
+- Processed flag management
+- Replay capability from RAW_JSON for data issues
 
-### Session 19 (100% Complete):
-- ✅ Added Preview SQL methods for all 5 reference types
-- ✅ Deleted old v1 ETL page and service completely
-- ✅ Renamed v2 to ETLOperations with new route /etl-operations
-- ✅ Created ETLModels.cs with all model classes
-- ✅ Fixed table status display (column name mismatches)
-- ✅ Fixed ETL history display
-- ✅ Adjusted sidebar title font size
-- ✅ Clean build with 0 errors
+### **PRIORITY #3: Test Complete New Architecture** ✅
 
-## 🎯 **IMMEDIATE TASKS FOR SESSION 24:**
+#### **3.1 Validation Steps**
+1. Test RAW_JSON insertion with full metadata
+2. Test JSON_TABLE parsing from RAW_JSON to staging
+3. Verify existing SCD2 processing still works
+4. Validate audit trail and replay capability
+5. Confirm Smart Workflow still achieves 98.5% API reduction
 
-### 1. **Test Enhanced ETL with Complete Field Coverage** 🧪 **PRIORITY #1**
-**ALL ENHANCED SERVICES READY FOR TESTING:**
-- **Test LoadPlants()**: Validate 24+ fields from dual API endpoint calls
-- **Test LoadIssues()**: Validate 25+ fields with complete component revision matrix
-- **Test All Reference Methods**: Validate enhanced metadata (RevDate, Status, OfficialRevision)
-- **Test NEW PCS Methods**: LoadPCSHeader() and LoadPCSTemperaturePressure() with safety-critical data
+## 🔗 **APPLICATION STATUS:**
+- **URL**: ✅ http://localhost:5005/etl-operations (Working perfectly)
+- **Build Status**: ✅ Production ready, 0 errors
+- **Core ETL**: ✅ All working (just bypassing RAW_JSON layer)
+- **Smart Workflow**: ✅ 98.5% API reduction operational
+- **Ready for Refactor**: ✅ No breaking changes to existing functionality
 
-### 2. **Safety-Critical Data Validation** 🚨 **MANDATORY**
-**VALIDATE DIMENSIONAL ACCURACY (SAFETY CRITICAL):**
-- [ ] **Test ParseDecimalSafely()**: Verify precise handling of engineering dimensions
-- [ ] **Pressure/Temperature Validation**: Verify 12-point design matrix accuracy
-- [ ] **Wall Thickness Testing**: Verify NUMBER(10,3) precision for safety-critical values
-- [ ] **Cross-validation**: Ensure API values → Database values match exactly
+## 📋 **IMPLEMENTATION APPROACH:**
 
-### 3. **UI Updates for Enhanced Capabilities** 🎨 **PRIORITY #2**
-- Update ETL Operations page to show enhanced field capabilities
-- Update Knowledge Articles to reflect complete field coverage
-- Add indicators for new PCS detail methods
-- Update table status displays for enhanced DDL
+### **Phase 1: Oracle DDL Updates**
+1. Update RAW_JSON table structure (new columns, CLOB storage, JSON validation)
+2. Update SP_INSERT_RAW_JSON procedure (accept 7 parameters vs current 4)
+3. Create JSON_TABLE parsing procedures (RAW_JSON → STG_TABLES)
 
-### 4. **Performance Monitoring** 📊 **PRIORITY #3**
-- Monitor enhanced LoadPlants() performance (dual API calls)
-- Test LoadIssues() with 25+ fields under load
-- Validate RAW_JSON compression effectiveness
-- Monitor Oracle package performance with enhanced field sets
+### **Phase 2: C# Code Updates**
+1. Fix InsertRawJson method to work with updated procedure
+2. Update ETL flow to parse from RAW_JSON instead of direct API calls
+3. Add processed flag management
 
-## 🔥 **TESTED AND CONFIRMED WORKING:**
-- ✅ Load Operators (8 records)
-- ✅ Load Plants (130 records)
-- ✅ Load Issues for selected plants
-- ✅ VDS References (2047 records loaded)
-- ✅ EDS References (23 records loaded)
-- ✅ MDS References (752 records loaded)
-- ✅ VSK References (230 records loaded)
-- ✅ ESK References (0 records - no data but working)
-- ✅ Pipe Element References (1309 records loaded)
-- ✅ Plant Loader configuration
-- ✅ Issue Loader with cascade deletion
-- ✅ Preview SQL for all operations
-- ✅ Table status display
-- ✅ ETL history display
+### **Phase 3: Testing & Validation**
+1. Test new architecture end-to-end
+2. Validate audit trail functionality
+3. Test replay capability
+4. Ensure Smart Workflow performance maintained
 
-## 💡 **ARCHITECTURE SUMMARY:**
-- **Simplified Issue Loader**: No toggles, presence = load references
-- **Cascade Deletion**: Plant removed → Issues deleted → References deleted
-- **SCD2 Complete**: INSERT, UPDATE, DELETE, REACTIVATE all working
-- **70% API Reduction**: Only processes selected issues
-- **Oracle-Centric**: All business logic in database packages
-- **Atomic Transactions**: Single COMMIT in orchestrator
+## 🔄 **QUICK RECOVERY COMMANDS FOR SESSION 28:**
 
-## 🚀 **PRODUCTION DEPLOYMENT READY:**
-The application is now feature-complete for the core ETL functionality:
-- All reference types implemented and tested
-- Clean codebase with no v1 artifacts
-- Proper error handling and logging
-- Transaction safety throughout
-- Performance optimized with Issue Loader
-- Full audit trail with SCD2
+```bash
+# 1. Start application (Smart workflow fully operational)
+cd /workspace/TR2000/TR2K/TR2KApp
+/home/node/.dotnet/dotnet run --urls "http://0.0.0.0:5005"
+
+# 2. Access ETL Operations page
+http://localhost:5005/etl-operations
+
+# 3. CURRENT STATUS: Ready for RAW_JSON architecture refactor!
+# - Core ETL: ✅ Working perfectly
+# - Smart workflow: ✅ 98.5% API reduction operational
+# - Documentation: ✅ Clean and focused (Session 27 refactor complete)
+# - Next task: Implement proper API → RAW_JSON → STG → CORE flow
+```
+
+## 🗃️ **KEY FILES FOR SESSION 28:**
+
+### **DDL to Update:**
+- `/Ops/Master_DDL_Script.sql` - Update RAW_JSON table and SP_INSERT_RAW_JSON procedure
+
+### **C# to Update:**
+- `/TR2KBlazorLibrary/Logic/Services/OracleETLServiceV2.cs` - Fix InsertRawJson method
+- Update ETL flow to use RAW_JSON → STG pattern
+
+### **New Documentation:**
+- `/Ops/DB_Design/RAW_JSON_Architecture.md` - GPT-5's recommended structure
+- `/Ops/DB_Design/Current_Issues_Analysis.md` - Parameter mismatch details
+- `/Ops/DB_Design/Migration_Plan.md` - Implementation steps
+
+## 💡 **EXPECTED BENEFITS AFTER REFACTOR:**
+1. **Industry Standard Architecture**: Proper API → RAW_JSON → STG → CORE flow
+2. **Complete Audit Trail**: Every API response captured with metadata
+3. **Replay Capability**: Re-process data without hitting API again
+4. **Deduplication**: Hash-based duplicate prevention
+5. **Performance**: Smart Workflow 98.5% API reduction maintained
+6. **Compliance**: Follows GPT-5 recommended ETL patterns
 
 ---
-**Last Updated:** 2025-08-17 Session 21 Complete
-**Next Focus:** Deploy Enhanced DDL, Update C# ETL Services, Complete Field Mapping
-**Critical Files:** Master_DDL_Script.sql, FIELD_COVERAGE_ANALYSIS.md
-**GitHub Status:** Session 21 user guide changes ready for commit
-**User Documentation:** ✅ FULLY UPDATED - All pages reflect enhanced DDL
+**Last Updated:** 2025-08-21 Session 27 Complete
+**Status:** Documentation refactored, RAW_JSON architecture issue identified and analyzed
+**Next Session Priority:** Implement proper RAW_JSON architecture per GPT-5 recommendations
+**Ready for Session 28:** ✅ All analysis complete, implementation plan ready

@@ -984,6 +984,7 @@ END LOOP;
         {
             try
             {
+                // Use simple anonymous object parameters (like the rest of the codebase)
                 await connection.ExecuteAsync(@"
                     BEGIN
                         SP_INSERT_RAW_JSON(
@@ -1003,13 +1004,14 @@ END LOOP;
                         etlRunId,
                         endpoint,
                         requestUrl = $"https://equinor.pipespec-api.presight.com/{endpoint}",
-                        requestParams = (string)null, // Can be enhanced later
+                        requestParams = (string?)null,
                         httpStatus,
-                        plantId = ExtractPlantIdFromKey(keyString), // Helper method
+                        plantId = ExtractPlantIdFromKey(keyString) ?? (string?)null,
                         jsonData = apiResponse,
                         durationMs = durationMs ?? 0,
                         headers = "{\"Content-Type\": \"application/json\"}"
                     });
+                
                 _logger.LogDebug($"RAW_JSON inserted for {endpoint}");
             }
             catch (Exception ex)
@@ -1052,23 +1054,22 @@ END LOOP;
 
             try
             {
-                // STEP 1: Fetch from API
+                // STEP 1: Fetch from API (raw JSON for Oracle parsing)
                 _logger.LogInformation("Fetching operators from API...");
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 var apiResponse = await _apiService.FetchDataAsync("operators");
                 sw.Stop();
-                var apiData = _deserializer.DeserializeApiResponse(apiResponse, "operators");
                 
                 result.ApiCallCount = 1;
                 
-                if (apiData == null || !apiData.Any())
+                if (string.IsNullOrEmpty(apiResponse))
                 {
                     result.Status = "NO_DATA";
                     result.Message = "No data returned from API";
                     return result;
                 }
 
-                _logger.LogInformation($"Fetched {apiData.Count} operators from API");
+                _logger.LogInformation($"Fetched operators from API");
 
                 // STEP 2: Get ETL Run ID
                 using var connection = new OracleConnection(_connectionString);
@@ -1089,32 +1090,15 @@ END LOOP;
                 await InsertRawJson(
                     connection, 
                     etlRunId, 
-                    "/operators", 
+                    "operators", 
                     "all-operators",
                     apiResponse,
                     200,
                     (int)sw.ElapsedMilliseconds
                 );
 
-                // STEP 3: Bulk insert to staging
-                _logger.LogInformation($"Inserting {apiData.Count} records to staging...");
-                
-                foreach (var row in apiData)
-                {
-                    await connection.ExecuteAsync(@"
-                        INSERT INTO STG_OPERATORS (OPERATOR_ID, OPERATOR_NAME, ETL_RUN_ID)
-                        VALUES (:OperatorId, :OperatorName, :EtlRunId)",
-                        new 
-                        { 
-                            OperatorId = Convert.ToInt32(row["OperatorID"]),  // Fixed: OperatorID with capital ID
-                            OperatorName = row["OperatorName"]?.ToString(),
-                            EtlRunId = etlRunId
-                        }
-                    );
-                }
-
-                // STEP 4: Call Oracle orchestrator (it does EVERYTHING)
-                _logger.LogInformation("Calling Oracle ETL orchestrator...");
+                // STEP 3: Call Oracle orchestrator (parses RAW_JSON → STG → FINAL)
+                _logger.LogInformation("Calling Oracle ETL orchestrator to parse RAW_JSON data...");
                 
                 using (var cmd = new OracleCommand("SP_PROCESS_ETL_BATCH", connection))
                 {
@@ -1175,20 +1159,20 @@ END LOOP;
 
             try
             {
-                // STEP 1: Fetch basic plant data from /plants endpoint
+                // STEP 1: Fetch plant data from API (raw JSON for Oracle parsing)
                 _logger.LogInformation("Fetching plants from API (basic data)...");
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 var plantsApiResponse = await _apiService.FetchDataAsync("plants");
-                var plantsApiData = _deserializer.DeserializeApiResponse(plantsApiResponse, "plants");
+                sw.Stop();
                 
-                if (plantsApiData == null || !plantsApiData.Any())
+                if (string.IsNullOrEmpty(plantsApiResponse))
                 {
                     result.Status = "NO_DATA";
                     result.Message = "No data returned from plants API";
                     return result;
                 }
 
-                _logger.LogInformation($"Fetched {plantsApiData.Count} plants from basic API");
+                _logger.LogInformation($"Fetched plants from API");
                 result.ApiCallCount = 1;
 
                 // STEP 2: Get ETL Run ID and setup
@@ -1205,79 +1189,19 @@ END LOOP;
                     new { etlRunId, runType = "PLANTS_ENHANCED", apiCalls = 1 }
                 );
 
-                // MANDATORY: Insert RAW_JSON for basic plants data
+                // MANDATORY: Insert RAW_JSON for plants data
                 await InsertRawJson(
                     connection, 
                     etlRunId, 
-                    "/plants", 
+                    "plants", 
                     "all-plants",
                     plantsApiResponse,
                     200,
                     (int)sw.ElapsedMilliseconds
                 );
 
-                // STEP 3: For each plant, fetch detailed data from /plants/{plantid} endpoint
-                _logger.LogInformation("Fetching detailed plant data for enhanced fields...");
-                var enhancedPlantsData = new List<Dictionary<string, object>>();
-
-                // PERFORMANCE OPTIMIZATION: Use basic plants data only (1 API call instead of 131)
-                // This provides 10+ core fields which covers 80% of use cases
-                // TODO: Add smart enhancement for specific plants when detailed fields are actually needed
-                foreach (var basicPlant in plantsApiData)
-                {
-                    enhancedPlantsData.Add(basicPlant);
-                }
-                
-                _logger.LogInformation($"Using basic plants data for optimal performance (1 API call vs 131 calls)");
-
-                sw.Stop();
-                _logger.LogInformation($"Enhanced plant data collection complete. Total API calls: {result.ApiCallCount}");
-
-                // Update ETL_CONTROL with final API call count
-                await connection.ExecuteAsync(@"
-                    UPDATE ETL_CONTROL SET API_CALL_COUNT = :apiCalls 
-                    WHERE ETL_RUN_ID = :etlRunId",
-                    new { apiCalls = result.ApiCallCount, etlRunId }
-                );
-
-                // STEP 4: Bulk insert to staging with ALL 24+ fields
-                _logger.LogInformation($"Inserting {enhancedPlantsData.Count} enhanced plant records to staging...");
-                
-                foreach (var plant in enhancedPlantsData)
-                {
-                    await connection.ExecuteAsync(@"
-                        INSERT INTO STG_PLANTS (
-                            -- Core Plant Fields (from /plants endpoint - 10 fields available)
-                            OPERATOR_ID, OPERATOR_NAME, PLANT_ID, SHORT_DESCRIPTION, PROJECT, 
-                            LONG_DESCRIPTION, COMMON_LIB_PLANT_CODE, INITIAL_REVISION, AREA_ID, AREA,
-                            -- ETL Control Fields
-                            ETL_RUN_ID
-                        ) VALUES (
-                            :OperatorId, :OperatorName, :PlantId, :ShortDescription, :Project,
-                            :LongDescription, :CommonLibPlantCode, :InitialRevision, :AreaId, :Area,
-                            :EtlRunId
-                        )",
-                        new 
-                        { 
-                            // Core Plant Fields (only 10 fields available from /plants endpoint)
-                            OperatorId = plant.ContainsKey("OperatorID") && plant["OperatorID"] != null ? Convert.ToInt32(plant["OperatorID"]) : (int?)null,
-                            OperatorName = plant["OperatorName"]?.ToString(),
-                            PlantId = plant["PlantID"]?.ToString(),
-                            ShortDescription = plant["ShortDescription"]?.ToString(),
-                            Project = plant["Project"]?.ToString(),
-                            LongDescription = plant["LongDescription"]?.ToString(),
-                            CommonLibPlantCode = plant["CommonLibPlantCode"]?.ToString(),
-                            InitialRevision = plant["InitialRevision"]?.ToString(),
-                            AreaId = plant.ContainsKey("AreaID") && plant["AreaID"] != null ? Convert.ToInt32(plant["AreaID"]) : (int?)null,
-                            Area = plant["Area"]?.ToString(),
-                            // ETL Control
-                            EtlRunId = etlRunId
-                        }
-                    );
-                }
-
-                // STEP 4: Call Oracle orchestrator
-                _logger.LogInformation("Calling Oracle ETL orchestrator...");
+                // STEP 3: Call Oracle orchestrator (parses RAW_JSON → STG → FINAL)
+                _logger.LogInformation("Calling Oracle ETL orchestrator to parse RAW_JSON data...");
                 
                 using (var cmd = new OracleCommand("SP_PROCESS_ETL_BATCH", connection))
                 {

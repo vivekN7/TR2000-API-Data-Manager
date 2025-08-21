@@ -1300,9 +1300,18 @@ CREATE OR REPLACE PROCEDURE SP_INSERT_RAW_JSON(
     p_headers        CLOB DEFAULT NULL
 ) AS
     v_hash RAW(32);
+    v_hash_input VARCHAR2(4000);
 BEGIN
-    -- Compute hash for deduplication
-    v_hash := STANDARD_HASH(p_json_data, 'SHA256');
+    -- Create hash input from data characteristics (no special privileges required)
+    v_hash_input := p_endpoint || '|' || NVL(p_plant_id, 'NULL') || '|' || 
+                    TO_CHAR(LENGTH(p_json_data)) || '|' || 
+                    SUBSTR(p_json_data, 1, 100) || '|' || 
+                    SUBSTR(p_json_data, -100);
+    
+    -- Use DBMS_UTILITY.GET_HASH_VALUE (no special privileges required)
+    v_hash := UTL_RAW.CAST_FROM_BINARY_INTEGER(
+        DBMS_UTILITY.GET_HASH_VALUE(v_hash_input, 1, POWER(2,30))
+    );
     
     -- Insert with comprehensive metadata
     INSERT INTO RAW_JSON (
@@ -1319,6 +1328,7 @@ EXCEPTION
     WHEN OTHERS THEN
         -- Log error but don't break ETL
         LOG_ETL_ERROR(p_etl_run_id, 'RAW_JSON_INSERT', 'SP_INSERT_RAW_JSON', SQLERRM);
+        RAISE; -- Re-raise to maintain error handling
 END SP_INSERT_RAW_JSON;
 /
 
@@ -2173,6 +2183,19 @@ CREATE OR REPLACE PROCEDURE SP_PROCESS_ETL_BATCH(
     v_processing_seconds NUMBER;
 BEGIN
     v_start_time := SYSDATE;
+    
+    -- Step 0: Parse RAW_JSON to STG_TABLES (NEW INDUSTRY-STANDARD STEP)
+    v_step := 'RAW_JSON_PARSING';
+    CASE p_entity_type
+        WHEN 'OPERATORS' THEN
+            SP_PARSE_OPERATORS_FROM_RAW_JSON(p_etl_run_id);
+        WHEN 'PLANTS' THEN
+            SP_PARSE_PLANTS_FROM_RAW_JSON(p_etl_run_id);
+        WHEN 'ISSUES' THEN
+            SP_PARSE_ISSUES_FROM_RAW_JSON(p_etl_run_id);
+        ELSE
+            RAISE_APPLICATION_ERROR(-20001, 'Unknown entity type: ' || p_entity_type);
+    END CASE;
     
     -- Step 1: Deduplication
     v_step := 'DEDUPLICATION';

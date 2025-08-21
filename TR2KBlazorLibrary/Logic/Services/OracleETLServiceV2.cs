@@ -72,7 +72,7 @@ VALUES (:etlRunId, 'OPERATORS', 'RUNNING', SYSTIMESTAMP, 1);"
                         StepNumber = 3,
                         Title = "Save to RAW_JSON (Audit Trail)",
                         Description = "Store raw API response for audit/forensics/replay",
-                        SqlStatement = @"-- C# calls SP_INSERT_RAW_JSON (best-effort, non-critical)
+                        SqlStatement = @"-- C# calls SP_INSERT_RAW_JSON (MANDATORY for data integrity)
 BEGIN
     SP_INSERT_RAW_JSON(
         p_endpoint      => '/operators',
@@ -971,7 +971,7 @@ END LOOP;
         }
 
         /// <summary>
-        /// Insert raw JSON response to audit table (optional, best-effort)
+        /// Insert raw JSON response to audit table (MANDATORY for data integrity)
         /// </summary>
         private async Task InsertRawJson(
             OracleConnection connection, 
@@ -1014,8 +1014,9 @@ END LOOP;
             }
             catch (Exception ex)
             {
-                // Log error but don't break ETL
-                _logger.LogWarning($"RAW_JSON insert failed: {ex.Message}");
+                // RAW_JSON is MANDATORY - ETL must fail if this fails
+                _logger.LogError($"RAW_JSON insert FAILED - ETL cannot continue: {ex.Message}");
+                throw new InvalidOperationException($"RAW_JSON insertion is mandatory for data integrity. Error: {ex.Message}", ex);
             }
         }
 
@@ -1084,7 +1085,7 @@ END LOOP;
                     new { etlRunId, runType = "OPERATORS", apiCalls = result.ApiCallCount }
                 );
 
-                // Optional: Insert RAW_JSON for audit trail
+                // MANDATORY: Insert RAW_JSON for audit trail
                 await InsertRawJson(
                     connection, 
                     etlRunId, 
@@ -1204,7 +1205,7 @@ END LOOP;
                     new { etlRunId, runType = "PLANTS_ENHANCED", apiCalls = 1 }
                 );
 
-                // Insert RAW_JSON for basic plants data
+                // MANDATORY: Insert RAW_JSON for basic plants data
                 await InsertRawJson(
                     connection, 
                     etlRunId, 
@@ -1385,7 +1386,7 @@ END LOOP;
                         var issuesData = _deserializer.DeserializeApiResponse(apiResponse, endpoint);
                         apiCalls++;
 
-                        // Log to RAW_JSON for audit trail (best-effort, non-critical)
+                        // Log to RAW_JSON for audit trail (MANDATORY for data integrity)
                         try
                         {
                             await connection.ExecuteAsync(@"
@@ -1407,7 +1408,8 @@ END LOOP;
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogWarning(ex, "RAW_JSON insert failed (non-critical): {Message}", ex.Message);
+                            _logger.LogError(ex, "RAW_JSON insert FAILED - ETL cannot continue: {Message}", ex.Message);
+                            throw new InvalidOperationException($"RAW_JSON insertion is mandatory for data integrity. Error: {ex.Message}", ex);
                         }
 
                         if (issuesData != null && issuesData.Any())
@@ -2035,7 +2037,7 @@ END LOOP;
                         var apiResponse = await _apiService.FetchDataAsync(apiUrl);
                         totalApiCalls++;
                         
-                        // Optional: Insert RAW_JSON for audit trail
+                        // MANDATORY: Insert RAW_JSON for audit trail
                         await InsertRawJson(
                             connection, 
                             etlRunId, 
@@ -2183,7 +2185,7 @@ END LOOP;
                         var apiResponse = await _apiService.FetchDataAsync(apiUrl);
                         totalApiCalls++;
                         
-                        // Optional: Insert RAW_JSON for audit trail
+                        // MANDATORY: Insert RAW_JSON for audit trail
                         await InsertRawJson(
                             connection, 
                             etlRunId, 
@@ -2331,7 +2333,7 @@ END LOOP;
                         var apiResponse = await _apiService.FetchDataAsync(apiUrl);
                         totalApiCalls++;
                         
-                        // Optional: Insert RAW_JSON for audit trail
+                        // MANDATORY: Insert RAW_JSON for audit trail
                         await InsertRawJson(
                             connection, 
                             etlRunId, 
@@ -2480,7 +2482,7 @@ END LOOP;
                         var apiResponse = await _apiService.FetchDataAsync(apiUrl);
                         totalApiCalls++;
                         
-                        // Optional: Insert RAW_JSON for audit trail
+                        // MANDATORY: Insert RAW_JSON for audit trail
                         await InsertRawJson(
                             connection, 
                             etlRunId, 
@@ -2628,7 +2630,7 @@ END LOOP;
                         var apiResponse = await _apiService.FetchDataAsync(apiUrl);
                         totalApiCalls++;
                         
-                        // Optional: Insert RAW_JSON for audit trail
+                        // MANDATORY: Insert RAW_JSON for audit trail
                         await InsertRawJson(
                             connection, 
                             etlRunId, 
@@ -2776,7 +2778,7 @@ END LOOP;
                         var apiResponse = await _apiService.FetchDataAsync(apiUrl);
                         totalApiCalls++;
                         
-                        // Optional: Insert RAW_JSON for audit trail
+                        // MANDATORY: Insert RAW_JSON for audit trail
                         await InsertRawJson(
                             connection, 
                             etlRunId, 

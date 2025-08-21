@@ -987,32 +987,55 @@ END LOOP;
                 await connection.ExecuteAsync(@"
                     BEGIN
                         SP_INSERT_RAW_JSON(
-                            p_endpoint      => :endpoint,
-                            p_key_string    => :keyString,
-                            p_etl_run_id    => :etlRunId,
-                            p_http_status   => :httpStatus,
-                            p_duration_ms   => :durationMs,
-                            p_headers_json  => :headers,
-                            p_payload       => :payload
+                            p_etl_run_id     => :etlRunId,
+                            p_endpoint       => :endpoint,
+                            p_request_url    => :requestUrl,
+                            p_request_params => :requestParams,
+                            p_response_status => :httpStatus,
+                            p_plant_id       => :plantId,
+                            p_json_data      => :jsonData,
+                            p_duration_ms    => :durationMs,
+                            p_headers        => :headers
                         );
                     END;",
                     new 
                     { 
-                        endpoint,
-                        keyString,
                         etlRunId,
+                        endpoint,
+                        requestUrl = $"https://equinor.pipespec-api.presight.com/{endpoint}",
+                        requestParams = (string)null, // Can be enhanced later
                         httpStatus,
+                        plantId = ExtractPlantIdFromKey(keyString), // Helper method
+                        jsonData = apiResponse,
                         durationMs = durationMs ?? 0,
-                        headers = "{\"Content-Type\": \"application/json\"}",
-                        payload = apiResponse
+                        headers = "{\"Content-Type\": \"application/json\"}"
                     });
                 _logger.LogDebug($"RAW_JSON inserted for {endpoint}");
             }
             catch (Exception ex)
             {
-                // Non-critical - log and continue
-                _logger.LogWarning($"RAW_JSON insert failed (non-critical): {ex.Message}");
+                // Log error but don't break ETL
+                _logger.LogWarning($"RAW_JSON insert failed: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Extract plant ID from keyString (if present)
+        /// </summary>
+        private string ExtractPlantIdFromKey(string keyString)
+        {
+            if (string.IsNullOrEmpty(keyString))
+                return null;
+                
+            // Extract plant ID from patterns like "vds-PLANTID-REVISION" or "all-plants"
+            if (keyString.Contains("-") && !keyString.StartsWith("all-"))
+            {
+                var parts = keyString.Split('-');
+                if (parts.Length >= 2)
+                    return parts[1]; // Return the plant ID part
+            }
+            
+            return null; // For global endpoints like "all-operators", "all-plants"
         }
 
         /// <summary>

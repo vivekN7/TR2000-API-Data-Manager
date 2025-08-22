@@ -1,5 +1,6 @@
 using TR2KApp.Components;
 using TR2KBlazorLibrary.Logic.Services;
+using TR2KBlazorLibrary.Legacy.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,8 +15,8 @@ builder.Services.AddHttpClient();
 builder.Services.AddScoped<TR2000ApiService>();
 builder.Services.AddScoped<ApiResponseDeserializer>();
 
-// Add Oracle ETL service
-builder.Services.AddScoped<OracleETLServiceV2>();
+// Add Legacy Oracle ETL service (for legacy page only)
+builder.Services.AddScoped<LegacyOracleETLService>();
 
 var app = builder.Build();
 

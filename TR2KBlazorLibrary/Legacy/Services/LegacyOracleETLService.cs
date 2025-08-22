@@ -7,27 +7,29 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Oracle.ManagedDataAccess.Client;
 using Oracle.ManagedDataAccess.Types;
+using TR2KBlazorLibrary.Legacy.Models;
+using TR2KBlazorLibrary.Logic.Services;
 using TR2KBlazorLibrary.Models;
 using Dapper;
 
-namespace TR2KBlazorLibrary.Logic.Services
+namespace TR2KBlazorLibrary.Legacy.Services
 {
     /// <summary>
     /// Simplified Oracle ETL Service that delegates all logic to database
     /// C# only fetches from API and calls stored procedures
     /// </summary>
-    public class OracleETLServiceV2
+    public class LegacyOracleETLService
     {
         private readonly string _connectionString;
         private readonly TR2000ApiService _apiService;
         private readonly ApiResponseDeserializer _deserializer;
-        private readonly ILogger<OracleETLServiceV2> _logger;
+        private readonly ILogger<LegacyOracleETLService> _logger;
 
-        public OracleETLServiceV2(
+        public LegacyOracleETLService(
             IConfiguration configuration, 
             TR2000ApiService apiService, 
             ApiResponseDeserializer deserializer, 
-            ILogger<OracleETLServiceV2> logger)
+            ILogger<LegacyOracleETLService> logger)
         {
             _connectionString = configuration.GetConnectionString("OracleConnection") ?? string.Empty;
             _apiService = apiService;

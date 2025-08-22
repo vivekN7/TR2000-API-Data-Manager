@@ -1,11 +1,12 @@
-@page "/etl-operations"
-@using TR2KBlazorLibrary.Logic.Services
+@page "/etl-failed-legacy"
+@using TR2KBlazorLibrary.Legacy.Services
+@using TR2KBlazorLibrary.Legacy.Models
 @using TR2KBlazorLibrary.Models
-@inject OracleETLServiceV2 ETLService
-@inject ILogger<ETLOperations> Logger
+@inject LegacyOracleETLService ETLService
+@inject ILogger<LegacyETLOperations> Logger
 @rendermode InteractiveServer
 
-<h3>ETL Operations - TR2000 Data Management</h3>
+<h3>ETL Failed - Legacy - TR2000 Data Management</h3>
 
 <!-- Collapsible Knowledge Articles Section -->
 <div class="card mb-3">

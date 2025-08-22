@@ -1,4 +1,4 @@
-namespace TR2KBlazorLibrary.Models
+namespace TR2KBlazorLibrary.Legacy.Models
 {
     /// <summary>
     /// Result of an ETL operation

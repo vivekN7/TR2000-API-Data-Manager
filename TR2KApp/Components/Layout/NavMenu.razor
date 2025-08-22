@@ -1,6 +1,6 @@
-﻿<div class="top-row ps-3 navbar navbar-dark" style="background-color: #00346a;">
+<div class="top-row ps-3 navbar navbar-dark" style="background-color: #00346a;">
     <div class="container-fluid">
-        <a class="navbar-brand text-white fw-bold" href="" style="font-size: 1.1rem;">TR2000 API Data Manager</a>
+        <a class="navbar-brand text-white fw-bold" href="" style="font-size: 0.9rem;">TR2000 API Data Manager</a>
     </div>
 </div>
 
@@ -8,35 +8,56 @@
 
 <div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
     <nav class="nav flex-column">
-        <div class="nav-item px-3">
+        <div class="nav-item px-2">
             <NavLink class="nav-link text-white" href="" Match="NavLinkMatch.All">
                 <i class="bi bi-house-door-fill me-2"></i> Home
             </NavLink>
         </div>
 
-        <div class="nav-item px-3">
+        <div class="nav-item px-2">
             <NavLink class="nav-link text-white" href="api-data">
-                <i class="bi bi-database me-2"></i> TR2000 API Data
+                <i class="bi bi-database me-2"></i> Direct API Calls
             </NavLink>
         </div>
 
-        <div class="nav-item px-3">
+        <div class="nav-item px-2">
             <NavLink class="nav-link text-white" href="pipe-sizes">
                 <i class="bi bi-diagram-3 me-2"></i> Get Pipe Sizes
             </NavLink>
         </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link text-white" href="etl-operations">
-                <i class="bi bi-lightning-charge-fill me-2"></i> ETL Operations
-            </NavLink>
+        <!-- Archive Section -->
+        <div class="nav-item px-2">
+            <div class="nav-link text-white" style="cursor: pointer;" onclick="toggleArchive()">
+                <i class="bi bi-archive me-2"></i> Archive
+                <i class="bi bi-chevron-down float-end" id="archive-chevron"></i>
+            </div>
+            <div class="collapse" id="archive-section">
+                <div class="nav-item px-2">
+                    <NavLink class="nav-link text-white-50" href="etl-failed-legacy" style="font-size: 0.85rem;">
+                        <i class="bi bi-exclamation-triangle me-1"></i> ETL Legacy
+                    </NavLink>
+                </div>
+            </div>
         </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link text-white" href="user-guide">
-                <i class="bi bi-book me-2"></i> User Guide
-            </NavLink>
-        </div>
     </nav>
 </div>
+
+<script>
+function toggleArchive() {
+    const archiveSection = document.getElementById('archive-section');
+    const chevron = document.getElementById('archive-chevron');
+    
+    if (archiveSection.classList.contains('show')) {
+        archiveSection.classList.remove('show');
+        chevron.classList.remove('bi-chevron-up');
+        chevron.classList.add('bi-chevron-down');
+    } else {
+        archiveSection.classList.add('show');
+        chevron.classList.remove('bi-chevron-down');
+        chevron.classList.add('bi-chevron-up');
+    }
+}
+</script>
 

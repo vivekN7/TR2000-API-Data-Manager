@@ -30,6 +30,9 @@
 
 ### Notes
 
+- **CRITICAL**: Master_DDL.sql is the SINGLE source of truth for all database objects. Always update this file for any schema changes.
+- The Master_DDL.sql includes DROP statements at the beginning for clean redeployment during development
+- **TESTING REQUIREMENT**: Always run `dotnet build` before asking user to test the Blazor app. Build first, then instruct user to test.
 - The existing TR2000ApiService and ApiResponseDeserializer can be leveraged for API calls
 - Database operations must use Dapper exclusively as per PRD requirements
 - All transformations must be in Oracle stored procedures, not C# code
@@ -41,29 +44,31 @@
 
 ## Tasks
 
-- [ ] 1.0 Setup Core Database Schema for Plants and Issues ONLY
-  - [ ] 1.1 Review TR2000_API_Endpoints_Documentation.md to understand Plants and Issues data fields
-  - [ ] 1.2 Create Master_DDL.sql with RAW_JSON table (including sha256 hash, endpoint_key, plant, issue_rev columns)
-  - [ ] 1.3 Define STG_PLANTS staging table with all VARCHAR2 columns matching API response
-  - [ ] 1.4 Define STG_ISSUES staging table with all VARCHAR2 columns matching API response
-  - [ ] 1.5 Create CORE.PLANTS table with proper data types and is_valid soft delete flag
-  - [ ] 1.6 Create CORE.ISSUES table with proper data types and is_valid soft delete flag
-  - [ ] 1.7 Setup SELECTION_LOADER table for storing user-selected plants and issues
-  - [ ] 1.8 Create ETL control tables (CONTROL_ENDPOINTS, CONTROL_SETTINGS, CONTROL_ENDPOINT_STATE)
-  - [ ] 1.9 Define ETL_RUN_LOG and ETL_ERROR_LOG tables for monitoring and error tracking
-  - [ ] 1.10 Create indexes for performance optimization on key columns
-- [ ] 1.11 Populate CONTROL_ENDPOINTS with initial Plants + Issues configs
-- [ ] 1.12 Ensure all schema changes are reflected in Master_DDL.sql only. No other DDL scripts should exist outside this file
+- [x] 1.0 Setup Core Database Schema for Plants and Issues ONLY
+  - [x] 1.1 Review TR2000_API_Endpoints_Documentation.md to understand Plants and Issues data fields
+  - [x] 1.2 Create Master_DDL.sql with RAW_JSON table (including sha256 hash, endpoint_key, plant, issue_rev columns)
+        **IMPORTANT**: Master_DDL.sql is the ONLY SQL script to be updated during development. It includes DROP statements for clean redeployment.
+  - [x] 1.3 Define STG_PLANTS staging table with all VARCHAR2 columns matching API response
+  - [x] 1.4 Define STG_ISSUES staging table with all VARCHAR2 columns matching API response
+  - [x] 1.5 Create PLANTS table with proper data types and is_valid soft delete flag
+  - [x] 1.6 Create ISSUES table with proper data types and is_valid soft delete flag
+  - [x] 1.7 Setup SELECTION_LOADER table for storing user-selected plants and issues
+  - [x] 1.8 Create ETL control tables (CONTROL_ENDPOINTS, CONTROL_SETTINGS, CONTROL_ENDPOINT_STATE)
+  - [x] 1.9 Define ETL_RUN_LOG and ETL_ERROR_LOG tables for monitoring and error tracking
+  - [x] 1.10 Create indexes for performance optimization on key columns
+- [x] 1.11 Populate CONTROL_ENDPOINTS with initial Plants + Issues configs
+- [x] 1.12 Ensure all schema changes are reflected in Master_DDL.sql only. No other DDL scripts should exist outside this file
+        **DEPLOYMENT NOTE**: Run Master_DDL.sql to drop and recreate all database objects cleanly. This is the ONLY script to maintain.
 
-- [ ] 2.0 Build Unified ETL Operations Page
-  - [ ] 2.1 Create single ETLOperations.razor page with multiple sections
-  - [ ] 2.2 Add Plant Selection section with dropdown populated from API
-  - [ ] 2.3 Add Issue Selection section that loads issues only for selected plants
-  - [ ] 2.4 Implement SelectionService.cs to manage SELECTION_LOADER table operations using Dapper
-  - [ ] 2.5 Add cascade logic in Oracle procedures to update dependent data when plants are removed
-  - [ ] 2.6 Implement validation to limit selection to maximum 10 plants
-  - [ ] 2.7 Create stored procedures for selection management (insert, update, cascade deletes)
-  - [ ] 2.8 Add selection persistence across application restarts
+- [x] 2.0 Build Unified ETL Operations Page
+  - [x] 2.1 Create single ETLOperations.razor page with multiple sections
+  - [x] 2.2 Add Plant Selection section with dropdown populated from API
+  - [x] 2.3 Add Issue Selection section that loads issues only for selected plants
+  - [x] 2.4 Implement SelectionService.cs to manage SELECTION_LOADER table operations using Dapper
+  - [x] 2.5 Add cascade logic in Oracle procedures to update dependent data when plants are removed
+  - [x] 2.6 Implement validation to limit selection to maximum 10 plants
+  - [x] 2.7 Create stored procedures for selection management (insert, update, cascade deletes)
+  - [x] 2.8 Add selection persistence across application restarts
 
 - [ ] 3.0 Build ETL Pipeline for Plants and Issues ONLY
   - [ ] 3.1 Create pkg_raw_ingest package for SHA256 deduplication and RAW_JSON insertion

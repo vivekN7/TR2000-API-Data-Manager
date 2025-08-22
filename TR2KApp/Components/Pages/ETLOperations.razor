@@ -1,0 +1,541 @@
+@page "/etl-operations"
+@using TR2KBlazorLibrary.Logic.Services
+@using TR2KBlazorLibrary.Models
+@using System.Text.Json
+@using System.Text.Json.Serialization
+@inject TR2000ApiService ApiService
+@inject SelectionService SelectionService
+@inject ETLService ETLService
+@inject ILogger<ETLOperations> Logger
+@rendermode InteractiveServer
+
+<PageTitle>ETL Operations</PageTitle>
+
+<div class="container-fluid">
+    <h1>ETL Operations Management</h1>
+    
+    <!-- Tab Navigation -->
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <button class="nav-link @(activeTab == "selection" ? "active" : "")" 
+                    @onclick="@(() => SetActiveTab("selection"))">
+                Plant & Issue Selection
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link @(activeTab == "monitoring" ? "active" : "")" 
+                    @onclick="@(() => SetActiveTab("monitoring"))">
+                ETL Monitoring
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link @(activeTab == "testing" ? "active" : "")" 
+                    @onclick="@(() => SetActiveTab("testing"))">
+                Testing & Validation
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link @(activeTab == "dashboard" ? "active" : "")" 
+                    @onclick="@(() => SetActiveTab("dashboard"))">
+                Dashboard
+            </button>
+        </li>
+    </ul>
+
+    <!-- Tab Content -->
+    <div class="tab-content">
+        @if (activeTab == "selection")
+        {
+            SelectionTab();
+        }
+        else if (activeTab == "monitoring")
+        {
+            MonitoringTab();
+        }
+        else if (activeTab == "testing")
+        {
+            TestingTab();
+        }
+        else if (activeTab == "dashboard")
+        {
+            DashboardTab();
+        }
+    </div>
+</div>
+
+<!-- Selection Tab Component -->
+@{
+    void SelectionTab()
+    {
+        <div class="row">
+            <!-- Plant Selection Column -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Plant Selection</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (isLoadingPlants)
+                        {
+                            <div class="text-center">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading plants...</span>
+                                </div>
+                                <p>Loading plants from API...</p>
+                            </div>
+                        }
+                        else if (availablePlants.Any())
+                        {
+                            <div class="mb-3">
+                                <label class="form-label">Available Plants (@availablePlants.Count)</label>
+                                <select class="form-select" multiple size="10" @onchange="OnPlantSelectionChanged">
+                                    @foreach (var plant in availablePlants)
+                                    {
+                                        <option value="@plant.PlantID" selected="@selectedPlantIds.Contains(plant.PlantID)">
+                                            @plant.PlantID - @plant.ShortDescription
+                                        </option>
+                                    }
+                                </select>
+                                <small class="text-muted">Hold Ctrl/Cmd to select multiple plants (max 10)</small>
+                            </div>
+                            
+                            <div class="alert alert-info">
+                                <strong>Selected:</strong> @selectedPlantIds.Count / 10 plants
+                                @if (selectedPlantIds.Count >= 10)
+                                {
+                                    <span class="text-danger ms-2">Maximum reached!</span>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-warning">
+                                No plants available. Click "Load Plants" to fetch from API.
+                            </div>
+                        }
+                        
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-primary" @onclick="LoadPlantsFromAPI" disabled="@isLoadingPlants">
+                                @if (isLoadingPlants)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                }
+                                Load Plants from API
+                            </button>
+                            <button class="btn btn-success" @onclick="SavePlantSelection" 
+                                    disabled="@(!selectedPlantIds.Any() || isSavingSelection)">
+                                @if (isSavingSelection)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                }
+                                Save Plant Selection
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Issue Selection Column -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">Issue Selection</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (!selectedPlantIds.Any())
+                        {
+                            <div class="alert alert-info">
+                                Please select at least one plant first.
+                            </div>
+                        }
+                        else if (isLoadingIssues)
+                        {
+                            <div class="text-center">
+                                <div class="spinner-border text-info" role="status">
+                                    <span class="visually-hidden">Loading issues...</span>
+                                </div>
+                                <p>Loading issues for selected plants...</p>
+                            </div>
+                        }
+                        else if (plantIssues.Any())
+                        {
+                            @foreach (var plantGroup in plantIssues.GroupBy(i => i.PlantId))
+                            {
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">@plantGroup.Key</label>
+                                    <select class="form-select" multiple size="5" 
+                                            @onchange="(e) => OnIssueSelectionChanged(e, plantGroup.Key)">
+                                        @foreach (var issue in plantGroup)
+                                        {
+                                            var issueKey = $"{issue.PlantId}|{issue.IssueRevision}";
+                                            <option value="@issue.IssueRevision" 
+                                                    selected="@selectedIssueKeys.Contains(issueKey)">
+                                                @issue.IssueRevision - @issue.Status (@issue.RevDate)
+                                            </option>
+                                        }
+                                    </select>
+                                </div>
+                            }
+                            
+                            <div class="alert alert-info">
+                                <strong>Selected:</strong> @selectedIssueKeys.Count issues across @selectedPlantIds.Count plants
+                            </div>
+                        }
+                        else if (selectedPlantIds.Any())
+                        {
+                            <div class="alert alert-warning">
+                                No issues found for selected plants. Click "Load Issues" to fetch.
+                            </div>
+                        }
+                        
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-info" @onclick="LoadIssuesForSelectedPlants" 
+                                    disabled="@(!selectedPlantIds.Any() || isLoadingIssues)">
+                                @if (isLoadingIssues)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                }
+                                Load Issues for Selected Plants
+                            </button>
+                            <button class="btn btn-success" @onclick="SaveIssueSelection" 
+                                    disabled="@(!selectedIssueKeys.Any() || isSavingSelection)">
+                                @if (isSavingSelection)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                }
+                                Save Issue Selection
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Current Selection Summary -->
+        <div class="row mt-3">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0">Current Selection Summary</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (currentSelections.Any())
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Plant ID</th>
+                                            <th>Issue Revision</th>
+                                            <th>Status</th>
+                                            <th>Last ETL Run</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var selection in currentSelections)
+                                        {
+                                            <tr>
+                                                <td>@selection.PlantId</td>
+                                                <td>@(selection.IssueRevision ?? "All Issues")</td>
+                                                <td>
+                                                    <span class="badge bg-@(selection.IsActive ? "success" : "secondary")">
+                                                        @(selection.IsActive ? "Active" : "Inactive")
+                                                    </span>
+                                                </td>
+                                                <td>@(selection.LastEtlRun?.ToString("yyyy-MM-dd HH:mm") ?? "Never")</td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-danger" 
+                                                            @onclick="() => RemoveSelection(selection.SelectionId)">
+                                                        Remove
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="text-muted">No selections saved yet.</p>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    void MonitoringTab()
+    {
+        <div class="alert alert-info">
+            <h4>ETL Monitoring</h4>
+            <p>ETL run monitoring, progress tracking, and error logs will be displayed here.</p>
+        </div>
+    }
+
+    void TestingTab()
+    {
+        <div class="alert alert-info">
+            <h4>Testing & Validation</h4>
+            <p>ETL testing, data validation, and manual trigger controls will be available here.</p>
+        </div>
+    }
+
+    void DashboardTab()
+    {
+        <div class="alert alert-info">
+            <h4>ETL Dashboard</h4>
+            <p>Statistics, performance metrics, and data preview functionality will be shown here.</p>
+        </div>
+    }
+}
+
+@code {
+    private string activeTab = "selection";
+    
+    private void SetActiveTab(string tab)
+    {
+        activeTab = tab;
+    }
+    
+    // Plant selection state
+    private List<PlantModel> availablePlants = new();
+    private HashSet<string> selectedPlantIds = new();
+    private bool isLoadingPlants = false;
+    
+    // Issue selection state
+    private List<IssueModel> plantIssues = new();
+    private HashSet<string> selectedIssueKeys = new(); // Format: "PlantId|IssueRevision"
+    private bool isLoadingIssues = false;
+    
+    // Selection persistence state
+    private List<SelectionModel> currentSelections = new();
+    private bool isSavingSelection = false;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCurrentSelections();
+    }
+    
+    private async Task LoadCurrentSelections()
+    {
+        try
+        {
+            currentSelections = await SelectionService.GetActiveSelectionsAsync();
+            
+            // Restore selected plants from saved selections
+            selectedPlantIds = currentSelections
+                .Select(s => s.PlantId)
+                .Distinct()
+                .ToHashSet();
+                
+            // Restore selected issues from saved selections
+            selectedIssueKeys = currentSelections
+                .Where(s => !string.IsNullOrEmpty(s.IssueRevision))
+                .Select(s => $"{s.PlantId}|{s.IssueRevision}")
+                .ToHashSet();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load current selections");
+        }
+    }
+    
+    private async Task LoadPlantsFromAPI()
+    {
+        isLoadingPlants = true;
+        try
+        {
+            var response = await ApiService.GetDataAsync("plants");
+            if (response.Success && !string.IsNullOrEmpty(response.Data))
+            {
+                using var doc = JsonDocument.Parse(response.Data);
+                var root = doc.RootElement;
+                
+                if (root.TryGetProperty("getPlant", out var plantsArray) && plantsArray.ValueKind == JsonValueKind.Array)
+                {
+                    availablePlants = new List<PlantModel>();
+                    foreach (var plant in plantsArray.EnumerateArray())
+                    {
+                        availablePlants.Add(new PlantModel
+                        {
+                            PlantID = plant.TryGetProperty("PlantID", out var pid) ? pid.GetInt32().ToString() : "",
+                            ShortDescription = plant.TryGetProperty("ShortDescription", out var desc) ? desc.GetString() ?? "" : "",
+                            OperatorName = plant.TryGetProperty("OperatorName", out var op) ? op.GetString() ?? "" : ""
+                        });
+                    }
+                }
+                
+                Logger.LogInformation($"Loaded {availablePlants.Count} plants from API");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load plants from API");
+        }
+        finally
+        {
+            isLoadingPlants = false;
+        }
+    }
+    
+    private async Task LoadIssuesForSelectedPlants()
+    {
+        if (!selectedPlantIds.Any()) return;
+        
+        isLoadingIssues = true;
+        plantIssues.Clear();
+        
+        try
+        {
+            foreach (var plantId in selectedPlantIds)
+            {
+                var response = await ApiService.GetDataAsync($"plants/{plantId}/issues");
+                if (response.Success && !string.IsNullOrEmpty(response.Data))
+                {
+                    using var doc = JsonDocument.Parse(response.Data);
+                    var root = doc.RootElement;
+                    
+                    // Check if response has the "get" property with nested array
+                    if (root.TryGetProperty("get", out var getObj) && 
+                        getObj.TryGetProperty($"plants/{plantId}/issues", out var issuesArray) && 
+                        issuesArray.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var issue in issuesArray.EnumerateArray())
+                        {
+                            plantIssues.Add(new IssueModel
+                            {
+                                PlantId = plantId,
+                                IssueRevision = issue.TryGetProperty("IssueRevision", out var rev) ? rev.GetString() ?? "" : "",
+                                Status = issue.TryGetProperty("Status", out var status) ? status.GetString() ?? "" : "",
+                                RevDate = issue.TryGetProperty("RevDate", out var date) ? date.GetString() ?? "" : ""
+                            });
+                        }
+                    }
+                }
+            }
+            
+            Logger.LogInformation($"Loaded {plantIssues.Count} issues for {selectedPlantIds.Count} plants");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load issues from API");
+        }
+        finally
+        {
+            isLoadingIssues = false;
+        }
+    }
+    
+    private void OnPlantSelectionChanged(ChangeEventArgs e)
+    {
+        if (e.Value is string[] selectedValues)
+        {
+            if (selectedValues.Length > 10)
+            {
+                Logger.LogWarning("Cannot select more than 10 plants");
+                return;
+            }
+            
+            selectedPlantIds = selectedValues.ToHashSet();
+            
+            // Clear issue selections when plants change
+            selectedIssueKeys.Clear();
+            plantIssues.Clear();
+        }
+    }
+    
+    private void OnIssueSelectionChanged(ChangeEventArgs e, string plantId)
+    {
+        if (e.Value is string[] selectedValues)
+        {
+            // Remove existing selections for this plant
+            selectedIssueKeys.RemoveWhere(k => k.StartsWith($"{plantId}|"));
+            
+            // Add new selections
+            foreach (var issueRev in selectedValues)
+            {
+                selectedIssueKeys.Add($"{plantId}|{issueRev}");
+            }
+        }
+    }
+    
+    private async Task SavePlantSelection()
+    {
+        if (!selectedPlantIds.Any()) return;
+        
+        isSavingSelection = true;
+        try
+        {
+            await SelectionService.SavePlantSelectionsAsync(selectedPlantIds.ToList());
+            await LoadCurrentSelections();
+            Logger.LogInformation($"Saved selection for {selectedPlantIds.Count} plants");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save plant selection");
+        }
+        finally
+        {
+            isSavingSelection = false;
+        }
+    }
+    
+    private async Task SaveIssueSelection()
+    {
+        if (!selectedIssueKeys.Any()) return;
+        
+        isSavingSelection = true;
+        try
+        {
+            var selections = selectedIssueKeys.Select(key =>
+            {
+                var parts = key.Split('|');
+                return new { PlantId = parts[0], IssueRevision = parts[1] };
+            }).ToList();
+            
+            await SelectionService.SaveIssueSelectionsAsync(selections.Select(s => 
+                new SelectionModel { PlantId = s.PlantId, IssueRevision = s.IssueRevision }).ToList());
+            await LoadCurrentSelections();
+            Logger.LogInformation($"Saved selection for {selectedIssueKeys.Count} issues");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save issue selection");
+        }
+        finally
+        {
+            isSavingSelection = false;
+        }
+    }
+    
+    private async Task RemoveSelection(int selectionId)
+    {
+        try
+        {
+            await SelectionService.RemoveSelectionAsync(selectionId);
+            await LoadCurrentSelections();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to remove selection");
+        }
+    }
+    
+    // Model classes
+    public class PlantModel
+    {
+        public string PlantID { get; set; } = "";
+        public string ShortDescription { get; set; } = "";
+        public string OperatorName { get; set; } = "";
+    }
+    
+    public class IssueModel
+    {
+        public string PlantId { get; set; } = "";
+        public string IssueRevision { get; set; } = "";
+        public string Status { get; set; } = "";
+        public string RevDate { get; set; } = "";
+    }
+}

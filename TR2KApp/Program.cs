@@ -11,9 +11,13 @@ builder.Services.AddRazorComponents()
 // Add HttpClient
 builder.Services.AddHttpClient();
 
-// Add API services only (no database)
+// Add API services
 builder.Services.AddScoped<TR2000ApiService>();
 builder.Services.AddScoped<ApiResponseDeserializer>();
+
+// Add new ETL services
+builder.Services.AddScoped<SelectionService>();
+builder.Services.AddScoped<ETLService>();
 
 // Add Legacy Oracle ETL service (for legacy page only)
 builder.Services.AddScoped<LegacyOracleETLService>();

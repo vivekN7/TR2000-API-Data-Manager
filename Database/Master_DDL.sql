@@ -4,11 +4,111 @@
 -- This file contains ALL database schema definitions for the TR2000 ETL system.
 -- No other DDL scripts should exist outside this file.
 -- 
+-- IMPORTANT: This is the ONLY SQL script that should be updated during development.
+-- It will be redeployed as needed, so it includes DROP statements for clean deployment.
+-- 
 -- Schema Structure:
 -- 1. RAW_JSON - Storage for API responses with deduplication
 -- 2. STG_* - Staging tables with VARCHAR2 columns for parsing
 -- 3. CORE.* - Final normalized tables with proper data types
 -- 4. Control Tables - ETL orchestration and monitoring
+-- ===============================================================================
+
+-- ===============================================================================
+-- SECTION 0: Clean Deployment - Drop All Objects
+-- ===============================================================================
+-- Drop tables in reverse dependency order to avoid foreign key violations
+
+-- Drop ETL Monitoring Tables
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TABLE ETL_ERROR_LOG CASCADE CONSTRAINTS';
+EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;
+/
+
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TABLE ETL_RUN_LOG CASCADE CONSTRAINTS';
+EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;
+/
+
+-- Drop Control Tables
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TABLE CONTROL_ENDPOINT_STATE CASCADE CONSTRAINTS';
+EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;
+/
+
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TABLE CONTROL_SETTINGS CASCADE CONSTRAINTS';
+EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;
+/
+
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TABLE CONTROL_ENDPOINTS CASCADE CONSTRAINTS';
+EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;
+/
+
+-- Drop Selection Table
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TABLE SELECTION_LOADER CASCADE CONSTRAINTS';
+EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;
+/
+
+-- Drop Core Tables
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TABLE ISSUES CASCADE CONSTRAINTS';
+EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;
+/
+
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TABLE PLANTS CASCADE CONSTRAINTS';
+EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;
+/
+
+-- Drop Staging Tables
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TABLE STG_ISSUES CASCADE CONSTRAINTS';
+EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;
+/
+
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TABLE STG_PLANTS CASCADE CONSTRAINTS';
+EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;
+/
+
+-- Drop RAW_JSON Table
+BEGIN
+    EXECUTE IMMEDIATE 'DROP TABLE RAW_JSON CASCADE CONSTRAINTS';
+EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;
+/
+
+-- Drop all stored procedures and packages
+DECLARE
+    CURSOR c_packages IS
+        SELECT object_name 
+        FROM user_objects 
+        WHERE object_type = 'PACKAGE'
+        AND object_name IN (
+            'PKG_RAW_INGEST',
+            'PKG_PARSE_PLANTS',
+            'PKG_PARSE_ISSUES',
+            'PKG_UPSERT_PLANTS',
+            'PKG_UPSERT_ISSUES',
+            'PKG_ETL_OPERATIONS'
+        );
+BEGIN
+    FOR rec IN c_packages LOOP
+        EXECUTE IMMEDIATE 'DROP PACKAGE ' || rec.object_name;
+    END LOOP;
+EXCEPTION
+    WHEN OTHERS THEN
+        IF SQLCODE != -4043 THEN -- Package does not exist
+            RAISE;
+        END IF;
+END;
+/
+
+-- Clear any remaining objects from previous deployments
+PURGE RECYCLEBIN;
+
 -- ===============================================================================
 
 -- ===============================================================================
@@ -114,13 +214,8 @@ CREATE INDEX idx_stg_issues_revision ON STG_ISSUES(issue_revision);
 -- SECTION 3: Core Tables
 -- ===============================================================================
 
--- Create CORE schema if not exists
--- Note: Schema creation requires DBA privileges
--- CREATE USER core IDENTIFIED BY core_password;
--- GRANT CREATE SESSION, CREATE TABLE, CREATE SEQUENCE, CREATE PROCEDURE TO core;
-
--- CORE.PLANTS - Final normalized Plants table with proper data types
-CREATE TABLE CORE.PLANTS (
+-- PLANTS - Final normalized Plants table with proper data types
+CREATE TABLE PLANTS (
     plant_id            VARCHAR2(50) PRIMARY KEY,
     operator_id         NUMBER,
     operator_name       VARCHAR2(255),
@@ -151,12 +246,12 @@ CREATE TABLE CORE.PLANTS (
     last_api_sync       TIMESTAMP
 );
 
-CREATE INDEX idx_core_plants_operator ON CORE.PLANTS(operator_id);
-CREATE INDEX idx_core_plants_valid ON CORE.PLANTS(is_valid);
-CREATE INDEX idx_core_plants_sync ON CORE.PLANTS(last_api_sync);
+CREATE INDEX idx_plants_operator ON PLANTS(operator_id);
+CREATE INDEX idx_plants_valid ON PLANTS(is_valid);
+CREATE INDEX idx_plants_sync ON PLANTS(last_api_sync);
 
--- CORE.ISSUES - Final normalized Issues table with proper data types
-CREATE TABLE CORE.ISSUES (
+-- ISSUES - Final normalized Issues table with proper data types
+CREATE TABLE ISSUES (
     issue_id            NUMBER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
     plant_id            VARCHAR2(50) NOT NULL,
     issue_revision      VARCHAR2(50) NOT NULL,
@@ -188,14 +283,14 @@ CREATE TABLE CORE.ISSUES (
     created_date        DATE DEFAULT SYSDATE NOT NULL,
     last_modified_date  DATE DEFAULT SYSDATE NOT NULL,
     last_api_sync       TIMESTAMP,
-    CONSTRAINT uk_core_issues UNIQUE (plant_id, issue_revision),
-    CONSTRAINT fk_core_issues_plant FOREIGN KEY (plant_id) REFERENCES CORE.PLANTS(plant_id)
+    CONSTRAINT uk_issues UNIQUE (plant_id, issue_revision),
+    CONSTRAINT fk_issues_plant FOREIGN KEY (plant_id) REFERENCES PLANTS(plant_id)
 );
 
-CREATE INDEX idx_core_issues_plant ON CORE.ISSUES(plant_id);
-CREATE INDEX idx_core_issues_revision ON CORE.ISSUES(issue_revision);
-CREATE INDEX idx_core_issues_valid ON CORE.ISSUES(is_valid);
-CREATE INDEX idx_core_issues_sync ON CORE.ISSUES(last_api_sync);
+CREATE INDEX idx_issues_plant ON ISSUES(plant_id);
+CREATE INDEX idx_issues_revision ON ISSUES(issue_revision);
+CREATE INDEX idx_issues_valid ON ISSUES(is_valid);
+CREATE INDEX idx_issues_sync ON ISSUES(last_api_sync);
 
 -- ===============================================================================
 -- SECTION 4: Selection Management
@@ -334,36 +429,758 @@ INSERT INTO CONTROL_ENDPOINTS (
     requires_issue,
     parse_procedure,
     upsert_procedure
-) VALUES 
-    ('plants', 
-     'plants', 
-     'Get all plants with metadata', 
-     1, 
-     'Y',
-     'N',
-     'N',
-     'pkg_parse_plants.parse_plants_json',
-     'pkg_upsert_plants.upsert_plants'),
-    
-    ('issues', 
-     'plants/{plantid}/issues', 
-     'Get issue revisions for a specific plant', 
-     2, 
-     'Y',
-     'Y',
-     'N',
-     'pkg_parse_issues.parse_issues_json',
-     'pkg_upsert_issues.upsert_issues');
+) VALUES (
+    'plants', 
+    'plants', 
+    'Get all plants with metadata', 
+    1, 
+    'Y',
+    'N',
+    'N',
+    'pkg_parse_plants.parse_plants_json',
+    'pkg_upsert_plants.upsert_plants'
+);
+
+INSERT INTO CONTROL_ENDPOINTS (
+    endpoint_key, 
+    endpoint_url_pattern, 
+    endpoint_description, 
+    processing_order, 
+    is_active,
+    requires_plant,
+    requires_issue,
+    parse_procedure,
+    upsert_procedure
+) VALUES (
+    'issues', 
+    'plants/{plantid}/issues', 
+    'Get issue revisions for a specific plant', 
+    2, 
+    'Y',
+    'Y',
+    'N',
+    'pkg_parse_issues.parse_issues_json',
+    'pkg_upsert_issues.upsert_issues'
+);
 
 -- Populate initial CONTROL_SETTINGS
-INSERT INTO CONTROL_SETTINGS (setting_key, setting_value, setting_description) VALUES
-    ('API_BASE_URL', 'https://equinor.pipespec-api.presight.com/', 'Base URL for TR2000 API'),
-    ('API_TIMEOUT_SECONDS', '60', 'API call timeout in seconds'),
-    ('MAX_PLANTS_PER_RUN', '10', 'Maximum number of plants to process in a single ETL run'),
-    ('RAW_JSON_RETENTION_DAYS', '30', 'Number of days to retain raw JSON responses'),
-    ('ETL_LOG_RETENTION_DAYS', '90', 'Number of days to retain ETL logs'),
-    ('ENABLE_PARALLEL_PROCESSING', 'N', 'Enable parallel processing of endpoints'),
-    ('BATCH_SIZE', '1000', 'Batch size for bulk operations');
+INSERT INTO CONTROL_SETTINGS (setting_key, setting_value, setting_description) 
+VALUES ('API_BASE_URL', 'https://equinor.pipespec-api.presight.com/', 'Base URL for TR2000 API');
+
+INSERT INTO CONTROL_SETTINGS (setting_key, setting_value, setting_description) 
+VALUES ('API_TIMEOUT_SECONDS', '60', 'API call timeout in seconds');
+
+INSERT INTO CONTROL_SETTINGS (setting_key, setting_value, setting_description) 
+VALUES ('MAX_PLANTS_PER_RUN', '10', 'Maximum number of plants to process in a single ETL run');
+
+INSERT INTO CONTROL_SETTINGS (setting_key, setting_value, setting_description) 
+VALUES ('RAW_JSON_RETENTION_DAYS', '30', 'Number of days to retain raw JSON responses');
+
+INSERT INTO CONTROL_SETTINGS (setting_key, setting_value, setting_description) 
+VALUES ('ETL_LOG_RETENTION_DAYS', '90', 'Number of days to retain ETL logs');
+
+INSERT INTO CONTROL_SETTINGS (setting_key, setting_value, setting_description) 
+VALUES ('ENABLE_PARALLEL_PROCESSING', 'N', 'Enable parallel processing of endpoints');
+
+INSERT INTO CONTROL_SETTINGS (setting_key, setting_value, setting_description) 
+VALUES ('BATCH_SIZE', '1000', 'Batch size for bulk operations');
+
+COMMIT;
+
+-- ===============================================================================
+-- SECTION 8: Stored Procedures and Packages
+-- ===============================================================================
+
+-- Package: PKG_RAW_INGEST
+-- Purpose: Handle RAW_JSON deduplication and insertion
+CREATE OR REPLACE PACKAGE pkg_raw_ingest AS
+    -- Check if a response hash already exists
+    FUNCTION is_duplicate_hash(p_hash VARCHAR2) RETURN BOOLEAN;
+    
+    -- Insert raw JSON response
+    FUNCTION insert_raw_json(
+        p_endpoint_key VARCHAR2,
+        p_plant_id VARCHAR2,
+        p_issue_revision VARCHAR2,
+        p_api_url VARCHAR2,
+        p_response_json CLOB,
+        p_response_hash VARCHAR2
+    ) RETURN NUMBER;
+END pkg_raw_ingest;
+/
+
+CREATE OR REPLACE PACKAGE BODY pkg_raw_ingest AS
+    
+    FUNCTION is_duplicate_hash(p_hash VARCHAR2) RETURN BOOLEAN IS
+        v_count NUMBER;
+    BEGIN
+        SELECT COUNT(*) INTO v_count
+        FROM RAW_JSON
+        WHERE response_hash = p_hash;
+        
+        RETURN (v_count > 0);
+    END is_duplicate_hash;
+    
+    FUNCTION insert_raw_json(
+        p_endpoint_key VARCHAR2,
+        p_plant_id VARCHAR2,
+        p_issue_revision VARCHAR2,
+        p_api_url VARCHAR2,
+        p_response_json CLOB,
+        p_response_hash VARCHAR2
+    ) RETURN NUMBER IS
+        v_raw_json_id NUMBER;
+    BEGIN
+        -- Check for duplicate first
+        IF is_duplicate_hash(p_response_hash) THEN
+            RETURN -1; -- Indicates duplicate, no insert needed
+        END IF;
+        
+        INSERT INTO RAW_JSON (
+            endpoint_key, plant_id, issue_revision, 
+            api_url, response_json, response_hash
+        ) VALUES (
+            p_endpoint_key, p_plant_id, p_issue_revision,
+            p_api_url, p_response_json, p_response_hash
+        ) RETURNING raw_json_id INTO v_raw_json_id;
+        
+        RETURN v_raw_json_id;
+    END insert_raw_json;
+    
+END pkg_raw_ingest;
+/
+
+-- Package: PKG_PARSE_PLANTS
+-- Purpose: Parse JSON from RAW_JSON to STG_PLANTS
+CREATE OR REPLACE PACKAGE pkg_parse_plants AS
+    PROCEDURE parse_plants_json(p_raw_json_id NUMBER);
+    PROCEDURE clear_staging;
+END pkg_parse_plants;
+/
+
+CREATE OR REPLACE PACKAGE BODY pkg_parse_plants AS
+    
+    PROCEDURE clear_staging IS
+    BEGIN
+        DELETE FROM STG_PLANTS;
+    END clear_staging;
+    
+    PROCEDURE parse_plants_json(p_raw_json_id NUMBER) IS
+    BEGIN
+        -- Clear staging first
+        clear_staging;
+        
+        -- Parse JSON and insert into staging
+        INSERT INTO STG_PLANTS (
+            raw_json_id,
+            operator_id,
+            operator_name,
+            plant_id,
+            short_description,
+            project,
+            long_description,
+            common_lib_plant_code,
+            initial_revision,
+            area_id,
+            area,
+            enable_embedded_note,
+            category_id,
+            category,
+            document_space_link,
+            enable_copy_pcs_from_plant,
+            over_length,
+            pcs_qa,
+            eds_mj,
+            celsius_bar,
+            web_info_text,
+            bolt_tension_text,
+            visible,
+            windows_remark_text,
+            user_protected
+        )
+        SELECT 
+            p_raw_json_id,
+            TO_CHAR(OperatorID),
+            OperatorName,
+            TO_CHAR(PlantID),
+            ShortDescription,
+            Project,
+            LongDescription,
+            CommonLibPlantCode,
+            InitialRevision,
+            TO_CHAR(AreaID),
+            Area,
+            EnableEmbeddedNote,
+            CategoryID,
+            Category,
+            DocumentSpaceLink,
+            EnableCopyPCSFromPlant,
+            OverLength,
+            PCSQA,
+            EDSMJ,
+            CelsiusBar,
+            WebInfoText,
+            BoltTensionText,
+            Visible,
+            WindowsRemarkText,
+            UserProtected
+        FROM RAW_JSON r,
+        JSON_TABLE(r.response_json, '$.getPlant[*]'
+            COLUMNS (
+                OperatorID NUMBER PATH '$.OperatorID',
+                OperatorName VARCHAR2(255) PATH '$.OperatorName',
+                PlantID NUMBER PATH '$.PlantID',
+                ShortDescription VARCHAR2(255) PATH '$.ShortDescription',
+                Project VARCHAR2(255) PATH '$.Project',
+                LongDescription VARCHAR2(4000) PATH '$.LongDescription',
+                CommonLibPlantCode VARCHAR2(50) PATH '$.CommonLibPlantCode',
+                InitialRevision VARCHAR2(50) PATH '$.InitialRevision',
+                AreaID NUMBER PATH '$.AreaID',
+                Area VARCHAR2(255) PATH '$.Area',
+                EnableEmbeddedNote VARCHAR2(50) PATH '$.EnableEmbeddedNote',
+                CategoryID VARCHAR2(50) PATH '$.CategoryID',
+                Category VARCHAR2(255) PATH '$.Category',
+                DocumentSpaceLink VARCHAR2(500) PATH '$.DocumentSpaceLink',
+                EnableCopyPCSFromPlant VARCHAR2(50) PATH '$.EnableCopyPCSFromPlant',
+                OverLength VARCHAR2(50) PATH '$.OverLength',
+                PCSQA VARCHAR2(50) PATH '$.PCSQA',
+                EDSMJ VARCHAR2(50) PATH '$.EDSMJ',
+                CelsiusBar VARCHAR2(50) PATH '$.CelsiusBar',
+                WebInfoText VARCHAR2(4000) PATH '$.WebInfoText',
+                BoltTensionText VARCHAR2(4000) PATH '$.BoltTensionText',
+                Visible VARCHAR2(50) PATH '$.Visible',
+                WindowsRemarkText VARCHAR2(4000) PATH '$.WindowsRemarkText',
+                UserProtected VARCHAR2(50) PATH '$.UserProtected'
+            )
+        ) jt
+        WHERE r.raw_json_id = p_raw_json_id;
+        
+        COMMIT;
+    END parse_plants_json;
+    
+END pkg_parse_plants;
+/
+
+-- Package: PKG_UPSERT_PLANTS
+-- Purpose: Merge from STG_PLANTS to PLANTS
+CREATE OR REPLACE PACKAGE pkg_upsert_plants AS
+    PROCEDURE upsert_plants;
+END pkg_upsert_plants;
+/
+
+CREATE OR REPLACE PACKAGE BODY pkg_upsert_plants AS
+    
+    PROCEDURE upsert_plants IS
+    BEGIN
+        -- First, mark all existing plants as invalid
+        UPDATE PLANTS SET is_valid = 'N';
+        
+        -- Merge staging data into PLANTS
+        MERGE INTO PLANTS tgt
+        USING (
+            SELECT DISTINCT
+                plant_id,
+                TO_NUMBER(operator_id) as operator_id,
+                operator_name,
+                short_description,
+                project,
+                long_description,
+                common_lib_plant_code,
+                initial_revision,
+                TO_NUMBER(area_id) as area_id,
+                area,
+                CASE WHEN UPPER(enable_embedded_note) IN ('TRUE', 'Y', '1') THEN 'Y' ELSE 'N' END as enable_embedded_note,
+                category_id,
+                category,
+                document_space_link,
+                CASE WHEN UPPER(enable_copy_pcs_from_plant) IN ('TRUE', 'Y', '1') THEN 'Y' ELSE 'N' END as enable_copy_pcs_from_plant,
+                CASE WHEN UPPER(over_length) IN ('TRUE', 'Y', '1') THEN 'Y' ELSE 'N' END as over_length,
+                CASE WHEN UPPER(pcs_qa) IN ('TRUE', 'Y', '1') THEN 'Y' ELSE 'N' END as pcs_qa,
+                CASE WHEN UPPER(eds_mj) IN ('TRUE', 'Y', '1') THEN 'Y' ELSE 'N' END as eds_mj,
+                CASE WHEN UPPER(celsius_bar) IN ('TRUE', 'Y', '1') THEN 'Y' ELSE 'N' END as celsius_bar,
+                web_info_text,
+                bolt_tension_text,
+                CASE WHEN UPPER(visible) IN ('TRUE', 'Y', '1') THEN 'Y' ELSE 'N' END as visible,
+                windows_remark_text,
+                CASE WHEN UPPER(user_protected) IN ('TRUE', 'Y', '1') THEN 'Y' ELSE 'N' END as user_protected
+            FROM STG_PLANTS
+        ) src
+        ON (tgt.plant_id = src.plant_id)
+        WHEN MATCHED THEN
+            UPDATE SET
+                operator_id = src.operator_id,
+                operator_name = src.operator_name,
+                short_description = src.short_description,
+                project = src.project,
+                long_description = src.long_description,
+                common_lib_plant_code = src.common_lib_plant_code,
+                initial_revision = src.initial_revision,
+                area_id = src.area_id,
+                area = src.area,
+                enable_embedded_note = src.enable_embedded_note,
+                category_id = src.category_id,
+                category = src.category,
+                document_space_link = src.document_space_link,
+                enable_copy_pcs_from_plant = src.enable_copy_pcs_from_plant,
+                over_length = src.over_length,
+                pcs_qa = src.pcs_qa,
+                eds_mj = src.eds_mj,
+                celsius_bar = src.celsius_bar,
+                web_info_text = src.web_info_text,
+                bolt_tension_text = src.bolt_tension_text,
+                visible = src.visible,
+                windows_remark_text = src.windows_remark_text,
+                user_protected = src.user_protected,
+                is_valid = 'Y',
+                last_modified_date = SYSDATE,
+                last_api_sync = SYSTIMESTAMP
+        WHEN NOT MATCHED THEN
+            INSERT (
+                plant_id, operator_id, operator_name, short_description,
+                project, long_description, common_lib_plant_code, initial_revision,
+                area_id, area, enable_embedded_note, category_id, category,
+                document_space_link, enable_copy_pcs_from_plant, over_length,
+                pcs_qa, eds_mj, celsius_bar, web_info_text, bolt_tension_text,
+                visible, windows_remark_text, user_protected, is_valid,
+                created_date, last_modified_date, last_api_sync
+            ) VALUES (
+                src.plant_id, src.operator_id, src.operator_name, src.short_description,
+                src.project, src.long_description, src.common_lib_plant_code, src.initial_revision,
+                src.area_id, src.area, src.enable_embedded_note, src.category_id, src.category,
+                src.document_space_link, src.enable_copy_pcs_from_plant, src.over_length,
+                src.pcs_qa, src.eds_mj, src.celsius_bar, src.web_info_text, src.bolt_tension_text,
+                src.visible, src.windows_remark_text, src.user_protected, 'Y',
+                SYSDATE, SYSDATE, SYSTIMESTAMP
+            );
+        
+        COMMIT;
+    END upsert_plants;
+    
+END pkg_upsert_plants;
+/
+
+-- Package: PKG_PARSE_ISSUES
+-- Purpose: Parse JSON from RAW_JSON to STG_ISSUES
+CREATE OR REPLACE PACKAGE pkg_parse_issues AS
+    PROCEDURE parse_issues_json(p_raw_json_id NUMBER, p_plant_id VARCHAR2);
+    PROCEDURE clear_staging_for_plant(p_plant_id VARCHAR2);
+END pkg_parse_issues;
+/
+
+CREATE OR REPLACE PACKAGE BODY pkg_parse_issues AS
+    
+    PROCEDURE clear_staging_for_plant(p_plant_id VARCHAR2) IS
+    BEGIN
+        DELETE FROM STG_ISSUES WHERE plant_id = p_plant_id;
+    END clear_staging_for_plant;
+    
+    PROCEDURE parse_issues_json(p_raw_json_id NUMBER, p_plant_id VARCHAR2) IS
+        v_sql CLOB;
+    BEGIN
+        -- Clear staging for this plant first
+        clear_staging_for_plant(p_plant_id);
+        
+        -- Build dynamic SQL with the plant_id embedded in the path string
+        v_sql := 'INSERT INTO STG_ISSUES (
+            raw_json_id,
+            plant_id,
+            issue_revision,
+            status,
+            rev_date,
+            protect_status,
+            general_revision,
+            general_rev_date,
+            pcs_revision,
+            pcs_rev_date,
+            eds_revision,
+            eds_rev_date,
+            vds_revision,
+            vds_rev_date,
+            vsk_revision,
+            vsk_rev_date,
+            mds_revision,
+            mds_rev_date,
+            esk_revision,
+            esk_rev_date,
+            sc_revision,
+            sc_rev_date,
+            vsm_revision,
+            vsm_rev_date,
+            user_name,
+            user_entry_time,
+            user_protected
+        )
+        SELECT 
+            ' || p_raw_json_id || ',
+            ''' || p_plant_id || ''',
+            IssueRevision,
+            Status,
+            RevDate,
+            ProtectStatus,
+            GeneralRevision,
+            GeneralRevDate,
+            PCSRevision,
+            PCSRevDate,
+            EDSRevision,
+            EDSRevDate,
+            VDSRevision,
+            VDSRevDate,
+            VSKRevision,
+            VSKRevDate,
+            MDSRevision,
+            MDSRevDate,
+            ESKRevision,
+            ESKRevDate,
+            SCRevision,
+            SCRevDate,
+            VSMRevision,
+            VSMRevDate,
+            UserName,
+            UserEntryTime,
+            UserProtected
+        FROM RAW_JSON r,
+        JSON_TABLE(r.response_json, ''$.get."plants/' || p_plant_id || '/issues"[*]''
+            COLUMNS (
+                IssueRevision VARCHAR2(50) PATH ''$.IssueRevision'',
+                Status VARCHAR2(50) PATH ''$.Status'',
+                RevDate VARCHAR2(50) PATH ''$.RevDate'',
+                ProtectStatus VARCHAR2(50) PATH ''$.ProtectStatus'',
+                GeneralRevision VARCHAR2(50) PATH ''$.GeneralRevision'',
+                GeneralRevDate VARCHAR2(50) PATH ''$.GeneralRevDate'',
+                PCSRevision VARCHAR2(50) PATH ''$.PCSRevision'',
+                PCSRevDate VARCHAR2(50) PATH ''$.PCSRevDate'',
+                EDSRevision VARCHAR2(50) PATH ''$.EDSRevision'',
+                EDSRevDate VARCHAR2(50) PATH ''$.EDSRevDate'',
+                VDSRevision VARCHAR2(50) PATH ''$.VDSRevision'',
+                VDSRevDate VARCHAR2(50) PATH ''$.VDSRevDate'',
+                VSKRevision VARCHAR2(50) PATH ''$.VSKRevision'',
+                VSKRevDate VARCHAR2(50) PATH ''$.VSKRevision'',
+                MDSRevision VARCHAR2(50) PATH ''$.MDSRevision'',
+                MDSRevDate VARCHAR2(50) PATH ''$.MDSRevDate'',
+                ESKRevision VARCHAR2(50) PATH ''$.ESKRevision'',
+                ESKRevDate VARCHAR2(50) PATH ''$.ESKRevDate'',
+                SCRevision VARCHAR2(50) PATH ''$.SCRevision'',
+                SCRevDate VARCHAR2(50) PATH ''$.SCRevDate'',
+                VSMRevision VARCHAR2(50) PATH ''$.VSMRevision'',
+                VSMRevDate VARCHAR2(50) PATH ''$.VSMRevDate'',
+                UserName VARCHAR2(255) PATH ''$.UserName'',
+                UserEntryTime VARCHAR2(50) PATH ''$.UserEntryTime'',
+                UserProtected VARCHAR2(50) PATH ''$.UserProtected''
+            )
+        ) jt
+        WHERE r.raw_json_id = ' || p_raw_json_id;
+        
+        EXECUTE IMMEDIATE v_sql;
+        
+        COMMIT;
+    END parse_issues_json;
+    
+END pkg_parse_issues;
+/
+
+-- Package: PKG_UPSERT_ISSUES
+-- Purpose: Merge from STG_ISSUES to ISSUES
+CREATE OR REPLACE PACKAGE pkg_upsert_issues AS
+    PROCEDURE upsert_issues;
+    PROCEDURE cascade_delete_for_plant(p_plant_id VARCHAR2);
+END pkg_upsert_issues;
+/
+
+CREATE OR REPLACE PACKAGE BODY pkg_upsert_issues AS
+    
+    PROCEDURE cascade_delete_for_plant(p_plant_id VARCHAR2) IS
+    BEGIN
+        -- Mark all issues for a removed plant as invalid
+        UPDATE ISSUES 
+        SET is_valid = 'N', last_modified_date = SYSDATE
+        WHERE plant_id = p_plant_id;
+    END cascade_delete_for_plant;
+    
+    PROCEDURE upsert_issues IS
+    BEGIN
+        -- First, mark all existing issues as invalid for plants that are being processed
+        UPDATE ISSUES 
+        SET is_valid = 'N'
+        WHERE plant_id IN (SELECT DISTINCT plant_id FROM STG_ISSUES);
+        
+        -- Merge staging data into ISSUES
+        MERGE INTO ISSUES tgt
+        USING (
+            SELECT 
+                plant_id,
+                issue_revision,
+                status,
+                TO_DATE(rev_date, 'DD-MON-YY') as rev_date,
+                protect_status,
+                general_revision,
+                TO_DATE(general_rev_date, 'DD-MON-YY') as general_rev_date,
+                pcs_revision,
+                TO_DATE(pcs_rev_date, 'DD-MON-YY') as pcs_rev_date,
+                eds_revision,
+                TO_DATE(eds_rev_date, 'DD-MON-YY') as eds_rev_date,
+                vds_revision,
+                TO_DATE(vds_rev_date, 'DD-MON-YY') as vds_rev_date,
+                vsk_revision,
+                TO_DATE(vsk_rev_date, 'DD-MON-YY') as vsk_rev_date,
+                mds_revision,
+                TO_DATE(mds_rev_date, 'DD-MON-YY') as mds_rev_date,
+                esk_revision,
+                TO_DATE(esk_rev_date, 'DD-MON-YY') as esk_rev_date,
+                sc_revision,
+                TO_DATE(sc_rev_date, 'DD-MON-YY') as sc_rev_date,
+                vsm_revision,
+                TO_DATE(vsm_rev_date, 'DD-MON-YY') as vsm_rev_date,
+                user_name,
+                TO_TIMESTAMP(user_entry_time, 'DD-MON-YY HH24:MI:SS') as user_entry_time,
+                CASE WHEN UPPER(user_protected) IN ('TRUE', 'Y', '1') THEN 'Y' ELSE 'N' END as user_protected
+            FROM STG_ISSUES
+            WHERE issue_revision IS NOT NULL
+        ) src
+        ON (tgt.plant_id = src.plant_id AND tgt.issue_revision = src.issue_revision)
+        WHEN MATCHED THEN
+            UPDATE SET
+                status = src.status,
+                rev_date = src.rev_date,
+                protect_status = src.protect_status,
+                general_revision = src.general_revision,
+                general_rev_date = src.general_rev_date,
+                pcs_revision = src.pcs_revision,
+                pcs_rev_date = src.pcs_rev_date,
+                eds_revision = src.eds_revision,
+                eds_rev_date = src.eds_rev_date,
+                vds_revision = src.vds_revision,
+                vds_rev_date = src.vds_rev_date,
+                vsk_revision = src.vsk_revision,
+                vsk_rev_date = src.vsk_rev_date,
+                mds_revision = src.mds_revision,
+                mds_rev_date = src.mds_rev_date,
+                esk_revision = src.esk_revision,
+                esk_rev_date = src.esk_rev_date,
+                sc_revision = src.sc_revision,
+                sc_rev_date = src.sc_rev_date,
+                vsm_revision = src.vsm_revision,
+                vsm_rev_date = src.vsm_rev_date,
+                user_name = src.user_name,
+                user_entry_time = src.user_entry_time,
+                user_protected = src.user_protected,
+                is_valid = 'Y',
+                last_modified_date = SYSDATE,
+                last_api_sync = SYSTIMESTAMP
+        WHEN NOT MATCHED THEN
+            INSERT (
+                plant_id, issue_revision, status, rev_date, protect_status,
+                general_revision, general_rev_date, pcs_revision, pcs_rev_date,
+                eds_revision, eds_rev_date, vds_revision, vds_rev_date,
+                vsk_revision, vsk_rev_date, mds_revision, mds_rev_date,
+                esk_revision, esk_rev_date, sc_revision, sc_rev_date,
+                vsm_revision, vsm_rev_date, user_name, user_entry_time,
+                user_protected, is_valid, created_date, last_modified_date, last_api_sync
+            ) VALUES (
+                src.plant_id, src.issue_revision, src.status, src.rev_date, src.protect_status,
+                src.general_revision, src.general_rev_date, src.pcs_revision, src.pcs_rev_date,
+                src.eds_revision, src.eds_rev_date, src.vds_revision, src.vds_rev_date,
+                src.vsk_revision, src.vsk_rev_date, src.mds_revision, src.mds_rev_date,
+                src.esk_revision, src.esk_rev_date, src.sc_revision, src.sc_rev_date,
+                src.vsm_revision, src.vsm_rev_date, src.user_name, src.user_entry_time,
+                src.user_protected, 'Y', SYSDATE, SYSDATE, SYSTIMESTAMP
+            );
+        
+        -- Cascade delete issues for plants marked as invalid
+        FOR plant_rec IN (SELECT plant_id FROM PLANTS WHERE is_valid = 'N') LOOP
+            cascade_delete_for_plant(plant_rec.plant_id);
+        END LOOP;
+        
+        COMMIT;
+    END upsert_issues;
+    
+END pkg_upsert_issues;
+/
+
+-- Package: PKG_ETL_OPERATIONS
+-- Purpose: Main ETL orchestration
+CREATE OR REPLACE PACKAGE pkg_etl_operations AS
+    PROCEDURE run_plants_etl(p_status OUT VARCHAR2, p_message OUT VARCHAR2);
+    PROCEDURE run_issues_etl_for_plant(p_plant_id VARCHAR2, p_status OUT VARCHAR2, p_message OUT VARCHAR2);
+    PROCEDURE run_full_etl(p_status OUT VARCHAR2, p_message OUT VARCHAR2);
+END pkg_etl_operations;
+/
+
+CREATE OR REPLACE PACKAGE BODY pkg_etl_operations AS
+    
+    PROCEDURE run_plants_etl(p_status OUT VARCHAR2, p_message OUT VARCHAR2) IS
+        v_run_id NUMBER;
+        v_start_time TIMESTAMP;
+    BEGIN
+        -- Log ETL start
+        v_start_time := SYSTIMESTAMP;
+        INSERT INTO ETL_RUN_LOG (run_type, endpoint_key, start_time, status, initiated_by)
+        VALUES ('PLANTS_ETL', 'plants', v_start_time, 'RUNNING', USER)
+        RETURNING run_id INTO v_run_id;
+        
+        BEGIN
+            -- Note: Raw JSON insert will be done from C# after API call
+            -- Here we just process existing RAW_JSON records
+            
+            -- Get latest raw_json_id for plants
+            FOR rec IN (
+                SELECT raw_json_id 
+                FROM RAW_JSON 
+                WHERE endpoint_key = 'plants'
+                ORDER BY api_call_timestamp DESC
+                FETCH FIRST 1 ROWS ONLY
+            ) LOOP
+                -- Parse JSON to staging
+                pkg_parse_plants.parse_plants_json(rec.raw_json_id);
+                
+                -- Upsert to core
+                pkg_upsert_plants.upsert_plants;
+            END LOOP;
+            
+            -- Update run log
+            UPDATE ETL_RUN_LOG 
+            SET end_time = SYSTIMESTAMP,
+                status = 'SUCCESS',
+                duration_seconds = ROUND(EXTRACT(DAY FROM (SYSTIMESTAMP - v_start_time)) * 86400 + 
+                                        EXTRACT(HOUR FROM (SYSTIMESTAMP - v_start_time)) * 3600 + 
+                                        EXTRACT(MINUTE FROM (SYSTIMESTAMP - v_start_time)) * 60 + 
+                                        EXTRACT(SECOND FROM (SYSTIMESTAMP - v_start_time)))
+            WHERE run_id = v_run_id;
+            
+            p_status := 'SUCCESS';
+            p_message := 'Plants ETL completed successfully';
+            
+        EXCEPTION
+            WHEN OTHERS THEN
+                -- Log error
+                INSERT INTO ETL_ERROR_LOG (
+                    run_id, endpoint_key, error_timestamp, error_type, 
+                    error_code, error_message, error_stack
+                ) VALUES (
+                    v_run_id, 'plants', SYSTIMESTAMP, 'PROCEDURE_ERROR',
+                    SQLCODE, SQLERRM, DBMS_UTILITY.FORMAT_ERROR_STACK
+                );
+                
+                -- Update run log
+                UPDATE ETL_RUN_LOG 
+                SET end_time = SYSTIMESTAMP,
+                    status = 'FAILED',
+                    duration_seconds = ROUND(EXTRACT(DAY FROM (SYSTIMESTAMP - v_start_time)) * 86400 + 
+                                            EXTRACT(HOUR FROM (SYSTIMESTAMP - v_start_time)) * 3600 + 
+                                            EXTRACT(MINUTE FROM (SYSTIMESTAMP - v_start_time)) * 60 + 
+                                            EXTRACT(SECOND FROM (SYSTIMESTAMP - v_start_time)))
+                WHERE run_id = v_run_id;
+                
+                p_status := 'FAILED';
+                p_message := SQLERRM;
+                RAISE;
+        END;
+    END run_plants_etl;
+    
+    PROCEDURE run_issues_etl_for_plant(p_plant_id VARCHAR2, p_status OUT VARCHAR2, p_message OUT VARCHAR2) IS
+        v_run_id NUMBER;
+        v_start_time TIMESTAMP;
+    BEGIN
+        -- Log ETL start
+        v_start_time := SYSTIMESTAMP;
+        INSERT INTO ETL_RUN_LOG (run_type, endpoint_key, plant_id, start_time, status, initiated_by)
+        VALUES ('ISSUES_ETL', 'issues', p_plant_id, v_start_time, 'RUNNING', USER)
+        RETURNING run_id INTO v_run_id;
+        
+        BEGIN
+            -- Get latest raw_json_id for this plant's issues
+            FOR rec IN (
+                SELECT raw_json_id 
+                FROM RAW_JSON 
+                WHERE endpoint_key = 'issues' 
+                AND plant_id = p_plant_id
+                ORDER BY api_call_timestamp DESC
+                FETCH FIRST 1 ROWS ONLY
+            ) LOOP
+                -- Parse JSON to staging
+                pkg_parse_issues.parse_issues_json(rec.raw_json_id, p_plant_id);
+                
+                -- Upsert to core
+                pkg_upsert_issues.upsert_issues;
+            END LOOP;
+            
+            -- Update run log
+            UPDATE ETL_RUN_LOG 
+            SET end_time = SYSTIMESTAMP,
+                status = 'SUCCESS',
+                duration_seconds = ROUND(EXTRACT(DAY FROM (SYSTIMESTAMP - v_start_time)) * 86400 + 
+                                        EXTRACT(HOUR FROM (SYSTIMESTAMP - v_start_time)) * 3600 + 
+                                        EXTRACT(MINUTE FROM (SYSTIMESTAMP - v_start_time)) * 60 + 
+                                        EXTRACT(SECOND FROM (SYSTIMESTAMP - v_start_time)))
+            WHERE run_id = v_run_id;
+            
+            p_status := 'SUCCESS';
+            p_message := 'Issues ETL for plant ' || p_plant_id || ' completed successfully';
+            
+        EXCEPTION
+            WHEN OTHERS THEN
+                -- Log error
+                INSERT INTO ETL_ERROR_LOG (
+                    run_id, endpoint_key, plant_id, error_timestamp, error_type, 
+                    error_code, error_message, error_stack
+                ) VALUES (
+                    v_run_id, 'issues', p_plant_id, SYSTIMESTAMP, 'PROCEDURE_ERROR',
+                    SQLCODE, SQLERRM, DBMS_UTILITY.FORMAT_ERROR_STACK
+                );
+                
+                -- Update run log
+                UPDATE ETL_RUN_LOG 
+                SET end_time = SYSTIMESTAMP,
+                    status = 'FAILED',
+                    duration_seconds = ROUND(EXTRACT(DAY FROM (SYSTIMESTAMP - v_start_time)) * 86400 + 
+                                            EXTRACT(HOUR FROM (SYSTIMESTAMP - v_start_time)) * 3600 + 
+                                            EXTRACT(MINUTE FROM (SYSTIMESTAMP - v_start_time)) * 60 + 
+                                            EXTRACT(SECOND FROM (SYSTIMESTAMP - v_start_time)))
+                WHERE run_id = v_run_id;
+                
+                p_status := 'FAILED';
+                p_message := SQLERRM;
+                RAISE;
+        END;
+    END run_issues_etl_for_plant;
+    
+    PROCEDURE run_full_etl(p_status OUT VARCHAR2, p_message OUT VARCHAR2) IS
+        v_plant_status VARCHAR2(50);
+        v_plant_message VARCHAR2(4000);
+        v_issue_status VARCHAR2(50);
+        v_issue_message VARCHAR2(4000);
+        v_error_count NUMBER := 0;
+    BEGIN
+        -- Run Plants ETL
+        run_plants_etl(v_plant_status, v_plant_message);
+        
+        IF v_plant_status != 'SUCCESS' THEN
+            v_error_count := v_error_count + 1;
+        END IF;
+        
+        -- Run Issues ETL for each active plant in selection
+        FOR plant_rec IN (
+            SELECT DISTINCT plant_id 
+            FROM SELECTION_LOADER 
+            WHERE is_active = 'Y'
+        ) LOOP
+            run_issues_etl_for_plant(plant_rec.plant_id, v_issue_status, v_issue_message);
+            
+            IF v_issue_status != 'SUCCESS' THEN
+                v_error_count := v_error_count + 1;
+            END IF;
+        END LOOP;
+        
+        IF v_error_count = 0 THEN
+            p_status := 'SUCCESS';
+            p_message := 'Full ETL completed successfully';
+        ELSE
+            p_status := 'PARTIAL';
+            p_message := 'ETL completed with ' || v_error_count || ' errors';
+        END IF;
+    END run_full_etl;
+    
+END pkg_etl_operations;
+/
 
 COMMIT;
 

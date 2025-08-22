@@ -128,6 +128,37 @@ public class TR2000ApiService
             return 0;
         }
     }
+
+    public async Task<ApiResponse> GetDataAsync(string endpoint)
+    {
+        try
+        {
+            var url = $"{BaseUrl}/{endpoint.TrimStart('/')}";
+            _logger.LogInformation("Fetching data from: {Url}", url);
+
+            var response = await _httpClient.GetAsync(url);
+            response.EnsureSuccessStatusCode();
+
+            var content = await response.Content.ReadAsStringAsync();
+            
+            return new ApiResponse
+            {
+                Success = true,
+                Data = content,
+                ErrorMessage = null
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to fetch data from endpoint: {Endpoint}", endpoint);
+            return new ApiResponse
+            {
+                Success = false,
+                Data = null,
+                ErrorMessage = ex.Message
+            };
+        }
+    }
 }
 
 public class TestConnectionResult
@@ -135,5 +166,12 @@ public class TestConnectionResult
     public bool Success { get; set; }
     public int RecordCount { get; set; }
     public TimeSpan ResponseTime { get; set; }
+    public string? ErrorMessage { get; set; }
+}
+
+public class ApiResponse
+{
+    public bool Success { get; set; }
+    public string? Data { get; set; }
     public string? ErrorMessage { get; set; }
 }

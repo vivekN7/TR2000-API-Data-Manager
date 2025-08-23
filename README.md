@@ -1,56 +1,49 @@
-# TR2000 API Data Manager
+# TR2000 ETL System
 
-A professional Blazor Server application for importing and managing data from the TR2000 API.
+## Overview
+Oracle APEX-based ETL system for TR2000 API data management with automated plant and issue processing.
 
-## Features
+## Key Features
+- ✅ **APEX_WEB_SERVICE** integration with HTTPS (70% code reduction)
+- ✅ **Oracle Database 21c** with APEX 24.2
+- ✅ **Automated ETL pipeline** with SHA256 deduplication
+- ✅ **Real-time API integration** with TR2000 endpoints
+- ✅ **Pure Oracle solution** - No external dependencies
 
-- **Data Import**: Import data from TR2000 API endpoints (Operators, Plants, PCS, Issues)
-- **SQLite Storage**: Pre-defined database schema for reliable data persistence
-- **Data Management**: View, export to CSV, and manage imported data
-- **Real-time Progress**: Track import progress with live updates
-- **Professional UI**: Clean Bootstrap 5 interface
-- **100% Functional**: Ready for production use
-
-## Technology Stack
-
-- **.NET 9.0** (Latest)
-- **Blazor Server**
-- **SQLite** with Dapper ORM
-- **Bootstrap 5**
-- **TR2000 API Integration**
+## Current Architecture
+- **Primary**: Oracle APEX with PL/SQL packages
+- **Database**: Oracle 21c XE with full ETL logic
+- **API Client**: APEX_WEB_SERVICE with Oracle wallet
+- **UI**: APEX application (15-minute setup)
+- **Legacy**: Blazor Server components (optional)
 
 ## Prerequisites
 
-- .NET 9.0 SDK or later
-- Git (for version control)
+- Oracle Database 21c XE with APEX 24.2
+- Oracle wallet configured at `C:\Oracle\wallet`
+- Network ACLs for `equinor.pipespec-api.presight.com`
 
-## Installation
+## Quick Start
 
-1. Clone the repository:
-```bash
-git clone https://github.com/vivekN7/TR2000-API-Data-Manager.git
-cd TR2000-API-Data-Manager
+### 1. Database Setup
+```sql
+-- Run as SYS user
+@Database/Master_DDL.sql
 ```
 
-2. Build the solution:
-```bash
-dotnet build
-```
+### 2. APEX Application (15 minutes)
+Follow `Database/APEX_QUICK_START.md`:
+1. Create workspace TR2000_ETL
+2. Create app from PLANTS table
+3. Add ETL buttons
+4. Run application
 
-3. Run the database creator (first time only):
-```bash
-cd DatabaseCreator
-dotnet run
-cd ..
+### 3. Access Application
 ```
-
-4. Run the application:
-```bash
-cd TR2KApp
-dotnet run --urls "http://localhost:5000"
+URL: http://localhost:8080/apex
+Workspace: TR2000_ETL
+Schema: TR2000_STAGING
 ```
-
-5. Open your browser and navigate to `http://localhost:5000`
 
 ## Project Structure
 

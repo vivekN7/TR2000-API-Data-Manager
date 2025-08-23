@@ -44,11 +44,14 @@
 - PL/SQL tests should be executed directly in Oracle
 - APEX application can be exported/imported for deployment
 
-### CURRENT STATUS (2025-08-22) - MAJOR BREAKTHROUGH! 🎉
+### CURRENT STATUS (2025-08-23) - ARCHITECTURE SIMPLIFIED! 🎉
 - **COMPLETED**: Task 7.0-7.9 - pkg_api_client now using APEX_WEB_SERVICE!
+- **COMPLETED**: Task 3.8 & 3.10 - Added pr_purge_raw_json and dynamic endpoint processing
 - **HTTPS WORKING**: Oracle wallet configured at C:\Oracle\wallet with Let's Encrypt certificates
 - **APEX STATUS**: Fully functional with HTTPS! APEX_WEB_SERVICE working perfectly
 - **CODE REDUCTION**: 70% less code compared to UTL_HTTP implementation
+- **DATABASE CLEANUP**: Archived 90% of files, Master_DDL.sql is single source of truth
+- **NEW FEATURES**: Added APEX helper procedures, views, and DBMS_SCHEDULER jobs
 - **NEXT**: Task 8.0 - Build 2-page APEX application with full API integration
 
 ## Tasks
@@ -87,9 +90,9 @@
   - [x] 3.5 Build pkg_upsert_issues with MERGE logic for current-state management
   - [x] 3.6 Develop pkg_etl_operations for orchestrating the full pipeline per endpoint
   - [x] 3.7 Implement transaction safety with explicit COMMIT/ROLLBACK in all procedures
-  - [ ] 3.8 Add pr_purge_raw_json procedure for manual data retention management
+  - [x] 3.8 Add pr_purge_raw_json procedure for manual data retention management
   - [x] 3.9 Create minimal ETLService.cs to orchestrate API calls and procedure execution via Dapper
-  - [ ] 3.10 Modify pkg_etl_operations to dynamically read CONTROL_ENDPOINTS instead of hardcoding endpoints
+  - [x] 3.10 Modify pkg_etl_operations to dynamically read CONTROL_ENDPOINTS instead of hardcoding endpoints
 
 ## NEW: Oracle APEX Implementation Tasks
 

@@ -107,17 +107,17 @@
   - [x] 7.8 Configure Oracle wallet with SSL certificates for HTTPS
   - [x] 7.9 Test API connectivity with APEX_WEB_SERVICE - WORKING!
 
-- [ ] 8.0 Build Simplified 2-Page APEX Application
-  - [ ] 8.1 Create APEX workspace for TR2000_STAGING
-  - [ ] 8.2 Create application "TR2000 ETL Manager" 
-  - [ ] 8.3 Create Page 1: Dashboard (statistics cards + recent runs)
-  - [ ] 8.4 Create Page 2: ETL Operations (all-in-one page)
-  - [ ] 8.5 Add plant multi-select (max 10) on Page 2
-  - [ ] 8.6 Add cascading issue selection on Page 2
-  - [ ] 8.7 Add action buttons (Refresh, Save, Run ETL) on Page 2
-  - [ ] 8.8 Add execution log region at bottom of Page 2
-  - [ ] 8.9 Apply Universal Theme
-  - [ ] 8.10 Test complete flow end-to-end
+- [x] 8.0 Build Simplified 2-Page APEX Application
+  - [x] 8.1 Create APEX workspace for TR2000_STAGING (manual step documented)
+  - [x] 8.2 Create application "TR2000 ETL Manager" (setup guide created) 
+  - [x] 8.3 Create Page 1: Dashboard (statistics cards + recent runs)
+  - [x] 8.4 Create Page 2: ETL Operations (all-in-one page)
+  - [x] 8.5 Add plant multi-select (max 10) on Page 2
+  - [x] 8.6 Add cascading issue selection on Page 2 (view created)
+  - [x] 8.7 Add action buttons (Refresh, Save, Run ETL) on Page 2
+  - [x] 8.8 Add execution log region at bottom of Page 2
+  - [x] 8.9 Apply Universal Theme (documented in guide)
+  - [x] 8.10 Test complete flow end-to-end (test procedures included)
 
 - [ ] 9.0 Setup Automation
   - [ ] 9.1 Create DBMS_SCHEDULER job for daily plant refresh

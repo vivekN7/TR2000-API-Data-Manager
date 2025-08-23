@@ -245,5 +245,139 @@ namespace TR2KBlazorLibrary.Logic.Services
             
             return rowsAffected;
         }
+
+        /// <summary>
+        /// Get all plants from database (PLANTS table)
+        /// </summary>
+        public async Task<List<PlantModel>> GetPlantsFromDatabaseAsync()
+        {
+            const string sql = @"
+                SELECT 
+                    plant_id AS PlantId,
+                    short_description AS PlantName,
+                    long_description AS PlantDescription,
+                    area AS Country,
+                    is_valid AS IsValidChar
+                FROM PLANTS
+                WHERE is_valid = 'Y'
+                ORDER BY plant_id";
+
+            using var connection = new OracleConnection(_connectionString);
+            var results = await connection.QueryAsync<PlantModel>(sql);
+            
+            // Convert char to bool for IsValid
+            foreach (var result in results)
+            {
+                result.IsValid = result.IsValidChar == "Y";
+            }
+            
+            return results.ToList();
+        }
+
+        /// <summary>
+        /// Get issues for selected plants from database (ISSUES table)
+        /// </summary>
+        public async Task<List<IssueModel>> GetIssuesFromDatabaseAsync(List<string> plantIds)
+        {
+            if (!plantIds.Any())
+            {
+                return new List<IssueModel>();
+            }
+
+            const string sql = @"
+                SELECT 
+                    issue_id AS IssueId,
+                    plant_id AS PlantId,
+                    issue_revision AS IssueRevision,
+                    issue_name AS IssueName,
+                    issue_type AS IssueType,
+                    issue_status AS IssueStatus,
+                    is_valid AS IsValidChar
+                FROM ISSUES
+                WHERE plant_id IN :plantIds
+                AND is_valid = 'Y'
+                ORDER BY plant_id, issue_revision";
+
+            using var connection = new OracleConnection(_connectionString);
+            var results = await connection.QueryAsync<IssueModel>(sql, new { plantIds });
+            
+            // Convert char to bool for IsValid
+            foreach (var result in results)
+            {
+                result.IsValid = result.IsValidChar == "Y";
+            }
+            
+            return results.ToList();
+        }
+
+        /// <summary>
+        /// Refresh plants data from API and trigger ETL
+        /// </summary>
+        public async Task<(bool success, string message)> RefreshPlantsDataAsync()
+        {
+            // This method should be called from ETLService which handles the full flow:
+            // 1. Fetch from API
+            // 2. Insert into RAW_JSON
+            // 3. Call stored procedures
+            // For now, we'll just call the stored procedure directly
+            // TODO: Refactor to use ETLService.ProcessPlantsEndpoint
+            
+            using var connection = new OracleConnection(_connectionString);
+            await connection.OpenAsync();
+
+            using var command = connection.CreateCommand();
+            command.CommandType = CommandType.StoredProcedure;
+            command.CommandText = "pkg_etl_operations.run_plants_etl";
+            
+            command.Parameters.Add("p_status", OracleDbType.Varchar2, 4000).Direction = ParameterDirection.Output;
+            command.Parameters.Add("p_message", OracleDbType.Varchar2, 4000).Direction = ParameterDirection.Output;
+
+            try
+            {
+                await command.ExecuteNonQueryAsync();
+                
+                var status = command.Parameters["p_status"].Value?.ToString() ?? "UNKNOWN";
+                var message = command.Parameters["p_message"].Value?.ToString() ?? "No message";
+                
+                return (status == "SUCCESS", message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to refresh plants data");
+                return (false, ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Refresh issues data for a specific plant from API and trigger ETL
+        /// </summary>
+        public async Task<(bool success, string message)> RefreshIssuesDataAsync(string plantId)
+        {
+            using var connection = new OracleConnection(_connectionString);
+            await connection.OpenAsync();
+
+            using var command = connection.CreateCommand();
+            command.CommandType = CommandType.StoredProcedure;
+            command.CommandText = "pkg_etl_operations.run_issues_etl_for_plant";
+            
+            command.Parameters.Add("p_plant_id", OracleDbType.Varchar2).Value = plantId;
+            command.Parameters.Add("p_status", OracleDbType.Varchar2, 4000).Direction = ParameterDirection.Output;
+            command.Parameters.Add("p_message", OracleDbType.Varchar2, 4000).Direction = ParameterDirection.Output;
+
+            try
+            {
+                await command.ExecuteNonQueryAsync();
+                
+                var status = command.Parameters["p_status"].Value?.ToString() ?? "UNKNOWN";
+                var message = command.Parameters["p_message"].Value?.ToString() ?? "No message";
+                
+                return (status == "SUCCESS", message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Failed to refresh issues data for plant {plantId}");
+                return (false, ex.Message);
+            }
+        }
     }
 }

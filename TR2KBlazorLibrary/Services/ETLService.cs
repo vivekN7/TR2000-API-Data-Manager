@@ -35,6 +35,53 @@ namespace TR2KBlazorLibrary.Logic.Services
         }
 
         /// <summary>
+        /// Process plants data from API through the full ETL pipeline
+        /// </summary>
+        public async Task<(bool success, string message)> ProcessPlantsAsync()
+        {
+            var runId = await StartEtlRun("PLANTS_REFRESH");
+            
+            try
+            {
+                // Process plants endpoint - this will:
+                // 1. Fetch from API
+                // 2. Insert into RAW_JSON
+                // 3. Call stored procedures to parse and upsert
+                await ProcessPlantsEndpoint(runId, new List<string>());
+                
+                await CompleteEtlRun(runId, "SUCCESS");
+                return (true, "Plants data refreshed successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Failed to process plants ETL");
+                await CompleteEtlRun(runId, "FAILED", ex.Message);
+                return (false, ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Process issues data for a specific plant from API through the full ETL pipeline
+        /// </summary>
+        public async Task<(bool success, string message)> ProcessIssuesForPlantAsync(string plantId)
+        {
+            var runId = await StartEtlRun("ISSUES_REFRESH");
+            
+            try
+            {
+                await ProcessIssuesEndpoint(runId, plantId);
+                await CompleteEtlRun(runId, "SUCCESS");
+                return (true, $"Issues data for plant {plantId} refreshed successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Failed to process issues ETL for plant {plantId}");
+                await CompleteEtlRun(runId, "FAILED", ex.Message);
+                return (false, ex.Message);
+            }
+        }
+
+        /// <summary>
         /// Run ETL for all active selections
         /// </summary>
         public async Task<EtlRunModel> RunETLAsync(string runType = "MANUAL")
@@ -151,7 +198,7 @@ namespace TR2KBlazorLibrary.Logic.Services
                 var rawJsonId = await InsertRawJson("issues", plantId, null, apiUrl, apiResponse.Data, responseHash);
 
                 // Call stored procedure to parse and upsert
-                await CallStoredProcedure("pkg_parse_issues.parse_issues_json", rawJsonId);
+                await CallStoredProcedure("pkg_parse_issues.parse_issues_json", rawJsonId, plantId);
                 await CallStoredProcedure("pkg_upsert_issues.upsert_issues");
 
                 _logger.LogInformation($"Issues endpoint for plant {plantId} processed successfully");
@@ -218,13 +265,60 @@ namespace TR2KBlazorLibrary.Logic.Services
         }
 
         /// <summary>
-        /// Call a stored procedure (placeholder - procedures will be added later)
+        /// Call a stored procedure with optional parameters
         /// </summary>
         private async Task CallStoredProcedure(string procedureName, params object[] parameters)
         {
-            _logger.LogInformation($"Would call stored procedure: {procedureName}");
-            // Stored procedures will be implemented in the next task
-            await Task.CompletedTask;
+            using var connection = new OracleConnection(_connectionString);
+            await connection.OpenAsync();
+            
+            using var command = connection.CreateCommand();
+            command.CommandType = CommandType.StoredProcedure;
+            
+            // Handle different procedure signatures
+            if (procedureName == "pkg_parse_plants.parse_plants_json" || 
+                procedureName == "pkg_parse_issues.parse_issues_json")
+            {
+                command.CommandText = procedureName;
+                command.Parameters.Add("p_raw_json_id", OracleDbType.Int32).Value = parameters[0];
+                
+                if (procedureName == "pkg_parse_issues.parse_issues_json" && parameters.Length > 1)
+                {
+                    command.Parameters.Add("p_plant_id", OracleDbType.Varchar2).Value = parameters[1];
+                }
+            }
+            else if (procedureName == "pkg_upsert_plants.upsert_plants" || 
+                     procedureName == "pkg_upsert_issues.upsert_issues")
+            {
+                command.CommandText = procedureName;
+                // These procedures don't have parameters
+            }
+            else if (procedureName == "pkg_etl_operations.run_plants_etl" || 
+                     procedureName == "pkg_etl_operations.run_issues_etl_for_plant")
+            {
+                command.CommandText = procedureName;
+                command.Parameters.Add("p_status", OracleDbType.Varchar2, 4000).Direction = ParameterDirection.Output;
+                command.Parameters.Add("p_message", OracleDbType.Varchar2, 4000).Direction = ParameterDirection.Output;
+                
+                if (procedureName == "pkg_etl_operations.run_issues_etl_for_plant")
+                {
+                    command.Parameters.Add("p_plant_id", OracleDbType.Varchar2).Value = parameters[0];
+                }
+            }
+            
+            await command.ExecuteNonQueryAsync();
+            
+            // Log output parameters if any
+            if (command.Parameters.Contains("p_status"))
+            {
+                var status = command.Parameters["p_status"].Value?.ToString();
+                var message = command.Parameters["p_message"].Value?.ToString();
+                _logger.LogInformation($"Procedure {procedureName} completed with status: {status}, message: {message}");
+            }
+            else
+            {
+                _logger.LogInformation($"Procedure {procedureName} executed successfully");
+            }
         }
 
         /// <summary>
@@ -258,7 +352,7 @@ namespace TR2KBlazorLibrary.Logic.Services
                 SET 
                     end_time = SYSTIMESTAMP,
                     status = :status,
-                    duration_seconds = EXTRACT(SECOND FROM (SYSTIMESTAMP - start_time)),
+                    duration_seconds = ROUND((CAST(SYSTIMESTAMP AS DATE) - CAST(start_time AS DATE)) * 86400),
                     notes = :notes
                 WHERE run_id = :runId";
 

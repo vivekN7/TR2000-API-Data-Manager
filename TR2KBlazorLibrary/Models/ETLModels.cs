@@ -117,4 +117,36 @@ namespace TR2KBlazorLibrary.Models
         public DateTime ApiCallTimestamp { get; set; }
         public DateTime CreatedDate { get; set; }
     }
+
+    /// <summary>
+    /// Model for PLANTS table
+    /// </summary>
+    public class PlantModel
+    {
+        public string PlantId { get; set; } = string.Empty;
+        public string? PlantName { get; set; }
+        public string? PlantDescription { get; set; }
+        public string? Country { get; set; }
+        public bool IsValid { get; set; }
+        public string IsValidChar { get; set; } = "Y"; // For Dapper mapping
+        public DateTime CreatedDate { get; set; }
+        public DateTime LastUpdated { get; set; }
+    }
+
+    /// <summary>
+    /// Model for ISSUES table
+    /// </summary>
+    public class IssueModel
+    {
+        public int IssueId { get; set; }
+        public string PlantId { get; set; } = string.Empty;
+        public string? IssueRevision { get; set; }
+        public string? IssueName { get; set; }
+        public string? IssueType { get; set; }
+        public string? IssueStatus { get; set; }
+        public bool IsValid { get; set; }
+        public string IsValidChar { get; set; } = "Y"; // For Dapper mapping
+        public DateTime CreatedDate { get; set; }
+        public DateTime LastUpdated { get; set; }
+    }
 }

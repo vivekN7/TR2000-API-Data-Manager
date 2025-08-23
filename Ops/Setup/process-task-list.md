@@ -4,6 +4,10 @@ Guidelines for managing task lists in markdown files to track progress on comple
 
 ## Task Implementation
 - **One sub-task at a time:** Do **NOT** start the next sub‑task until you ask the user for permission and they say "yes" or "y"
+- **API Call Limits:** When testing in the environment:
+  - Can run test scripts directly without user permission for up to 5 API calls
+  - MUST get user permission before running scripts that make more than 5 API calls
+  - Always aim for minimal API calls to avoid hammering endpoints
 - **Completion protocol:**  
   1. When you finish a **sub‑task**, immediately mark it as completed by changing `[ ]` to `[x]`.
   2. If **all** subtasks underneath a parent task are now `[x]`, follow this sequence:

@@ -81,7 +81,7 @@
                                 <div class="spinner-border text-primary" role="status">
                                     <span class="visually-hidden">Loading plants...</span>
                                 </div>
-                                <p>Loading plants from API...</p>
+                                <p>Loading plants from database...</p>
                             </div>
                         }
                         else if (availablePlants.Any())
@@ -120,7 +120,14 @@
                                 {
                                     <span class="spinner-border spinner-border-sm me-2"></span>
                                 }
-                                Load Plants from API
+                                Load Plants from Database
+                            </button>
+                            <button class="btn btn-warning" @onclick="RefreshPlantsFromAPI" disabled="@isRefreshingPlants">
+                                @if (isRefreshingPlants)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                }
+                                Refresh Plants from API
                             </button>
                             <button class="btn btn-success" @onclick="SavePlantSelection" 
                                     disabled="@(!selectedPlantIds.Any() || isSavingSelection)">
@@ -303,6 +310,7 @@
     private List<PlantModel> availablePlants = new();
     private HashSet<string> selectedPlantIds = new();
     private bool isLoadingPlants = false;
+    private bool isRefreshingPlants = false;
     
     // Issue selection state
     private List<IssueModel> plantIssues = new();
@@ -347,32 +355,38 @@
         isLoadingPlants = true;
         try
         {
-            var response = await ApiService.GetDataAsync("plants");
-            if (response.Success && !string.IsNullOrEmpty(response.Data))
+            // First check if we have any data in the database
+            var dbPlants = await SelectionService.GetPlantsFromDatabaseAsync();
+            
+            if (!dbPlants.Any())
             {
-                using var doc = JsonDocument.Parse(response.Data);
-                var root = doc.RootElement;
+                // No data in database, need to refresh from API first
+                Logger.LogInformation("No plants in database, refreshing from API...");
+                var (success, message) = await ETLService.ProcessPlantsAsync();
                 
-                if (root.TryGetProperty("getPlant", out var plantsArray) && plantsArray.ValueKind == JsonValueKind.Array)
+                if (!success)
                 {
-                    availablePlants = new List<PlantModel>();
-                    foreach (var plant in plantsArray.EnumerateArray())
-                    {
-                        availablePlants.Add(new PlantModel
-                        {
-                            PlantID = plant.TryGetProperty("PlantID", out var pid) ? pid.GetInt32().ToString() : "",
-                            ShortDescription = plant.TryGetProperty("ShortDescription", out var desc) ? desc.GetString() ?? "" : "",
-                            OperatorName = plant.TryGetProperty("OperatorName", out var op) ? op.GetString() ?? "" : ""
-                        });
-                    }
+                    Logger.LogError($"Failed to refresh plants data: {message}");
+                    return;
                 }
                 
-                Logger.LogInformation($"Loaded {availablePlants.Count} plants from API");
+                // Try loading from database again
+                dbPlants = await SelectionService.GetPlantsFromDatabaseAsync();
             }
+            
+            // Convert from PlantModel (library) to local PlantModel
+            availablePlants = dbPlants.Select(p => new PlantModel
+            {
+                PlantID = p.PlantId,
+                ShortDescription = p.PlantName ?? "",
+                OperatorName = p.PlantDescription ?? ""
+            }).ToList();
+            
+            Logger.LogInformation($"Loaded {availablePlants.Count} plants from database");
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Failed to load plants from API");
+            Logger.LogError(ex, "Failed to load plants from database");
         }
         finally
         {
@@ -389,38 +403,41 @@
         
         try
         {
-            foreach (var plantId in selectedPlantIds)
+            // First check if we have any issues in the database for selected plants
+            var dbIssues = await SelectionService.GetIssuesFromDatabaseAsync(selectedPlantIds.ToList());
+            
+            if (!dbIssues.Any())
             {
-                var response = await ApiService.GetDataAsync($"plants/{plantId}/issues");
-                if (response.Success && !string.IsNullOrEmpty(response.Data))
+                // No data in database, need to refresh from API for each plant
+                Logger.LogInformation("No issues in database, refreshing from API...");
+                
+                foreach (var plantId in selectedPlantIds)
                 {
-                    using var doc = JsonDocument.Parse(response.Data);
-                    var root = doc.RootElement;
-                    
-                    // Check if response has the "get" property with nested array
-                    if (root.TryGetProperty("get", out var getObj) && 
-                        getObj.TryGetProperty($"plants/{plantId}/issues", out var issuesArray) && 
-                        issuesArray.ValueKind == JsonValueKind.Array)
+                    var (success, message) = await ETLService.ProcessIssuesForPlantAsync(plantId);
+                    if (!success)
                     {
-                        foreach (var issue in issuesArray.EnumerateArray())
-                        {
-                            plantIssues.Add(new IssueModel
-                            {
-                                PlantId = plantId,
-                                IssueRevision = issue.TryGetProperty("IssueRevision", out var rev) ? rev.GetString() ?? "" : "",
-                                Status = issue.TryGetProperty("Status", out var status) ? status.GetString() ?? "" : "",
-                                RevDate = issue.TryGetProperty("RevDate", out var date) ? date.GetString() ?? "" : ""
-                            });
-                        }
+                        Logger.LogError($"Failed to refresh issues for plant {plantId}: {message}");
                     }
                 }
+                
+                // Try loading from database again
+                dbIssues = await SelectionService.GetIssuesFromDatabaseAsync(selectedPlantIds.ToList());
             }
             
-            Logger.LogInformation($"Loaded {plantIssues.Count} issues for {selectedPlantIds.Count} plants");
+            // Convert from IssueModel (library) to local IssueModel
+            plantIssues = dbIssues.Select(i => new IssueModel
+            {
+                PlantId = i.PlantId,
+                IssueRevision = i.IssueRevision ?? "",
+                Status = i.IssueStatus ?? "",
+                RevDate = "" // Not available in database model
+            }).ToList();
+            
+            Logger.LogInformation($"Loaded {plantIssues.Count} issues from database for {selectedPlantIds.Count} plants");
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Failed to load issues from API");
+            Logger.LogError(ex, "Failed to load issues from database");
         }
         finally
         {
@@ -479,6 +496,35 @@
         finally
         {
             isSavingSelection = false;
+        }
+    }
+    
+    private async Task RefreshPlantsFromAPI()
+    {
+        isRefreshingPlants = true;
+        try
+        {
+            // Use ETLService to fetch from API, insert into RAW_JSON, and process through pipeline
+            var (success, message) = await ETLService.ProcessPlantsAsync();
+            
+            if (success)
+            {
+                Logger.LogInformation($"Successfully refreshed plants from API: {message}");
+                // Reload the plants list from database
+                await LoadPlantsFromAPI();
+            }
+            else
+            {
+                Logger.LogError($"Failed to refresh plants from API: {message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to refresh plants from API");
+        }
+        finally
+        {
+            isRefreshingPlants = false;
         }
     }
     

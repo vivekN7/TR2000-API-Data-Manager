@@ -84,12 +84,15 @@ The TR2000 ETL System is a data integration solution designed to digitize and au
 
 ## Design Considerations
 
-### User Interface
-- Clean, functional dropdown-based selection interface for plants and issues
-- Dashboard with card-based layout showing run status, errors, and statistics
-- Visual progress indicators during ETL operations
-- Tabbed interface for different monitoring views (runs, errors, data preview)
-- Responsive design that works on standard desktop resolutions
+### User Interface (Oracle APEX)
+- Interactive Grid for plant selection with multi-select capability
+- Dependent select lists for issue selection based on chosen plants
+- Dashboard page with regions showing ETL statistics, recent runs, and errors
+- Interactive Reports for viewing PLANTS, ISSUES, and reference data
+- Process buttons to trigger ETL operations (calls PL/SQL procedures)
+- Built-in Excel/CSV export functionality on all reports
+- Automatic session state management and form validation
+- Responsive design included by default in APEX Universal Theme
 
 ### Database Architecture
 - Follow the established RAW_JSON → STG_* → CORE pattern
@@ -99,11 +102,20 @@ The TR2000 ETL System is a data integration solution designed to digitize and au
 
 ## Technical Considerations
 
+### Technology Stack
+- **Complete Platform**: Oracle Database with APEX (Application Express)
+- **API Integration**: APEX_WEB_SERVICE package for REST API calls
+- **User Interface**: APEX Interactive Reports, Forms, and Dashboards
+- **Backend Logic**: PL/SQL packages and procedures
+- **Scheduling**: DBMS_SCHEDULER for automated ETL runs
+- **Security**: APEX authentication and authorization schemes
+- **Development**: APEX Builder + SQL Developer
+
 ### Architecture Constraints
 - All DDL must be maintained in a single Master_DDL.sql file
-- Database logic must reside in Oracle stored procedures, not application code
-- C# application limited to orchestration, logging, and UI
-- Must use Dapper for all database queries from C# (this is mandatory for all data access)
+- Complete solution implemented in Oracle/APEX (no external applications)
+- API calls made directly from PL/SQL using APEX_WEB_SERVICE
+- UI provided by Oracle APEX pages (no external frontend)
 - Set-based operations only - no row-by-row processing
 
 ### API Integration
@@ -142,7 +154,20 @@ The TR2000 ETL System is a data integration solution designed to digitize and au
 
 ---
 
-*Document Version: 1.0*  
+*Document Version: 2.0*  
 *Created: 2025-08-22*  
-*Target Delivery: 5 days from approval*  
-*Audience: Development team, System administrators, Data engineers*
+*Updated: 2025-08-22 - Pivoted to Oracle APEX-only architecture*  
+*Target Delivery: Simplified with APEX - 2-3 days*  
+*Audience: Oracle DBAs, APEX Developers, Data Engineers*
+
+## Architecture Decision Record
+
+**Decision Date**: 2025-08-22  
+**Decision**: Pivot from Blazor/C# to pure Oracle APEX solution  
+**Rationale**: 
+- APEX is installed and configured
+- Eliminates external dependencies
+- Simplifies deployment and maintenance
+- Provides all required functionality natively
+- Reduces technology stack from 2 platforms to 1
+- DBA team already familiar with APEX

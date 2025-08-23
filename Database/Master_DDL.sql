@@ -92,7 +92,8 @@ DECLARE
             'PKG_PARSE_ISSUES',
             'PKG_UPSERT_PLANTS',
             'PKG_UPSERT_ISSUES',
-            'PKG_ETL_OPERATIONS'
+            'PKG_ETL_OPERATIONS',
+            'PKG_API_CLIENT'
         );
 BEGIN
     FOR rec IN c_packages LOOP
@@ -1040,10 +1041,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_etl_operations AS
             UPDATE ETL_RUN_LOG 
             SET end_time = SYSTIMESTAMP,
                 status = 'SUCCESS',
-                duration_seconds = ROUND(EXTRACT(DAY FROM (SYSTIMESTAMP - v_start_time)) * 86400 + 
-                                        EXTRACT(HOUR FROM (SYSTIMESTAMP - v_start_time)) * 3600 + 
-                                        EXTRACT(MINUTE FROM (SYSTIMESTAMP - v_start_time)) * 60 + 
-                                        EXTRACT(SECOND FROM (SYSTIMESTAMP - v_start_time)))
+                duration_seconds = ROUND((CAST(SYSTIMESTAMP AS DATE) - CAST(v_start_time AS DATE)) * 86400)
             WHERE run_id = v_run_id;
             
             p_status := 'SUCCESS';
@@ -1051,28 +1049,31 @@ CREATE OR REPLACE PACKAGE BODY pkg_etl_operations AS
             
         EXCEPTION
             WHEN OTHERS THEN
-                -- Log error
-                INSERT INTO ETL_ERROR_LOG (
-                    run_id, endpoint_key, error_timestamp, error_type, 
-                    error_code, error_message, error_stack
-                ) VALUES (
-                    v_run_id, 'plants', SYSTIMESTAMP, 'PROCEDURE_ERROR',
-                    SQLCODE, SQLERRM, DBMS_UTILITY.FORMAT_ERROR_STACK
-                );
-                
-                -- Update run log
-                UPDATE ETL_RUN_LOG 
-                SET end_time = SYSTIMESTAMP,
-                    status = 'FAILED',
-                    duration_seconds = ROUND(EXTRACT(DAY FROM (SYSTIMESTAMP - v_start_time)) * 86400 + 
-                                            EXTRACT(HOUR FROM (SYSTIMESTAMP - v_start_time)) * 3600 + 
-                                            EXTRACT(MINUTE FROM (SYSTIMESTAMP - v_start_time)) * 60 + 
-                                            EXTRACT(SECOND FROM (SYSTIMESTAMP - v_start_time)))
-                WHERE run_id = v_run_id;
-                
-                p_status := 'FAILED';
-                p_message := SQLERRM;
-                RAISE;
+                DECLARE
+                    v_error_code NUMBER := SQLCODE;
+                    v_error_msg VARCHAR2(4000) := SQLERRM;
+                    v_error_stack VARCHAR2(4000) := DBMS_UTILITY.FORMAT_ERROR_STACK();
+                BEGIN
+                    -- Log error
+                    INSERT INTO ETL_ERROR_LOG (
+                        run_id, endpoint_key, error_timestamp, error_type, 
+                        error_code, error_message, error_stack
+                    ) VALUES (
+                        v_run_id, 'plants', SYSTIMESTAMP, 'PROCEDURE_ERROR',
+                        v_error_code, v_error_msg, v_error_stack
+                    );
+                    
+                    -- Update run log
+                    UPDATE ETL_RUN_LOG 
+                    SET end_time = SYSTIMESTAMP,
+                        status = 'FAILED',
+                        duration_seconds = ROUND((CAST(SYSTIMESTAMP AS DATE) - CAST(v_start_time AS DATE)) * 86400)
+                    WHERE run_id = v_run_id;
+                    
+                    p_status := 'FAILED';
+                    p_message := v_error_msg;
+                    RAISE;
+                END;
         END;
     END run_plants_etl;
     
@@ -1107,10 +1108,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_etl_operations AS
             UPDATE ETL_RUN_LOG 
             SET end_time = SYSTIMESTAMP,
                 status = 'SUCCESS',
-                duration_seconds = ROUND(EXTRACT(DAY FROM (SYSTIMESTAMP - v_start_time)) * 86400 + 
-                                        EXTRACT(HOUR FROM (SYSTIMESTAMP - v_start_time)) * 3600 + 
-                                        EXTRACT(MINUTE FROM (SYSTIMESTAMP - v_start_time)) * 60 + 
-                                        EXTRACT(SECOND FROM (SYSTIMESTAMP - v_start_time)))
+                duration_seconds = ROUND((CAST(SYSTIMESTAMP AS DATE) - CAST(v_start_time AS DATE)) * 86400)
             WHERE run_id = v_run_id;
             
             p_status := 'SUCCESS';
@@ -1118,28 +1116,31 @@ CREATE OR REPLACE PACKAGE BODY pkg_etl_operations AS
             
         EXCEPTION
             WHEN OTHERS THEN
-                -- Log error
-                INSERT INTO ETL_ERROR_LOG (
-                    run_id, endpoint_key, plant_id, error_timestamp, error_type, 
-                    error_code, error_message, error_stack
-                ) VALUES (
-                    v_run_id, 'issues', p_plant_id, SYSTIMESTAMP, 'PROCEDURE_ERROR',
-                    SQLCODE, SQLERRM, DBMS_UTILITY.FORMAT_ERROR_STACK
-                );
-                
-                -- Update run log
-                UPDATE ETL_RUN_LOG 
-                SET end_time = SYSTIMESTAMP,
-                    status = 'FAILED',
-                    duration_seconds = ROUND(EXTRACT(DAY FROM (SYSTIMESTAMP - v_start_time)) * 86400 + 
-                                            EXTRACT(HOUR FROM (SYSTIMESTAMP - v_start_time)) * 3600 + 
-                                            EXTRACT(MINUTE FROM (SYSTIMESTAMP - v_start_time)) * 60 + 
-                                            EXTRACT(SECOND FROM (SYSTIMESTAMP - v_start_time)))
-                WHERE run_id = v_run_id;
-                
-                p_status := 'FAILED';
-                p_message := SQLERRM;
-                RAISE;
+                DECLARE
+                    v_error_code NUMBER := SQLCODE;
+                    v_error_msg VARCHAR2(4000) := SQLERRM;
+                    v_error_stack VARCHAR2(4000) := DBMS_UTILITY.FORMAT_ERROR_STACK();
+                BEGIN
+                    -- Log error
+                    INSERT INTO ETL_ERROR_LOG (
+                        run_id, endpoint_key, plant_id, error_timestamp, error_type, 
+                        error_code, error_message, error_stack
+                    ) VALUES (
+                        v_run_id, 'issues', p_plant_id, SYSTIMESTAMP, 'PROCEDURE_ERROR',
+                        v_error_code, v_error_msg, v_error_stack
+                    );
+                    
+                    -- Update run log
+                    UPDATE ETL_RUN_LOG 
+                    SET end_time = SYSTIMESTAMP,
+                        status = 'FAILED',
+                        duration_seconds = ROUND((CAST(SYSTIMESTAMP AS DATE) - CAST(v_start_time AS DATE)) * 86400)
+                    WHERE run_id = v_run_id;
+                    
+                    p_status := 'FAILED';
+                    p_message := v_error_msg;
+                    RAISE;
+                END;
         END;
     END run_issues_etl_for_plant;
     
@@ -1181,6 +1182,338 @@ CREATE OR REPLACE PACKAGE BODY pkg_etl_operations AS
     
 END pkg_etl_operations;
 /
+
+COMMIT;
+
+-- ===============================================================================
+-- SECTION 9: APEX API Client Package
+-- ===============================================================================
+-- Package: PKG_API_CLIENT
+-- Purpose: Handle API calls using APEX_WEB_SERVICE
+-- Note: Requires APEX to be installed and APEX_PUBLIC_USER configured
+
+CREATE OR REPLACE PACKAGE pkg_api_client AS
+    -- Fetch plants data from TR2000 API
+    FUNCTION fetch_plants_json RETURN CLOB;
+    
+    -- Fetch issues data for a specific plant
+    FUNCTION fetch_issues_json(p_plant_id VARCHAR2) RETURN CLOB;
+    
+    -- Calculate SHA256 hash for deduplication
+    FUNCTION calculate_sha256(p_input CLOB) RETURN VARCHAR2;
+    
+    -- Complete ETL refresh for plants (fetch + process)
+    PROCEDURE refresh_plants_from_api(
+        p_status OUT VARCHAR2,
+        p_message OUT VARCHAR2
+    );
+    
+    -- Complete ETL refresh for issues (fetch + process)
+    PROCEDURE refresh_issues_from_api(
+        p_plant_id VARCHAR2,
+        p_status OUT VARCHAR2,
+        p_message OUT VARCHAR2
+    );
+END pkg_api_client;
+/
+
+CREATE OR REPLACE PACKAGE BODY pkg_api_client AS
+    
+    -- Private constants for wallet configuration
+    -- NOTE: Update wallet path and password for your environment
+    c_wallet_path CONSTANT VARCHAR2(100) := 'file:C:\Oracle\wallet';
+    c_wallet_pwd CONSTANT VARCHAR2(100) := 'WalletPass123';
+    
+    -- Fetch plants JSON from API
+    FUNCTION fetch_plants_json RETURN CLOB IS
+        v_response CLOB;
+        v_api_base_url VARCHAR2(500);
+        v_url VARCHAR2(1000);
+    BEGIN
+        -- Get API base URL from settings
+        SELECT setting_value INTO v_api_base_url
+        FROM CONTROL_SETTINGS
+        WHERE setting_key = 'API_BASE_URL';
+        
+        v_url := v_api_base_url || 'plants';
+        
+        -- Use APEX_WEB_SERVICE for clean, simple HTTPS calls
+        v_response := apex_web_service.make_rest_request(
+            p_url => v_url,
+            p_http_method => 'GET',
+            p_wallet_path => c_wallet_path,
+            p_wallet_pwd => c_wallet_pwd
+        );
+        
+        IF v_response IS NULL OR LENGTH(v_response) = 0 THEN
+            RAISE_APPLICATION_ERROR(-20001, 'No response from API for plants endpoint');
+        END IF;
+        
+        RETURN v_response;
+    EXCEPTION
+        WHEN OTHERS THEN
+            RAISE_APPLICATION_ERROR(-20002, 'Error fetching plants: ' || SQLERRM);
+    END fetch_plants_json;
+    
+    -- Fetch issues JSON for a specific plant
+    FUNCTION fetch_issues_json(p_plant_id VARCHAR2) RETURN CLOB IS
+        v_response CLOB;
+        v_api_base_url VARCHAR2(500);
+        v_url VARCHAR2(1000);
+    BEGIN
+        -- Get API base URL from settings
+        SELECT setting_value INTO v_api_base_url
+        FROM CONTROL_SETTINGS
+        WHERE setting_key = 'API_BASE_URL';
+        
+        v_url := v_api_base_url || 'plants/' || p_plant_id || '/issues';
+        
+        -- Use APEX_WEB_SERVICE for clean, simple HTTPS calls
+        v_response := apex_web_service.make_rest_request(
+            p_url => v_url,
+            p_http_method => 'GET',
+            p_wallet_path => c_wallet_path,
+            p_wallet_pwd => c_wallet_pwd
+        );
+        
+        -- Return empty array if no response (404 case)
+        RETURN NVL(v_response, '[]');
+    EXCEPTION
+        WHEN OTHERS THEN
+            RAISE_APPLICATION_ERROR(-20004, 'Error fetching issues for plant ' || p_plant_id || ': ' || SQLERRM);
+    END fetch_issues_json;
+    
+    -- Calculate SHA256 hash
+    FUNCTION calculate_sha256(p_input CLOB) RETURN VARCHAR2 IS
+        v_hash RAW(32);
+    BEGIN
+        v_hash := SYS.DBMS_CRYPTO.HASH(
+            UTL_RAW.CAST_TO_RAW(p_input),
+            SYS.DBMS_CRYPTO.HASH_SH256
+        );
+        RETURN LOWER(RAWTOHEX(v_hash));
+    EXCEPTION
+        WHEN OTHERS THEN
+            RAISE_APPLICATION_ERROR(-20005, 'Error calculating SHA256: ' || SQLERRM);
+    END calculate_sha256;
+    
+    -- Refresh plants data from API
+    PROCEDURE refresh_plants_from_api(
+        p_status OUT VARCHAR2,
+        p_message OUT VARCHAR2
+    ) IS
+        v_json_response CLOB;
+        v_response_hash VARCHAR2(64);
+        v_raw_json_id NUMBER;
+        v_run_id NUMBER;
+        v_start_time TIMESTAMP;
+    BEGIN
+        -- Start ETL run
+        v_start_time := SYSTIMESTAMP;
+        INSERT INTO ETL_RUN_LOG (run_type, endpoint_key, start_time, status, initiated_by)
+        VALUES ('PLANTS_API_REFRESH', 'plants', v_start_time, 'RUNNING', USER)
+        RETURNING run_id INTO v_run_id;
+        
+        BEGIN
+            -- Fetch from API
+            v_json_response := fetch_plants_json();
+            
+            -- Calculate hash for deduplication
+            v_response_hash := calculate_sha256(v_json_response);
+            
+            -- Check if this response is a duplicate
+            IF pkg_raw_ingest.is_duplicate_hash(v_response_hash) THEN
+                -- Update run log
+                UPDATE ETL_RUN_LOG 
+                SET end_time = SYSTIMESTAMP,
+                    status = 'SUCCESS',
+                    notes = 'Data unchanged (duplicate hash)',
+                    duration_seconds = ROUND((CAST(SYSTIMESTAMP AS DATE) - CAST(v_start_time AS DATE)) * 86400)
+                WHERE run_id = v_run_id;
+                
+                p_status := 'SUCCESS';
+                p_message := 'Plants data unchanged (duplicate hash detected)';
+                COMMIT;
+                RETURN;
+            END IF;
+            
+            -- Insert into RAW_JSON
+            v_raw_json_id := pkg_raw_ingest.insert_raw_json(
+                p_endpoint_key => 'plants',
+                p_plant_id => NULL,
+                p_issue_revision => NULL,
+                p_api_url => 'plants',
+                p_response_json => v_json_response,
+                p_response_hash => v_response_hash
+            );
+            
+            -- Parse JSON to staging
+            pkg_parse_plants.parse_plants_json(v_raw_json_id);
+            
+            -- Upsert to core
+            pkg_upsert_plants.upsert_plants();
+            
+            -- Update run log
+            UPDATE ETL_RUN_LOG 
+            SET end_time = SYSTIMESTAMP,
+                status = 'SUCCESS',
+                notes = 'Plants refreshed successfully',
+                duration_seconds = ROUND((CAST(SYSTIMESTAMP AS DATE) - CAST(v_start_time AS DATE)) * 86400)
+            WHERE run_id = v_run_id;
+            
+            COMMIT;
+            
+            p_status := 'SUCCESS';
+            p_message := 'Plants data refreshed successfully from API';
+            
+        EXCEPTION
+            WHEN OTHERS THEN
+                DECLARE
+                    v_error_code NUMBER := SQLCODE;
+                    v_error_msg VARCHAR2(4000) := SUBSTR(SQLERRM, 1, 4000);
+                    v_error_stack VARCHAR2(4000) := DBMS_UTILITY.FORMAT_ERROR_STACK();
+                BEGIN
+                    -- Log error
+                    INSERT INTO ETL_ERROR_LOG (
+                        run_id, endpoint_key, error_timestamp, error_type, 
+                        error_code, error_message, error_stack
+                    ) VALUES (
+                        v_run_id, 'plants', SYSTIMESTAMP, 'API_REFRESH_ERROR',
+                        v_error_code, v_error_msg, v_error_stack
+                    );
+                    
+                    -- Update run log
+                    UPDATE ETL_RUN_LOG 
+                    SET end_time = SYSTIMESTAMP,
+                        status = 'FAILED',
+                        notes = v_error_msg,
+                        duration_seconds = ROUND((CAST(SYSTIMESTAMP AS DATE) - CAST(v_start_time AS DATE)) * 86400)
+                    WHERE run_id = v_run_id;
+                    
+                    ROLLBACK;
+                    
+                    p_status := 'ERROR';
+                    p_message := 'Failed to refresh plants: ' || v_error_msg;
+                    RAISE;
+                END;
+        END;
+    END refresh_plants_from_api;
+    
+    -- Refresh issues data for a specific plant
+    PROCEDURE refresh_issues_from_api(
+        p_plant_id VARCHAR2,
+        p_status OUT VARCHAR2,
+        p_message OUT VARCHAR2
+    ) IS
+        v_json_response CLOB;
+        v_response_hash VARCHAR2(64);
+        v_raw_json_id NUMBER;
+        v_run_id NUMBER;
+        v_start_time TIMESTAMP;
+    BEGIN
+        -- Start ETL run
+        v_start_time := SYSTIMESTAMP;
+        INSERT INTO ETL_RUN_LOG (run_type, endpoint_key, plant_id, start_time, status, initiated_by)
+        VALUES ('ISSUES_API_REFRESH', 'issues', p_plant_id, v_start_time, 'RUNNING', USER)
+        RETURNING run_id INTO v_run_id;
+        
+        BEGIN
+            -- Fetch from API
+            v_json_response := fetch_issues_json(p_plant_id);
+            
+            -- Calculate hash for deduplication
+            v_response_hash := calculate_sha256(v_json_response);
+            
+            -- Check if this response is a duplicate
+            IF pkg_raw_ingest.is_duplicate_hash(v_response_hash) THEN
+                -- Update run log
+                UPDATE ETL_RUN_LOG 
+                SET end_time = SYSTIMESTAMP,
+                    status = 'SUCCESS',
+                    notes = 'Data unchanged (duplicate hash)',
+                    duration_seconds = ROUND((CAST(SYSTIMESTAMP AS DATE) - CAST(v_start_time AS DATE)) * 86400)
+                WHERE run_id = v_run_id;
+                
+                p_status := 'SUCCESS';
+                p_message := 'Issues data unchanged for plant ' || p_plant_id || ' (duplicate hash detected)';
+                COMMIT;
+                RETURN;
+            END IF;
+            
+            -- Insert into RAW_JSON
+            v_raw_json_id := pkg_raw_ingest.insert_raw_json(
+                p_endpoint_key => 'issues',
+                p_plant_id => p_plant_id,
+                p_issue_revision => NULL,
+                p_api_url => 'plants/' || p_plant_id || '/issues',
+                p_response_json => v_json_response,
+                p_response_hash => v_response_hash
+            );
+            
+            -- Parse JSON to staging
+            pkg_parse_issues.parse_issues_json(v_raw_json_id, p_plant_id);
+            
+            -- Upsert to core
+            pkg_upsert_issues.upsert_issues();
+            
+            -- Update run log
+            UPDATE ETL_RUN_LOG 
+            SET end_time = SYSTIMESTAMP,
+                status = 'SUCCESS',
+                notes = 'Issues refreshed successfully for plant ' || p_plant_id,
+                duration_seconds = ROUND((CAST(SYSTIMESTAMP AS DATE) - CAST(v_start_time AS DATE)) * 86400)
+            WHERE run_id = v_run_id;
+            
+            COMMIT;
+            
+            p_status := 'SUCCESS';
+            p_message := 'Issues data refreshed successfully for plant ' || p_plant_id;
+            
+        EXCEPTION
+            WHEN OTHERS THEN
+                DECLARE
+                    v_error_code NUMBER := SQLCODE;
+                    v_error_msg VARCHAR2(4000) := SUBSTR(SQLERRM, 1, 4000);
+                    v_error_stack VARCHAR2(4000) := DBMS_UTILITY.FORMAT_ERROR_STACK();
+                BEGIN
+                    -- Log error
+                    INSERT INTO ETL_ERROR_LOG (
+                        run_id, endpoint_key, plant_id, error_timestamp, error_type, 
+                        error_code, error_message, error_stack
+                    ) VALUES (
+                        v_run_id, 'issues', p_plant_id, SYSTIMESTAMP, 'API_REFRESH_ERROR',
+                        v_error_code, v_error_msg, v_error_stack
+                    );
+                    
+                    -- Update run log
+                    UPDATE ETL_RUN_LOG 
+                    SET end_time = SYSTIMESTAMP,
+                        status = 'FAILED',
+                        notes = v_error_msg,
+                        duration_seconds = ROUND((CAST(SYSTIMESTAMP AS DATE) - CAST(v_start_time AS DATE)) * 86400)
+                    WHERE run_id = v_run_id;
+                    
+                    ROLLBACK;
+                    
+                    p_status := 'ERROR';
+                    p_message := 'Failed to refresh issues for plant ' || p_plant_id || ': ' || v_error_msg;
+                    RAISE;
+                END;
+        END;
+    END refresh_issues_from_api;
+    
+END pkg_api_client;
+/
+
+-- Grant required privileges (run as DBA if needed)
+-- IMPORTANT: These grants must be executed by a DBA user, NOT as TR2000_STAGING
+-- The following will cause ORA-01749 if run as TR2000_STAGING:
+-- GRANT EXECUTE ON APEX_WEB_SERVICE TO TR2000_STAGING;
+-- GRANT EXECUTE ON SYS.DBMS_CRYPTO TO TR2000_STAGING;
+--
+-- Ask your DBA to run these commands or run them as SYS:
+-- GRANT EXECUTE ON APEX_WEB_SERVICE TO TR2000_STAGING;
+-- GRANT EXECUTE ON SYS.DBMS_CRYPTO TO TR2000_STAGING;
 
 COMMIT;
 

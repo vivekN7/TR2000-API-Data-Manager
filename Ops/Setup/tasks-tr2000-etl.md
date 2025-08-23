@@ -44,15 +44,16 @@
 - PL/SQL tests should be executed directly in Oracle
 - APEX application can be exported/imported for deployment
 
-### CURRENT STATUS (2025-08-23) - ARCHITECTURE SIMPLIFIED! 🎉
+### CURRENT STATUS (2025-08-23) - VERSION CONTROL IMPLEMENTED! 🎉
 - **COMPLETED**: Task 7.0-7.9 - pkg_api_client now using APEX_WEB_SERVICE!
 - **COMPLETED**: Task 3.8 & 3.10 - Added pr_purge_raw_json and dynamic endpoint processing
-- **HTTPS WORKING**: Oracle wallet configured at C:\Oracle\wallet with Let's Encrypt certificates
-- **APEX STATUS**: Fully functional with HTTPS! APEX_WEB_SERVICE working perfectly
+- **COMPLETED**: Task 8.0 - APEX application setup complete
+- **NEW**: Migration-based version control system implemented
+- **HTTPS WORKING**: Oracle wallet configured at C:\Oracle\wallet
 - **CODE REDUCTION**: 70% less code compared to UTL_HTTP implementation
-- **DATABASE CLEANUP**: Archived 90% of files, Master_DDL.sql is single source of truth
-- **NEW FEATURES**: Added APEX helper procedures, views, and DBMS_SCHEDULER jobs
-- **NEXT**: Task 8.0 - Build 2-page APEX application with full API integration
+- **VERSION CONTROL**: Database changes now tracked via migrations (V001, V002, etc.)
+- **DEPLOYMENT**: Automated with deploy_migrations.sh script
+- **NEXT**: Apply migrations and create APEX UI
 
 ## Tasks
 
@@ -124,6 +125,18 @@
   - [ ] 9.2 Create job for processing selected issues
   - [ ] 9.3 Add job monitoring page in APEX
   - [ ] 9.4 Implement email notifications on failure (optional)
+
+- [x] 10.0 Implement Version Control System
+  - [x] 10.1 Create migration-based structure (migrations/, rollback/, scripts/)
+  - [x] 10.2 Add schema_version tracking table (V000)
+  - [x] 10.3 Split Master_DDL into versioned migrations
+  - [x] 10.4 Create rollback scripts for each migration
+  - [x] 10.5 Build deployment script (deploy_migrations.sh)
+  - [x] 10.6 Update PRD with version control requirements
+  - [x] 10.7 Create DATABASE_VERSION_CONTROL_GUIDE.md
+  - [ ] 10.8 Test migration deployment process
+  - [ ] 10.9 Create APEX export script for version control
+  - [ ] 10.10 Document team workflow for database changes
 
 - [ ] 4.0 ~~Add Monitoring and Testing to ETL Operations Page~~ [REPLACED BY APEX]
   - [ ] 4.1 ~~Add monitoring section to ETLOperations.razor~~ [N/A - Using APEX Interactive Reports]

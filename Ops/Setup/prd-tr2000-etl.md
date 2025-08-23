@@ -171,3 +171,38 @@ The TR2000 ETL System is a data integration solution designed to digitize and au
 - Provides all required functionality natively
 - Reduces technology stack from 2 platforms to 1
 - DBA team already familiar with APEX
+
+## Version Control Requirements
+
+### Database Version Control Standards
+1. **Migration-Based Development**
+   - All database changes implemented as numbered migrations (V###__description.sql)
+   - No direct production modifications allowed
+   - Each migration must be atomic and reversible
+   - Schema version tracking table mandatory
+
+2. **Required Structure**
+   ```
+   Database/
+   ├── migrations/     # Forward migrations (V001, V002, etc.)
+   ├── rollback/       # Rollback scripts (R001, R002, etc.)
+   ├── scripts/        # Deployment and utility scripts
+   └── apex_exports/   # APEX application exports
+   ```
+
+3. **APEX Version Control**
+   - Export after every change in split mode
+   - Each page as separate file for granular tracking
+   - Regular automated exports via SQL script
+
+4. **Deployment Process**
+   - Use deploy_migrations.sh for all deployments
+   - Test on development copy first
+   - Document all deployments in schema_version table
+   - Tag production releases in git
+
+5. **Git Workflow**
+   - Feature branches for new migrations
+   - Pull request reviews required
+   - Clear commit messages with migration numbers
+   - No direct commits to main/master branch

@@ -237,3 +237,6 @@ dotnet-install.sh
 
 # Keep the SQLite database file (it's part of the project)
 !TR2KApp/Data/tr2000_api_data.db
+# Oracle Instant Client (too large for GitHub)
+Database/tools/instantclient/
+

@@ -117,6 +117,8 @@ The TR2000 ETL System is a data integration solution designed to digitize and au
 - API calls made directly from PL/SQL using APEX_WEB_SERVICE
 - UI provided by Oracle APEX pages (no external frontend)
 - Set-based operations only - no row-by-row processing
+- Simple deployment: just run Master_DDL.sql to rebuild everything
+- Git for version control (no manual backups needed)
 
 ### API Integration
 - Implement intelligent caching to achieve 70% reduction in API calls
@@ -154,9 +156,9 @@ The TR2000 ETL System is a data integration solution designed to digitize and au
 
 ---
 
-*Document Version: 2.0*  
+*Document Version: 2.1*  
 *Created: 2025-08-22*  
-*Updated: 2025-08-22 - Pivoted to Oracle APEX-only architecture*  
+*Updated: 2025-08-23 - Simplified to Master_DDL.sql approach*  
 *Target Delivery: Simplified with APEX - 2-3 days*  
 *Audience: Oracle DBAs, APEX Developers, Data Engineers*
 
@@ -172,31 +174,35 @@ The TR2000 ETL System is a data integration solution designed to digitize and au
 - Reduces technology stack from 2 platforms to 1
 - DBA team already familiar with APEX
 
-## Version Control Requirements
+## Version Control & Deployment
 
-### Database Version Control Standards
-1. **Migration-Based Development**
-   - All database changes implemented as numbered migrations (V###__description.sql)
-   - No direct production modifications allowed
-   - Each migration must be atomic and reversible
-   - Schema version tracking table mandatory
+### Simple Database Management
+1. **Single Source of Truth**
+   - Master_DDL.sql contains ALL database objects
+   - Includes DROP statements for clean redeployment
+   - No migrations or complex versioning needed
 
-2. **Required Structure**
+2. **Current Structure**
    ```
    Database/
-   ├── migrations/     # Forward migrations (V001, V002, etc.)
-   ├── rollback/       # Rollback scripts (R001, R002, etc.)
-   ├── scripts/        # Deployment and utility scripts
-   └── apex_exports/   # APEX application exports
+   ├── Master_DDL.sql           # Complete database schema and procedures
+   ├── APEX_QUICK_START.md     # Guide for APEX setup
+   ├── scripts/
+   │   └── export_apex.sh      # Export APEX app for version control
+   ├── tools/
+   │   └── instantclient/      # Oracle SQL*Plus client
+   └── apex_exports/           # APEX application exports (when created)
    ```
 
-3. **APEX Version Control**
-   - Export after every change in split mode
-   - Each page as separate file for granular tracking
-   - Regular automated exports via SQL script
+3. **Version Control**
+   - Git tracks all changes to Master_DDL.sql
+   - Commit after each significant change
+   - No manual backup files needed
 
 4. **Deployment Process**
-   - Use deploy_migrations.sh for all deployments
+   - Connect to database: `TR2000_STAGING/piping@host.docker.internal:1521/XEPDB1`
+   - Run: `@Master_DDL.sql`
+   - Everything drops and recreates cleanly
    - Test on development copy first
    - Document all deployments in schema_version table
    - Tag production releases in git

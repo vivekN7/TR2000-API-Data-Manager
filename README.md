@@ -1,152 +1,157 @@
 # TR2000 ETL System
 
 ## Overview
-Oracle APEX-based ETL system for TR2000 API data management with automated plant and issue processing.
+Pure Oracle APEX-based ETL system for TR2000 API data management with automated plant and issue processing.
 
 ## Key Features
 - ✅ **APEX_WEB_SERVICE** integration with HTTPS (70% code reduction)
-- ✅ **Oracle Database 21c** with APEX 24.2
+- ✅ **Oracle Database 21c** with complete ETL logic in PL/SQL
 - ✅ **Automated ETL pipeline** with SHA256 deduplication
 - ✅ **Real-time API integration** with TR2000 endpoints
+- ✅ **Single source of truth** - Master_DDL.sql for all database objects
 - ✅ **Pure Oracle solution** - No external dependencies
 
 ## Current Architecture
-- **Primary**: Oracle APEX with PL/SQL packages
-- **Database**: Oracle 21c XE with full ETL logic
-- **API Client**: APEX_WEB_SERVICE with Oracle wallet
-- **UI**: APEX application (15-minute setup)
-- **Legacy**: Blazor Server components (optional)
+- **Database**: Oracle 21c XE with TR2000_STAGING schema
+- **API Client**: APEX_WEB_SERVICE with Oracle wallet for HTTPS
+- **ETL Logic**: PL/SQL packages (pkg_api_client, pkg_etl_operations, etc.)
+- **UI**: Oracle APEX application (to be created)
+- **Deployment**: Simple - just run Master_DDL.sql
 
 ## Prerequisites
 
-- Oracle Database 21c XE with APEX 24.2
-- Oracle wallet configured at `C:\Oracle\wallet`
-- Network ACLs for `equinor.pipespec-api.presight.com`
+- Oracle Database 21c XE
+- Oracle APEX 24.2 (or compatible version)
+- Oracle wallet configured for HTTPS
+- Network access to `equinor.pipespec-api.presight.com`
 
 ## Quick Start
 
 ### 1. Database Setup
 ```sql
--- Run as SYS user
+-- Connect as TR2000_STAGING user
+sqlplus TR2000_STAGING/piping@host.docker.internal:1521/XEPDB1
+
+-- Run the master DDL script
 @Database/Master_DDL.sql
 ```
 
-### 2. APEX Application (15 minutes)
+### 2. APEX Application Setup
 Follow `Database/APEX_QUICK_START.md`:
 1. Create workspace TR2000_ETL
 2. Create app from PLANTS table
-3. Add ETL buttons
-4. Run application
+3. Add ETL operations page
+4. Configure buttons to call PL/SQL procedures
 
 ### 3. Access Application
 ```
 URL: http://localhost:8080/apex
 Workspace: TR2000_ETL
-Schema: TR2000_STAGING
+Username: TR2000_STAGING
+Password: piping
 ```
 
 ## Project Structure
 
 ```
 TR2K/
-├── TR2KApp/                    # Main Blazor Server Application
-│   ├── Components/             # Blazor components and pages
-│   ├── Data/                   # SQLite database file
-│   └── wwwroot/                # Static files (CSS, JS, Bootstrap)
-├── TR2KBlazorLibrary/          # Business Logic Library
-│   ├── Logic/                  # Services and Repositories
-│   └── Models/                 # Data models
-├── DatabaseCreator/            # Database initialization tool
-├── Documentation/              # API documentation and references
-└── Tasks/                      # Development tasks and PRD
+├── Database/
+│   ├── Master_DDL.sql          # Complete database schema and procedures
+│   ├── APEX_QUICK_START.md     # Guide for APEX setup
+│   ├── scripts/
+│   │   └── export_apex.sh      # Export APEX app for version control
+│   ├── tools/
+│   │   └── instantclient/      # Oracle SQL*Plus client
+│   └── apex_exports/           # APEX application exports (when created)
+└── Ops/
+    └── Setup/
+        ├── prd-tr2000-etl.md   # Product Requirements Document
+        ├── tasks-tr2000-etl.md # Task tracking
+        └── TR2000_API_Endpoints_Documentation.md # API reference
 ```
+
+## Database Objects
+
+### Core Tables
+- `PLANTS` - Plant master data
+- `ISSUES` - Issue revisions per plant  
+- `SELECTION_LOADER` - User selections for ETL processing
+- `RAW_JSON` - Raw API responses with SHA256 deduplication
+- `ETL_RUN_LOG` - ETL execution history
+- `ETL_ERROR_LOG` - Error tracking with context
+
+### Key Packages
+- `pkg_api_client` - APEX_WEB_SERVICE API calls
+- `pkg_raw_ingest` - SHA256 deduplication and RAW_JSON management
+- `pkg_parse_plants` - JSON parsing for plants endpoint
+- `pkg_parse_issues` - JSON parsing for issues endpoint
+- `pkg_etl_operations` - ETL orchestration
 
 ## Usage
 
-1. **Navigate to TR2000 API Data** from the sidebar
-2. **Select a data type** (Operators, Plants, PCS, or Issues)
-3. **For PCS/Issues**: Select a plant from the dropdown
-4. **Test Connection** to verify API access
-5. **Import Data** to fetch and store in SQLite
-6. **View and Export** your imported data
+### Manual ETL Operations (via SQL*Plus)
+```sql
+-- Refresh all plants
+EXEC pkg_api_client.refresh_plants_from_api(:status, :message);
 
-## Database Schema
+-- Refresh issues for a specific plant
+EXEC pkg_api_client.refresh_issues_from_api('AAS', :status, :message);
 
-The application uses a pre-defined SQLite database with the following tables:
-- `operators` - TR2000 operators
-- `plants` - TR2000 plants
-- `pcs` - Pipe Class Sheets
-- `issues` - Plant issues
-- `ImportLog` - Import operation tracking
-
-## Development
-
-### Building from Source
-```bash
-dotnet build
+-- Run full ETL
+EXEC pkg_etl_operations.run_full_etl(:status, :message);
 ```
 
-### Running Tests
-```bash
-dotnet test
-```
+### Via APEX Application (when created)
+1. Navigate to ETL Operations page
+2. Select plants (max 10)
+3. Select issue revisions
+4. Click "Run ETL"
+5. Monitor progress in execution log
 
-### Creating a Release Build
-```bash
-dotnet publish -c Release
-```
+## Version Control
+
+- **Master_DDL.sql** is the single source of truth
+- Git tracks all changes (no manual backups needed)
+- Deployment is simple: just run Master_DDL.sql
+- APEX exports tracked via export_apex.sh script
 
 ## Git Workflow
 
-### Initial Setup (Already Done)
-```bash
-git init
-git add .
-git commit -m "Initial commit"
-git remote add origin https://github.com/vivekN7/TR2000-API-Data-Manager.git
-```
-
 ### Making Changes
 ```bash
+# Edit Master_DDL.sql or other files
 git add .
-git commit -m "Your commit message"
+git commit -m "feat: Add new ETL procedure"
+
+# Push when ready (not required for every commit)
 git push origin master
 ```
 
-### To Push to GitHub
+### Database Deployment
+```bash
+# Connect to database
+cd /workspace/TR2000/TR2K/Database
+./tools/sqlplus_wrapper.sh
 
-You'll need to set up authentication. Options:
-
-1. **Using GitHub Personal Access Token (Recommended)**:
-   - Go to GitHub Settings → Developer settings → Personal access tokens
-   - Generate a new token with `repo` permissions
-   - Use the token as your password when pushing
-
-2. **Using SSH**:
-   ```bash
-   git remote set-url origin git@github.com:vivekN7/TR2000-API-Data-Manager.git
-   ```
-
-3. **Using GitHub CLI**:
-   ```bash
-   gh auth login
-   git push origin master
-   ```
-
-## Contributing
-
-Feel free to submit issues and enhancement requests!
-
-## License
-
-This project is proprietary software. All rights reserved.
+# Run the DDL
+SQL> @Master_DDL.sql
+```
 
 ## Status
 
-✅ **100% Complete and Ready for Production**
+- ✅ **Database Schema**: Complete
+- ✅ **ETL Procedures**: Complete  
+- ✅ **API Integration**: Working with HTTPS
+- 🔄 **APEX UI**: To be created
+- 📋 **Automation**: Post-project activity
 
-Last Updated: August 13, 2025
+## Next Steps
+
+1. Create APEX application following APEX_QUICK_START.md
+2. Test ETL operations through APEX UI
+3. Export APEX app for version control
+4. Schedule automation jobs (post-project)
 
 ---
 
-Built with ❤️ using .NET 9.0 and Blazor
+Last Updated: August 23, 2025

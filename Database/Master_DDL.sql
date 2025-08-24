@@ -1220,9 +1220,9 @@ END pkg_api_client;
 CREATE OR REPLACE PACKAGE BODY pkg_api_client AS
     
     -- Private constants for wallet configuration
-    -- NOTE: Update wallet path and password for your environment
-    c_wallet_path CONSTANT VARCHAR2(100) := 'file:C:\Oracle\wallet';
-    c_wallet_pwd CONSTANT VARCHAR2(100) := 'WalletPass123';
+    -- NOTE: Wallet created and tested - contains certificates for TR2000 API
+    c_wallet_path CONSTANT VARCHAR2(100) := 'file:C:\app\vivek\product\21c\dbhomeXE\network\admin\wallet';
+    c_wallet_pwd CONSTANT VARCHAR2(100) := 'WalletPass123';  -- Working wallet configuration
     
     -- Fetch plants JSON from API
     FUNCTION fetch_plants_json RETURN CLOB IS

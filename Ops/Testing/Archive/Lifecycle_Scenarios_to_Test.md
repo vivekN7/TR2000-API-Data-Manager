@@ -312,6 +312,13 @@ INSERT INTO PLANT_ID_MAPPING VALUES ('PLANT_10', 'PLANT_10A', SYSDATE);
 5. **Manual Override**: No flag to prevent API from changing certain plants
 6. **Merge Detection**: No logic to detect if two plants are actually the same
 
+## Critical Issues to Monitor
+
+1. **Plant ID Changes** - System cannot detect if API changes a plant_id
+2. **Network ACL** - Most common cause of API failures  
+3. **Wallet Configuration** - Required for HTTPS calls
+4. **JSON Path Bugs** - Verify correct paths for parsing (e.g., `$.getIssueList[*]`)
+
 ## Recommendations for Production
 
 1. **Monitor for ID Changes**:

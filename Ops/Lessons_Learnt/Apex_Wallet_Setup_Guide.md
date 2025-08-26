@@ -5,6 +5,11 @@ APEX_WEB_SERVICE requires two things to make HTTPS API calls:
 1. **Network ACL permissions** - Often overlooked, this blocks everything if not set
 2. **Oracle Wallet with SSL certificates** - Required for HTTPS connections
 
+### 🔴 CRITICAL DISCOVERY (2025-08-24)
+- **WORKING API**: `https://equinor.pipespec-api.presight.com/` ✅
+- **NOT WORKING**: `https://tr2000api.equinor.com/` ❌ (needs different certificates)
+- **NEVER USE**: `/v1/` in the URL path - this was causing 404 errors!
+
 ## ⚠️ Common Pitfall
 **90% of "wallet not working" issues are actually Network ACL issues!** The wallet might be perfect, but if the ACL blocks network access, you'll get certificate errors that are misleading.
 
@@ -154,30 +159,48 @@ SSL_VERSION = 0
 ### Update pkg_api_client in Master_DDL.sql
 ```sql
 CREATE OR REPLACE PACKAGE BODY pkg_api_client AS
-    -- CRITICAL: Use the full path to your wallet
-    c_wallet_path CONSTANT VARCHAR2(100) := 'file:C:\app\vivek\product\21c\dbhomeXE\network\admin\wallet';
-    c_wallet_pwd CONSTANT VARCHAR2(100) := 'WalletPass123';
+    -- CRITICAL: Use Windows path (not Docker path!) and include password
+    -- Wallet configuration that WORKS:
     
-    -- Rest of package...
+    FUNCTION fetch_plants_json RETURN CLOB IS
+        l_response CLOB;
+        l_url VARCHAR2(500);
+    BEGIN
+        l_url := get_base_url() || '/plants';  -- NO /v1 here!
+        
+        l_response := APEX_WEB_SERVICE.make_rest_request(
+            p_url => l_url,
+            p_http_method => 'GET',
+            p_wallet_path => 'file:C:\app\vivek\product\21c\dbhomeXE\network\admin\wallet',
+            p_wallet_pwd => 'WalletPass123'  -- MUST include password!
+        );
+        
+        RETURN l_response;
+    END;
 ```
 
 ### Test the Complete Setup
 ```sql
--- Final test
+-- Final test (UPDATED: Using working API endpoint)
+SET SERVEROUTPUT ON
 DECLARE
     v_response CLOB;
 BEGIN
+    -- Using the WORKING endpoint (not tr2000api.equinor.com)
     v_response := apex_web_service.make_rest_request(
         p_url => 'https://equinor.pipespec-api.presight.com/plants',
         p_http_method => 'GET',
         p_wallet_path => 'file:C:\app\vivek\product\21c\dbhomeXE\network\admin\wallet',
-        p_wallet_pwd => 'WalletPass123'
+        p_wallet_pwd => 'WalletPass123'  -- CRITICAL: Must include password!
     );
     DBMS_OUTPUT.PUT_LINE('SUCCESS! Length: ' || LENGTH(v_response));
     DBMS_OUTPUT.PUT_LINE('First 200 chars: ' || SUBSTR(v_response, 1, 200));
 EXCEPTION
     WHEN OTHERS THEN
         DBMS_OUTPUT.PUT_LINE('FAILED: ' || SQLERRM);
+        IF SQLCODE = -29024 THEN
+            DBMS_OUTPUT.PUT_LINE('Try the alternative endpoint: equinor.pipespec-api.presight.com');
+        END IF;
 END;
 /
 ```
@@ -263,7 +286,8 @@ sqlplus TR2000_STAGING/piping@localhost:1521/XEPDB1
 - **Wallet Path**: `file:C:\app\vivek\product\21c\dbhomeXE\network\admin\wallet`
 - **Wallet Password**: `WalletPass123`
 - **APEX Version**: 24.2.0 (schema APEX_240200)
-- **API Base URL**: `https://equinor.pipespec-api.presight.com/`
+- **API Base URL**: `https://equinor.pipespec-api.presight.com/` ✅ WORKING
+- **Alternative API**: `https://tr2000api.equinor.com/` ❌ REQUIRES DIFFERENT CERTIFICATES
 
 ---
 
@@ -274,6 +298,9 @@ sqlplus TR2000_STAGING/piping@localhost:1521/XEPDB1
 3. **Wallet in Oracle home survives reinstalls** - Use Oracle home directory, not custom paths
 4. **Test with HTTP first** - Isolates network issues from SSL issues
 5. **Error messages are misleading** - "Certificate error" often means ACL issue
+6. **NEVER use /v1 in TR2000 API URLs** - The correct URL is `https://equinor.pipespec-api.presight.com/plants`, NOT `/v1/plants`
+7. **Two APIs available** - `equinor.pipespec-api.presight.com` works with Let's Encrypt certs, `tr2000api.equinor.com` needs specific certs
+8. **Docker paths don't work on Windows** - Always use Windows paths like `C:\app\...` not `/workspace/...`
 
 ---
 
@@ -282,6 +309,6 @@ sqlplus TR2000_STAGING/piping@localhost:1521/XEPDB1
 1. `/workspace/TR2000/TR2K/Database/Master_DDL.sql` - Has correct wallet path
 2. `/workspace/TR2000/TR2K/Database/scripts/fix_network_acl.sql` - ACL setup script
 3. `/workspace/TR2000/TR2K/Database/scripts/test_refresh_plants.sql` - Verification script
-4. This guide - `APEX_WALLET_SETUP_GUIDE.md`
+4. This guide - `Apex_Wallet_Setup_Guide.md`
 
 Save these files and you can recover from any disaster in 15 minutes instead of 2 days!

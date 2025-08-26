@@ -1,6 +1,6 @@
 # ETL Test Matrix - Complete Testing Coverage
-*Last Updated: 2025-08-24 (End of Session)*
-*Version: 2.1 - Updated with PKG_ADDITIONAL_TESTS implementation*
+*Last Updated: 2025-08-26 (Session 10)*
+*Version: 2.3 - Added reference table test functions (Task 7)*
 
 ## Purpose
 Map every potential failure point in the ETL pipeline to a specific test procedure, ensuring 100% coverage of critical scenarios.
@@ -147,7 +147,34 @@ All test results are logged to **TEST_RESULTS** table with enhanced tracking:
 
 ---
 
-## 8. Special Scenarios (Cross-cutting Concerns)
+## 8. GUID and Correlation Scenarios (Session 10)
+
+| Failure Scenario | Test Procedure | Test Parameters | Result Tracking in TEST_RESULTS |
+|-----------------|----------------|-----------------|------------------------------------|
+| **GUID Generation** |
+| **GUID collision** - Duplicate GUID generated. *Example: SYS_GUID() collision (virtually impossible)* | `test_guid_uniqueness()` | iterations=10000 | data_flow_step='GUID_GEN', test_category='UNIQUENESS', expected_result='No duplicates' |
+| **GUID conversion** - RAW to VARCHAR2 fails. *Example: Invalid hex in conversion* | `test_guid_conversion()` | test_format=true | data_flow_step='GUID_GEN', test_category='CONVERSION', actual_result='Valid UUID format' |
+| **Correlation Tracking** |
+| **Lost correlation** - API correlation ID not tracked. *Example: Network retry loses original correlation* | `test_correlation_tracking()` | retry_count=3 | data_flow_step='API_CORRELATION', test_category='TRACKING', actual_result='All retries same correlation' |
+| **Cross-system trace** - Can't trace operation across systems. *Example: GUID not propagated to external system* | `test_cross_system()` | systems=['TR2000','SAP'] | data_flow_step='CROSS_SYSTEM', test_category='INTEGRATION', expected_result='GUID preserved' |
+
+---
+
+## 9. CASCADE Management Scenarios (Session 9)
+
+| Failure Scenario | Test Procedure | Test Parameters | Result Tracking in TEST_RESULTS |
+|-----------------|----------------|-----------------|------------------------------------|
+| **Cascade Triggers** |
+| **Plant cascade** - Plant deletion cascades to issues. *Example: Plant 34 with 8 issues* | `test_plant_cascade()` | plant_id='34' | data_flow_step='CASCADE', test_category='PLANT_CASCADE', actual_result='8 issues marked invalid' |
+| **Selection cascade** - Selection removal cascades. *Example: Deselect JSP2 cascades to its data* | `test_selection_cascade()` ✅ | plant='JSP2' | data_flow_step='CASCADE', test_category='SELECTION', records_affected=12 |
+| **Cascade logging** - CASCADE_LOG captures operations. *Example: Verify audit trail* | `test_cascade_audit()` | check_log=true | data_flow_step='CASCADE', test_category='AUDIT', actual_result='Log entry created' |
+| **Autonomous Transactions** |
+| **Main fails, cascade succeeds** - Cascade completes despite error. *Example: Main transaction rolls back* | `test_autonomous_cascade()` | force_error=true | data_flow_step='CASCADE', failure_mode='AUTONOMOUS', actual_result='Cascade committed' |
+| **Deadlock in cascade** - Triggers cause deadlock. *Example: Circular cascade dependency* | `test_cascade_deadlock()` | circular=true | data_flow_step='CASCADE', failure_mode='DEADLOCK', error_code='ORA-00060' |
+
+---
+
+## 10. Special Scenarios (Cross-cutting Concerns)
 
 | Failure Scenario | Test Procedure | Test Parameters | Result Tracking in TEST_RESULTS |
 |-----------------|----------------|-----------------|------------------------------------|
@@ -166,20 +193,21 @@ All test results are logged to **TEST_RESULTS** table with enhanced tracking:
 
 ## Test Implementation Status
 
-### ✅ Currently Implemented (9 tests total)
+### ✅ Currently Implemented (8 tests in PKG_SIMPLE_TESTS)
 
-#### PKG_SIMPLE_TESTS (5 tests)
+#### PKG_SIMPLE_TESTS (8 tests)
 1. `test_api_connection()` - Basic connectivity only
 2. `test_json_parsing()` - Date formats and JSON paths  
-3. `test_soft_deletes()` - Basic cascade logic
-4. `test_selection_cascade()` - Selection management
+3. `test_soft_deletes()` - Basic cascade logic with CASCADE_MANAGER
+4. `test_selection_cascade()` - Selection management with triggers
 5. `test_error_capture()` - Error logging
+6. `test_reference_parsing()` - ✅ Parses reference JSON into staging tables (Task 7)
+7. `test_reference_cascade()` - ✅ Tests cascade deletion from issues to references (Task 7)
+8. `test_invalid_fk()` - ✅ Validates foreign key constraints on references (Task 7)
 
-#### PKG_ADDITIONAL_TESTS (4 tests) - **NEW! Added 2025-08-24**
-6. `test_json_path_mismatch()` - ✅ Detects API JSON structure changes
-7. `test_field_case_sensitivity()` - ✅ Catches field name case mismatches
-8. `test_null_primary_keys()` - ✅ Prevents NULL keys in core tables
-9. `test_wrong_column_names()` - ✅ Verifies column names are correct
+#### Note on Additional Tests
+The PKG_ADDITIONAL_TESTS mentioned in Session 8 documentation was planned but not implemented.
+The test scenarios remain valid and should be implemented in future sessions.
 
 ### 🔨 Priority 1: To Implement Next (Task 7 - Reference Tables)
 ```sql

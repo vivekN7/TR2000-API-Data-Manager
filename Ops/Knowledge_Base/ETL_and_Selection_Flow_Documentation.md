@@ -264,8 +264,17 @@ pkg_api_client.refresh_plants_from_api (MASTER CONTROLLER)
 6. **pkg_upsert_issues** - Issues staging to production
 7. **pkg_selection_mgmt** - Manages user selections and cascade operations
 
+### Reference Data Packages (Task 7 - Session 10)
+11. **pkg_parse_references** - Parses JSON for all 9 reference types (PCS, SC, VSM, VDS, EDS, MDS, VSK, ESK, PIPE_ELEMENT)
+12. **pkg_upsert_references** - Merges reference data from staging to core with FK validation
+13. **pkg_api_client_references** - API calls for fetching issue references
+
+### GUID and Cascade Management Packages (Session 9-10)
+8. **pkg_cascade_manager** - Handles cascade soft deletes across all tables
+9. **pkg_guid_utils** - GUID generation and conversion utilities
+
 ### Future/Alternative Package
-8. **pkg_etl_operations** - Dynamic ETL using CONTROL_ENDPOINTS table (not currently used)
+10. **pkg_etl_operations** - Dynamic ETL using CONTROL_ENDPOINTS table (not currently used)
 
 ### Why This Architecture?
 - **Single Responsibility**: One place to understand the flow
@@ -275,6 +284,87 @@ pkg_api_client.refresh_plants_from_api (MASTER CONTROLLER)
 - **Modularity**: Can reprocess without re-fetching
 - **Testing**: Can test parsing separately from merging
 - **Reusability**: Same pattern for plants, issues, and future endpoints
+
+---
+
+## GUID Architecture (Session 10)
+
+### Purpose
+GUIDs (Globally Unique Identifiers) provide unique identification across systems, enabling:
+- Multi-system integration without ID conflicts
+- API idempotency to prevent duplicate operations
+- Cross-system correlation tracking
+- Business key independence
+
+### Implementation
+All core tables now include GUID columns:
+```sql
+-- Example from PLANTS table
+plant_guid     RAW(16) DEFAULT SYS_GUID()  -- Internal GUID (Primary Key)
+external_guid  VARCHAR2(36)                -- From external systems
+api_sync_guid  VARCHAR2(36)                -- For API sync tracking
+```
+
+### Key Tables with GUIDs
+- **PLANTS** - plant_guid as unique identifier
+- **ISSUES** - issue_guid with FK to plant_guid
+- **SELECTION_LOADER** - selection_guid for tracking
+- **RAW_JSON** - Uses api_correlation_id for tracking
+
+---
+
+## CASCADE Management System (Session 9)
+
+### Overview
+Implements automatic cascade soft deletes to maintain referential integrity without hard deletes.
+
+### Components
+
+#### CASCADE_LOG Table
+Tracks all cascade operations for audit:
+```sql
+CASCADE_LOG
+├── log_id (NUMBER) - Primary key
+├── trigger_name (VARCHAR2) - Which trigger fired
+├── table_name (VARCHAR2) - Table being updated
+├── operation_type (VARCHAR2) - 'PLANT_CASCADE', 'ISSUE_CASCADE', etc.
+├── affected_records (NUMBER) - Count of records marked invalid
+└── log_timestamp (TIMESTAMP) - When cascade occurred
+```
+
+#### PKG_CASCADE_MANAGER Package
+Central logic for cascade operations:
+- **cascade_plant_deletion()** - When plant marked invalid, cascades to issues
+- **cascade_issue_deletion()** - When issue marked invalid, cascades to references (future)
+- **cascade_selection_deletion()** - When selection removed, deactivates downstream
+- Uses AUTONOMOUS_TRANSACTION to ensure cascade completes even if main transaction fails
+
+#### Cascade Triggers
+1. **TRG_CASCADE_PLANT_TO_SELECTION** - Plant changes cascade to SELECTION_LOADER
+2. **TRG_CASCADE_SELECTION_TO_ALL** - Selection changes cascade to all downstream
+3. **TRG_CASCADE_ISSUES_TO_SELECTION** - Issue changes update SELECTION_LOADER
+
+### Cascade Flow Example
+```
+Plant marked invalid (is_valid='N')
+    ↓ TRG_CASCADE_PLANT_TO_SELECTION fires
+    ↓ PKG_CASCADE_MANAGER.cascade_plant_deletion()
+SELECTION_LOADER entries deactivated
+    ↓ TRG_CASCADE_SELECTION_TO_ALL fires
+All issues for that plant marked invalid
+    ↓ (Future: cascade to reference tables)
+Log entry created in CASCADE_LOG
+```
+
+### Testing Cascade Operations
+```sql
+-- Test cascade by marking plant invalid
+UPDATE PLANTS SET is_valid = 'N' WHERE plant_id = '34';
+
+-- Check cascade results
+SELECT * FROM CASCADE_LOG ORDER BY log_timestamp DESC;
+SELECT COUNT(*) FROM ISSUES WHERE plant_id = '34' AND is_valid = 'N';
+```
 
 ---
 
@@ -477,5 +567,5 @@ Once plants are selected and issues loaded:
 
 ---
 
-*Last Updated: 2025-08-24*
-*Version: 2.0 - Merged from Plant_Selection_Flow.md and ETL_Flow_Documentation.md*
+*Last Updated: 2025-08-26*
+*Version: 2.2 - Added Reference Tables architecture and packages (Task 7)*

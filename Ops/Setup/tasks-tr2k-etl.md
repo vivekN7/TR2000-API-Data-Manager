@@ -86,12 +86,12 @@
   - [x] 7.10 Test with JSP2 and GRANE selected issues
   - [x] 7.11 Extend PKG_SIMPLE_TESTS with reference tests
 
-- [ ] 8.0 Build ETL Backend for PCS Details (Section 3 of API) 🎯 NEXT PRIORITY
-  - [ ] 8.1 Review API doc Section 3: 7 PCS detail endpoints
-  - [ ] 8.2 Create tables for Line, Gasket, Stud, Nut, Isolation, Spool, Joint
-  - [ ] 8.3 Build pkg_parse_pcs_details for JSON parsing
-  - [ ] 8.4 Build pkg_upsert_pcs_details with FK to PCS_REFERENCES
-  - [ ] 8.5 Add PCS detail endpoints to CONTROL_ENDPOINTS  
+- [ ] 8.0 Build ETL Backend for PCS Details (Section 3 of API) 🎯 IN PROGRESS
+  - [x] 8.1 Review API doc Section 3: 7 PCS detail endpoints (6 detail types identified)
+  - [x] 8.2 Create tables for Header, Temp/Pressure, Pipe Sizes, Pipe Elements, Valve Elements, Embedded Notes
+  - [x] 8.3 Build pkg_parse_pcs_details for JSON parsing
+  - [x] 8.4 Build pkg_upsert_pcs_details with FK to PCS_REFERENCES
+  - [x] 8.5 Add PCS detail endpoints to CONTROL_ENDPOINTS  
   - [ ] 8.6 Extend pkg_api_client with fetch_pcs_details
   - [ ] 8.7 Add parameter support for different PCS detail types
   - [ ] 8.8 Add to pkg_etl_operations workflow

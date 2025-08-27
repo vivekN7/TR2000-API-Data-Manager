@@ -22,6 +22,11 @@ PROMPT =========================================================================
 @07_pkg_selection_mgmt.sql
 @08_pkg_etl_operations.sql
 
+-- Reference packages (Task 7)
+@10_pkg_parse_references.sql
+@11_pkg_upsert_references.sql
+@13_pkg_api_client_references.sql
+
 -- CASCADE management
 @11_pkg_cascade_manager.sql
 

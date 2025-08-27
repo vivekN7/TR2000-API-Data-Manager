@@ -62,6 +62,9 @@ PROMPT Creating tables...
 -- GUID tracking tables for API and external systems
 @08_guid_tracking_tables.sql
 
+-- Reference tables for issue references
+@06_reference_tables.sql
+
 PROMPT
 PROMPT ===============================================================================
 PROMPT Table deployment complete

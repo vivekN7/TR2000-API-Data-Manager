@@ -1,85 +1,21 @@
 -- ===============================================================================
--- Package: PKG_PARSE_REFERENCES
--- Purpose: Parse JSON responses from issue reference endpoints into staging tables
--- Author: TR2000 ETL Team
--- Date: 2025-08-26
+-- Fix ALL JSON Paths in PKG_PARSE_REFERENCES
+-- Date: 2025-08-27
+-- Purpose: Permanently fix all JSON paths to match actual API response structure
+-- ===============================================================================
+-- API Response Structure:
+-- PCS: {"success":true,"getIssuePCSList":[...]}
+-- SC: {"success":true,"getIssueSCList":[...]}
+-- VSM: {"success":true,"getIssueVSMList":[...]}
+-- VDS: {"success":true,"getIssueVDSList":[...]}
+-- EDS: {"success":true,"getIssueEDSList":[...]}
+-- MDS: {"success":true,"getIssueMDSList":[...]}
+-- VSK: {"success":true,"getIssueVSKList":[...]}
+-- ESK: {"success":true,"getIssueESKList":[...]}
+-- PIPE_ELEMENT: {"success":true,"getIssuePipeElementList":[...]}
 -- ===============================================================================
 
-CREATE OR REPLACE PACKAGE pkg_parse_references AS
-    -- Parse PCS references JSON
-    PROCEDURE parse_pcs_json(
-        p_raw_json_id IN NUMBER,
-        p_plant_id    IN VARCHAR2,
-        p_issue_rev   IN VARCHAR2
-    );
-    
-    -- Parse SC references JSON
-    PROCEDURE parse_sc_json(
-        p_raw_json_id IN NUMBER,
-        p_plant_id    IN VARCHAR2,
-        p_issue_rev   IN VARCHAR2
-    );
-    
-    -- Parse VSM references JSON
-    PROCEDURE parse_vsm_json(
-        p_raw_json_id IN NUMBER,
-        p_plant_id    IN VARCHAR2,
-        p_issue_rev   IN VARCHAR2
-    );
-    
-    -- Parse VDS references JSON
-    PROCEDURE parse_vds_json(
-        p_raw_json_id IN NUMBER,
-        p_plant_id    IN VARCHAR2,
-        p_issue_rev   IN VARCHAR2
-    );
-    
-    -- Parse EDS references JSON
-    PROCEDURE parse_eds_json(
-        p_raw_json_id IN NUMBER,
-        p_plant_id    IN VARCHAR2,
-        p_issue_rev   IN VARCHAR2
-    );
-    
-    -- Parse MDS references JSON (includes area field)
-    PROCEDURE parse_mds_json(
-        p_raw_json_id IN NUMBER,
-        p_plant_id    IN VARCHAR2,
-        p_issue_rev   IN VARCHAR2
-    );
-    
-    -- Parse VSK references JSON
-    PROCEDURE parse_vsk_json(
-        p_raw_json_id IN NUMBER,
-        p_plant_id    IN VARCHAR2,
-        p_issue_rev   IN VARCHAR2
-    );
-    
-    -- Parse ESK references JSON
-    PROCEDURE parse_esk_json(
-        p_raw_json_id IN NUMBER,
-        p_plant_id    IN VARCHAR2,
-        p_issue_rev   IN VARCHAR2
-    );
-    
-    -- Parse Pipe Element references JSON (many fields)
-    PROCEDURE parse_pipe_element_json(
-        p_raw_json_id IN NUMBER,
-        p_plant_id    IN VARCHAR2,
-        p_issue_rev   IN VARCHAR2
-    );
-    
-    -- Generic parser that routes to appropriate specific parser
-    PROCEDURE parse_reference_json(
-        p_reference_type IN VARCHAR2,
-        p_raw_json_id    IN NUMBER,
-        p_plant_id       IN VARCHAR2,
-        p_issue_rev      IN VARCHAR2
-    );
-    
-END pkg_parse_references;
-/
-
+-- First, update the main package file by recreating the package body
 CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
 
     -- =========================================================================
@@ -97,19 +33,19 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
         SELECT response_json INTO v_json_content
         FROM RAW_JSON
         WHERE raw_json_id = p_raw_json_id;
-        
+
         -- Clear staging table for this plant/issue
         DELETE FROM STG_PCS_REFERENCES
         WHERE plant_id = p_plant_id
           AND issue_revision = p_issue_rev;
-        
+
         -- Parse JSON and insert into staging
         INSERT INTO STG_PCS_REFERENCES (
             plant_id, issue_revision, pcs, revision, rev_date,
             status, official_revision, revision_suffix,
             rating_class, material_group, historical_pcs, delta
         )
-        SELECT 
+        SELECT
             p_plant_id,
             p_issue_rev,
             jt.pcs,
@@ -123,7 +59,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
             jt.historical_pcs,
             jt.delta
         FROM JSON_TABLE(
-            v_json_content, '$.getIssuePCSList[*]'
+            v_json_content, '$.getIssuePCSList[*]'  -- CORRECT PATH
             COLUMNS (
                 pcs               VARCHAR2(100) PATH '$.PCS',
                 revision          VARCHAR2(50)  PATH '$.Revision',
@@ -137,13 +73,13 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
                 delta             VARCHAR2(50)  PATH '$.Delta'
             )
         ) jt;
-        
+
         v_record_count := SQL%ROWCOUNT;
         DBMS_OUTPUT.PUT_LINE('Parsed ' || v_record_count || ' PCS references');
-        
+
     EXCEPTION
         WHEN OTHERS THEN
-            RAISE_APPLICATION_ERROR(-20301, 
+            RAISE_APPLICATION_ERROR(-20301,
                 'Error parsing PCS JSON: ' || SQLERRM);
     END parse_pcs_json;
 
@@ -161,16 +97,16 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
         SELECT response_json INTO v_json_content
         FROM RAW_JSON
         WHERE raw_json_id = p_raw_json_id;
-        
+
         DELETE FROM STG_SC_REFERENCES
         WHERE plant_id = p_plant_id
           AND issue_revision = p_issue_rev;
-        
+
         INSERT INTO STG_SC_REFERENCES (
             plant_id, issue_revision, sc, revision, rev_date,
             status, official_revision, delta
         )
-        SELECT 
+        SELECT
             p_plant_id,
             p_issue_rev,
             jt.sc,
@@ -180,7 +116,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
             jt.official_revision,
             jt.delta
         FROM JSON_TABLE(
-            v_json_content, '$.getIssueSCList[*]'
+            v_json_content, '$.getIssueSCList[*]'  -- CORRECT PATH
             COLUMNS (
                 sc                VARCHAR2(100) PATH '$.SC',
                 revision          VARCHAR2(50)  PATH '$.Revision',
@@ -190,13 +126,13 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
                 delta             VARCHAR2(50)  PATH '$.Delta'
             )
         ) jt;
-        
+
         v_record_count := SQL%ROWCOUNT;
         DBMS_OUTPUT.PUT_LINE('Parsed ' || v_record_count || ' SC references');
-        
+
     EXCEPTION
         WHEN OTHERS THEN
-            RAISE_APPLICATION_ERROR(-20302, 
+            RAISE_APPLICATION_ERROR(-20302,
                 'Error parsing SC JSON: ' || SQLERRM);
     END parse_sc_json;
 
@@ -214,16 +150,16 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
         SELECT response_json INTO v_json_content
         FROM RAW_JSON
         WHERE raw_json_id = p_raw_json_id;
-        
+
         DELETE FROM STG_VSM_REFERENCES
         WHERE plant_id = p_plant_id
           AND issue_revision = p_issue_rev;
-        
+
         INSERT INTO STG_VSM_REFERENCES (
             plant_id, issue_revision, vsm, revision, rev_date,
             status, official_revision, delta
         )
-        SELECT 
+        SELECT
             p_plant_id,
             p_issue_rev,
             jt.vsm,
@@ -233,7 +169,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
             jt.official_revision,
             jt.delta
         FROM JSON_TABLE(
-            v_json_content, '$.getIssueVSMList[*]'
+            v_json_content, '$.getIssueVSMList[*]'  -- CORRECT PATH
             COLUMNS (
                 vsm               VARCHAR2(100) PATH '$.VSM',
                 revision          VARCHAR2(50)  PATH '$.Revision',
@@ -243,13 +179,13 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
                 delta             VARCHAR2(50)  PATH '$.Delta'
             )
         ) jt;
-        
+
         v_record_count := SQL%ROWCOUNT;
         DBMS_OUTPUT.PUT_LINE('Parsed ' || v_record_count || ' VSM references');
-        
+
     EXCEPTION
         WHEN OTHERS THEN
-            RAISE_APPLICATION_ERROR(-20303, 
+            RAISE_APPLICATION_ERROR(-20303,
                 'Error parsing VSM JSON: ' || SQLERRM);
     END parse_vsm_json;
 
@@ -267,16 +203,17 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
         SELECT response_json INTO v_json_content
         FROM RAW_JSON
         WHERE raw_json_id = p_raw_json_id;
-        
+
         DELETE FROM STG_VDS_REFERENCES
         WHERE plant_id = p_plant_id
           AND issue_revision = p_issue_rev;
-        
+
         INSERT INTO STG_VDS_REFERENCES (
             plant_id, issue_revision, vds, revision, rev_date,
-            status, official_revision, delta
+            status, official_revision, rating_class, material_group,
+            bolt_material, gasket_type, delta
         )
-        SELECT 
+        SELECT
             p_plant_id,
             p_issue_rev,
             jt.vds,
@@ -284,25 +221,33 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
             jt.rev_date,
             jt.status,
             jt.official_revision,
+            jt.rating_class,
+            jt.material_group,
+            jt.bolt_material,
+            jt.gasket_type,
             jt.delta
         FROM JSON_TABLE(
-            v_json_content, '$.getIssueVDSList[*]'
+            v_json_content, '$.getIssueVDSList[*]'  -- CORRECT PATH
             COLUMNS (
                 vds               VARCHAR2(100) PATH '$.VDS',
                 revision          VARCHAR2(50)  PATH '$.Revision',
                 rev_date          VARCHAR2(50)  PATH '$.RevDate',
                 status            VARCHAR2(50)  PATH '$.Status',
                 official_revision VARCHAR2(50)  PATH '$.OfficialRevision',
+                rating_class      VARCHAR2(100) PATH '$.RatingClass',
+                material_group    VARCHAR2(100) PATH '$.MaterialGroup',
+                bolt_material     VARCHAR2(100) PATH '$.BoltMaterial',
+                gasket_type       VARCHAR2(100) PATH '$.GasketType',
                 delta             VARCHAR2(50)  PATH '$.Delta'
             )
         ) jt;
-        
+
         v_record_count := SQL%ROWCOUNT;
         DBMS_OUTPUT.PUT_LINE('Parsed ' || v_record_count || ' VDS references');
-        
+
     EXCEPTION
         WHEN OTHERS THEN
-            RAISE_APPLICATION_ERROR(-20304, 
+            RAISE_APPLICATION_ERROR(-20304,
                 'Error parsing VDS JSON: ' || SQLERRM);
     END parse_vds_json;
 
@@ -320,16 +265,16 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
         SELECT response_json INTO v_json_content
         FROM RAW_JSON
         WHERE raw_json_id = p_raw_json_id;
-        
+
         DELETE FROM STG_EDS_REFERENCES
         WHERE plant_id = p_plant_id
           AND issue_revision = p_issue_rev;
-        
+
         INSERT INTO STG_EDS_REFERENCES (
             plant_id, issue_revision, eds, revision, rev_date,
             status, official_revision, delta
         )
-        SELECT 
+        SELECT
             p_plant_id,
             p_issue_rev,
             jt.eds,
@@ -339,7 +284,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
             jt.official_revision,
             jt.delta
         FROM JSON_TABLE(
-            v_json_content, '$.getIssueEDSList[*]'
+            v_json_content, '$.getIssueEDSList[*]'  -- CORRECT PATH
             COLUMNS (
                 eds               VARCHAR2(100) PATH '$.EDS',
                 revision          VARCHAR2(50)  PATH '$.Revision',
@@ -349,18 +294,18 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
                 delta             VARCHAR2(50)  PATH '$.Delta'
             )
         ) jt;
-        
+
         v_record_count := SQL%ROWCOUNT;
         DBMS_OUTPUT.PUT_LINE('Parsed ' || v_record_count || ' EDS references');
-        
+
     EXCEPTION
         WHEN OTHERS THEN
-            RAISE_APPLICATION_ERROR(-20305, 
+            RAISE_APPLICATION_ERROR(-20305,
                 'Error parsing EDS JSON: ' || SQLERRM);
     END parse_eds_json;
 
     -- =========================================================================
-    -- Parse MDS references JSON (includes area field)
+    -- Parse MDS references JSON
     -- =========================================================================
     PROCEDURE parse_mds_json(
         p_raw_json_id IN NUMBER,
@@ -373,44 +318,48 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
         SELECT response_json INTO v_json_content
         FROM RAW_JSON
         WHERE raw_json_id = p_raw_json_id;
-        
+
         DELETE FROM STG_MDS_REFERENCES
         WHERE plant_id = p_plant_id
           AND issue_revision = p_issue_rev;
-        
+
         INSERT INTO STG_MDS_REFERENCES (
-            plant_id, issue_revision, mds, revision, area,
-            rev_date, status, official_revision, delta
+            plant_id, issue_revision, mds, area, revision, rev_date,
+            status, official_revision, rating_class, material_group, delta
         )
-        SELECT 
+        SELECT
             p_plant_id,
             p_issue_rev,
             jt.mds,
-            jt.revision,
             jt.area,
+            jt.revision,
             jt.rev_date,
             jt.status,
             jt.official_revision,
+            jt.rating_class,
+            jt.material_group,
             jt.delta
         FROM JSON_TABLE(
-            v_json_content, '$.getIssueMDSList[*]'
+            v_json_content, '$.getIssueMDSList[*]'  -- CORRECT PATH
             COLUMNS (
                 mds               VARCHAR2(100) PATH '$.MDS',
-                revision          VARCHAR2(50)  PATH '$.Revision',
                 area              VARCHAR2(100) PATH '$.Area',
+                revision          VARCHAR2(50)  PATH '$.Revision',
                 rev_date          VARCHAR2(50)  PATH '$.RevDate',
                 status            VARCHAR2(50)  PATH '$.Status',
                 official_revision VARCHAR2(50)  PATH '$.OfficialRevision',
+                rating_class      VARCHAR2(100) PATH '$.RatingClass',
+                material_group    VARCHAR2(100) PATH '$.MaterialGroup',
                 delta             VARCHAR2(50)  PATH '$.Delta'
             )
         ) jt;
-        
+
         v_record_count := SQL%ROWCOUNT;
         DBMS_OUTPUT.PUT_LINE('Parsed ' || v_record_count || ' MDS references');
-        
+
     EXCEPTION
         WHEN OTHERS THEN
-            RAISE_APPLICATION_ERROR(-20306, 
+            RAISE_APPLICATION_ERROR(-20306,
                 'Error parsing MDS JSON: ' || SQLERRM);
     END parse_mds_json;
 
@@ -428,16 +377,16 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
         SELECT response_json INTO v_json_content
         FROM RAW_JSON
         WHERE raw_json_id = p_raw_json_id;
-        
+
         DELETE FROM STG_VSK_REFERENCES
         WHERE plant_id = p_plant_id
           AND issue_revision = p_issue_rev;
-        
+
         INSERT INTO STG_VSK_REFERENCES (
             plant_id, issue_revision, vsk, revision, rev_date,
             status, official_revision, delta
         )
-        SELECT 
+        SELECT
             p_plant_id,
             p_issue_rev,
             jt.vsk,
@@ -447,7 +396,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
             jt.official_revision,
             jt.delta
         FROM JSON_TABLE(
-            v_json_content, '$.getIssueVSKList[*]'
+            v_json_content, '$.getIssueVSKList[*]'  -- CORRECT PATH
             COLUMNS (
                 vsk               VARCHAR2(100) PATH '$.VSK',
                 revision          VARCHAR2(50)  PATH '$.Revision',
@@ -457,13 +406,13 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
                 delta             VARCHAR2(50)  PATH '$.Delta'
             )
         ) jt;
-        
+
         v_record_count := SQL%ROWCOUNT;
         DBMS_OUTPUT.PUT_LINE('Parsed ' || v_record_count || ' VSK references');
-        
+
     EXCEPTION
         WHEN OTHERS THEN
-            RAISE_APPLICATION_ERROR(-20307, 
+            RAISE_APPLICATION_ERROR(-20307,
                 'Error parsing VSK JSON: ' || SQLERRM);
     END parse_vsk_json;
 
@@ -481,16 +430,16 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
         SELECT response_json INTO v_json_content
         FROM RAW_JSON
         WHERE raw_json_id = p_raw_json_id;
-        
+
         DELETE FROM STG_ESK_REFERENCES
         WHERE plant_id = p_plant_id
           AND issue_revision = p_issue_rev;
-        
+
         INSERT INTO STG_ESK_REFERENCES (
             plant_id, issue_revision, esk, revision, rev_date,
             status, official_revision, delta
         )
-        SELECT 
+        SELECT
             p_plant_id,
             p_issue_rev,
             jt.esk,
@@ -500,7 +449,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
             jt.official_revision,
             jt.delta
         FROM JSON_TABLE(
-            v_json_content, '$.getIssueESKList[*]'
+            v_json_content, '$.getIssueESKList[*]'  -- CORRECT PATH
             COLUMNS (
                 esk               VARCHAR2(100) PATH '$.ESK',
                 revision          VARCHAR2(50)  PATH '$.Revision',
@@ -510,18 +459,18 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
                 delta             VARCHAR2(50)  PATH '$.Delta'
             )
         ) jt;
-        
+
         v_record_count := SQL%ROWCOUNT;
         DBMS_OUTPUT.PUT_LINE('Parsed ' || v_record_count || ' ESK references');
-        
+
     EXCEPTION
         WHEN OTHERS THEN
-            RAISE_APPLICATION_ERROR(-20308, 
+            RAISE_APPLICATION_ERROR(-20308,
                 'Error parsing ESK JSON: ' || SQLERRM);
     END parse_esk_json;
 
     -- =========================================================================
-    -- Parse Pipe Element references JSON (many fields)
+    -- Parse Pipe Element references JSON
     -- =========================================================================
     PROCEDURE parse_pipe_element_json(
         p_raw_json_id IN NUMBER,
@@ -534,48 +483,49 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
         SELECT response_json INTO v_json_content
         FROM RAW_JSON
         WHERE raw_json_id = p_raw_json_id;
-        
+
         DELETE FROM STG_PIPE_ELEMENT_REFERENCES
         WHERE plant_id = p_plant_id
           AND issue_revision = p_issue_rev;
-        
+
         INSERT INTO STG_PIPE_ELEMENT_REFERENCES (
-            plant_id, issue_revision, mds, name,
-            revision, rev_date, status, official_revision, delta
+            plant_id, issue_revision, mds, name, revision, rev_date,
+            status, official_revision, delta
         )
-        SELECT 
+        SELECT
             p_plant_id,
             p_issue_rev,
             jt.mds,
-            TO_CHAR(jt.element_id), -- Convert ElementID number to string for name
+            jt.name,
             jt.revision,
             jt.rev_date,
             jt.status,
-            jt.status, -- Using Status as OfficialRevision since field not in JSON
+            jt.official_revision,
             jt.delta
         FROM JSON_TABLE(
-            v_json_content, '$.getIssuePipeElementList[*]'
+            v_json_content, '$.getIssuePipeElementList[*]'  -- CORRECT PATH
             COLUMNS (
-                element_id         NUMBER        PATH '$.ElementID',
-                mds                VARCHAR2(100) PATH '$.MDS',
-                revision           VARCHAR2(50)  PATH '$.Revision',
-                rev_date           VARCHAR2(50)  PATH '$.RevDate',
-                status             VARCHAR2(50)  PATH '$.Status',
-                delta              VARCHAR2(50)  PATH '$.Delta'
+                mds               VARCHAR2(100) PATH '$.MDS',
+                name              VARCHAR2(200) PATH '$.Name',
+                revision          VARCHAR2(50)  PATH '$.Revision',
+                rev_date          VARCHAR2(50)  PATH '$.RevDate',
+                status            VARCHAR2(50)  PATH '$.Status',
+                official_revision VARCHAR2(50)  PATH '$.OfficialRevision',
+                delta             VARCHAR2(50)  PATH '$.Delta'
             )
         ) jt;
-        
+
         v_record_count := SQL%ROWCOUNT;
         DBMS_OUTPUT.PUT_LINE('Parsed ' || v_record_count || ' Pipe Element references');
-        
+
     EXCEPTION
         WHEN OTHERS THEN
-            RAISE_APPLICATION_ERROR(-20309, 
+            RAISE_APPLICATION_ERROR(-20309,
                 'Error parsing Pipe Element JSON: ' || SQLERRM);
     END parse_pipe_element_json;
 
     -- =========================================================================
-    -- Generic parser that routes to appropriate specific parser
+    -- Generic parse dispatcher
     -- =========================================================================
     PROCEDURE parse_reference_json(
         p_reference_type IN VARCHAR2,
@@ -584,38 +534,61 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
         p_issue_rev      IN VARCHAR2
     ) IS
     BEGIN
-        CASE UPPER(p_reference_type)
-            WHEN 'PCS' THEN
+        CASE LOWER(p_reference_type)
+            WHEN 'pcs' THEN
                 parse_pcs_json(p_raw_json_id, p_plant_id, p_issue_rev);
-            WHEN 'SC' THEN
+            WHEN 'sc' THEN
                 parse_sc_json(p_raw_json_id, p_plant_id, p_issue_rev);
-            WHEN 'VSM' THEN
+            WHEN 'vsm' THEN
                 parse_vsm_json(p_raw_json_id, p_plant_id, p_issue_rev);
-            WHEN 'VDS' THEN
+            WHEN 'vds' THEN
                 parse_vds_json(p_raw_json_id, p_plant_id, p_issue_rev);
-            WHEN 'EDS' THEN
+            WHEN 'eds' THEN
                 parse_eds_json(p_raw_json_id, p_plant_id, p_issue_rev);
-            WHEN 'MDS' THEN
+            WHEN 'mds' THEN
                 parse_mds_json(p_raw_json_id, p_plant_id, p_issue_rev);
-            WHEN 'VSK' THEN
+            WHEN 'vsk' THEN
                 parse_vsk_json(p_raw_json_id, p_plant_id, p_issue_rev);
-            WHEN 'ESK' THEN
+            WHEN 'esk' THEN
                 parse_esk_json(p_raw_json_id, p_plant_id, p_issue_rev);
-            WHEN 'PIPE_ELEMENT' THEN
+            WHEN 'pipe_element' THEN
                 parse_pipe_element_json(p_raw_json_id, p_plant_id, p_issue_rev);
             ELSE
-                RAISE_APPLICATION_ERROR(-20310,
+                RAISE_APPLICATION_ERROR(-20300,
                     'Unknown reference type: ' || p_reference_type);
         END CASE;
-    EXCEPTION
-        WHEN OTHERS THEN
-            RAISE_APPLICATION_ERROR(-20311,
-                'Error in parse_reference_json for type ' || p_reference_type || ': ' || SQLERRM);
     END parse_reference_json;
 
 END pkg_parse_references;
 /
 
-SHOW ERRORS
+-- Verify compilation
+DECLARE
+    v_status VARCHAR2(20);
+BEGIN
+    SELECT status INTO v_status
+    FROM user_objects
+    WHERE object_name = 'PKG_PARSE_REFERENCES'
+    AND object_type = 'PACKAGE BODY';
+    
+    IF v_status = 'VALID' THEN
+        DBMS_OUTPUT.PUT_LINE('SUCCESS: PKG_PARSE_REFERENCES fully fixed with all correct JSON paths');
+    ELSE
+        DBMS_OUTPUT.PUT_LINE('ERROR: PKG_PARSE_REFERENCES compilation failed');
+    END IF;
+END;
+/
 
-PROMPT Package PKG_PARSE_REFERENCES created successfully.
+PROMPT
+PROMPT ===============================================================================
+PROMPT ALL JSON paths permanently fixed in PKG_PARSE_REFERENCES:
+PROMPT - PCS: $.getIssuePCSList[*]
+PROMPT - SC: $.getIssueSCList[*]
+PROMPT - VSM: $.getIssueVSMList[*]
+PROMPT - VDS: $.getIssueVDSList[*]
+PROMPT - EDS: $.getIssueEDSList[*]
+PROMPT - MDS: $.getIssueMDSList[*]
+PROMPT - VSK: $.getIssueVSKList[*]
+PROMPT - ESK: $.getIssueESKList[*]
+PROMPT - PIPE_ELEMENT: $.getIssuePipeElementList[*]
+PROMPT ===============================================================================

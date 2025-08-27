@@ -2,13 +2,29 @@
 
 Guidelines for managing task lists in markdown files to track progress on completing the TR2000 ETL System PRD.
 
-## 📊 CURRENT STATUS (Session 10 Complete - 2025-08-26)
+## 📊 CURRENT STATUS (Session 11 Complete - 2025-08-27)
 
 ### Quick Status
-- **Current Task**: Task 7 ready to start (Issue Reference Tables)
-- **Completed**: Tasks 1-6 ✅ (Schema, APEX, Selection, ETL Pipeline, API Client, Testing Framework)
-- **Test Data**: JSP2 (124) and GRANE (34) plants with 20 issues loaded
-- **Next Priority**: Task 7 - Issue Reference Tables implementation
+- **Current Task**: Task 8 ready to start (PCS Details)
+- **Completed**: Tasks 1-7 ✅ (Schema, APEX, Selection, ETL Pipeline, API Client, Testing Framework, Reference Tables)
+- **Test Data**: JSP2 (124) and GRANE (34) plants with 76 PCS references loaded
+- **Next Priority**: Task 8 - PCS Details implementation
+
+### CRITICAL FIX NEEDED (Start of Session 12):
+- **PKG_UPSERT_REFERENCES** has compilation error in PIPE_ELEMENT section
+- File: `/Database/deploy/03_packages/11_pkg_upsert_references.sql`
+- Issue: Uses `element_id` instead of `element_name` (lines 760-817)
+- Fix: Replace all `element_id` with `element_name` to match table structure
+
+### Session 11 Achievements (2025-08-27)
+- ✅ TASK 7 COMPLETE - Reference Tables Implementation
+- ✅ Fixed JSON paths in PKG_PARSE_REFERENCES (all 9 types)
+- ✅ Added reference packages to main deployment scripts
+- ✅ Added triggers to deployment pipeline
+- ✅ Successfully loaded and tested 76 PCS references
+- ✅ Cascade functionality verified working
+- ✅ All fixes merged into main deployment (not incremental)
+- ⚠️ One remaining issue: PKG_UPSERT_REFERENCES compilation error (see above)
 
 ### Session 10 Achievements
 - ✅ Transitioned from Docker to PowerShell direct access (connection strings updated)
@@ -71,6 +87,24 @@ Guidelines for managing task lists in markdown files to track progress on comple
      ```
 3. Mark the **parent task** as completed
 4. Stop after each sub‑task and wait for user's go‑ahead
+
+### 🔴 CRITICAL: Incremental Script Management
+**NEVER leave fixes in incremental scripts for next session!**
+
+When you create an incremental fix script:
+1. **Test it thoroughly** - Ensure the fix works correctly
+2. **IMMEDIATELY merge into master** deployment files:
+   - If fixing a table → Update `01_tables/[appropriate_file].sql`
+   - If fixing a package → Update `03_packages/[appropriate_file].sql`
+   - If fixing a view → Update `02_views/[appropriate_file].sql`
+3. **Archive the incremental** script:
+   - Move to `incremental/archived_merged/`
+   - Rename with `_MERGED` suffix and date
+   - Example: `fix_pipe_element_2025-08-27_MERGED.sql`
+4. **Test the master deployment** to ensure it works
+5. **Document what was merged** in commit message
+
+**Why this matters:** Incremental scripts get forgotten between sessions, causing the same bugs to reappear when deploying from master files. This wastes hours of debugging time!
 
 ### Task List Maintenance
 - **Update tasks-tr2k-etl.md** - Mark tasks [x] when complete

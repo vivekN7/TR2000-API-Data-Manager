@@ -757,8 +757,8 @@ CREATE OR REPLACE PACKAGE BODY pkg_upsert_references AS
         WHERE plant_id = p_plant_id
           AND issue_revision = p_issue_rev
           AND is_valid = 'Y'
-          AND element_id NOT IN (
-              SELECT safe_number_parse(element_id) FROM STG_PIPE_ELEMENT_REFERENCES
+          AND (mds, element_name) NOT IN (
+              SELECT mds, name FROM STG_PIPE_ELEMENT_REFERENCES
               WHERE plant_id = p_plant_id
                 AND issue_revision = p_issue_rev
           );
@@ -770,53 +770,41 @@ CREATE OR REPLACE PACKAGE BODY pkg_upsert_references AS
             SELECT 
                 plant_id,
                 issue_revision,
-                safe_number_parse(element_id) AS element_id,
-                element_group,
-                dimension_standard,
-                product_form,
-                material_grade,
                 mds,
-                mds_revision,
-                area,
+                name AS element_name,
                 revision,
                 safe_date_parse(rev_date) AS rev_date,
                 status,
+                official_revision,
                 delta
             FROM STG_PIPE_ELEMENT_REFERENCES
             WHERE plant_id = p_plant_id
               AND issue_revision = p_issue_rev
-              AND safe_number_parse(element_id) IS NOT NULL
+              AND name IS NOT NULL
         ) src
         ON (tgt.plant_id = src.plant_id 
             AND tgt.issue_revision = src.issue_revision
-            AND tgt.element_id = src.element_id)
+            AND tgt.mds = src.mds
+            AND tgt.element_name = src.element_name)
         WHEN MATCHED THEN
             UPDATE SET
-                element_group = src.element_group,
-                dimension_standard = src.dimension_standard,
-                product_form = src.product_form,
-                material_grade = src.material_grade,
-                mds = src.mds,
-                mds_revision = src.mds_revision,
-                area = src.area,
                 revision = src.revision,
                 rev_date = src.rev_date,
                 status = src.status,
+                official_revision = src.official_revision,
                 delta = src.delta,
                 is_valid = 'Y',
                 last_modified_date = SYSDATE,
                 last_api_sync = SYSTIMESTAMP
         WHEN NOT MATCHED THEN
             INSERT (
-                reference_guid, plant_id, issue_revision, element_id,
-                element_group, dimension_standard, product_form, material_grade,
-                mds, mds_revision, area, revision, rev_date, status, delta,
+                reference_guid, plant_id, issue_revision, mds, element_name,
+                revision, rev_date, status, official_revision, delta,
                 is_valid, created_date, last_modified_date, last_api_sync
             )
             VALUES (
-                SYS_GUID(), src.plant_id, src.issue_revision, src.element_id,
-                src.element_group, src.dimension_standard, src.product_form, src.material_grade,
-                src.mds, src.mds_revision, src.area, src.revision, src.rev_date, src.status, src.delta,
+                SYS_GUID(), src.plant_id, src.issue_revision, src.mds, src.element_name,
+                src.revision, src.rev_date, src.status, src.official_revision, src.delta,
                 'Y', SYSDATE, SYSDATE, SYSTIMESTAMP
             );
         

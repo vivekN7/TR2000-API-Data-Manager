@@ -53,9 +53,15 @@ PROMPT STEP 4: Deploying Procedures
 PROMPT ===============================================================================
 @04_procedures/deploy_all_procedures.sql
 
--- 5. Load Initial Data
+-- 5. Deploy Triggers (CREATE OR REPLACE - safe)
 PROMPT ===============================================================================
-PROMPT STEP 5: Loading Initial Data
+PROMPT STEP 5: Deploying Triggers
+PROMPT ===============================================================================
+@04_triggers/deploy_all_triggers.sql
+
+-- 6. Load Initial Data
+PROMPT ===============================================================================
+PROMPT STEP 6: Loading Initial Data
 PROMPT ===============================================================================
 @05_data/deploy_all_data.sql
 
@@ -78,7 +84,7 @@ PROMPT =========================================================================
 
 SELECT object_type, COUNT(*) as count, status
 FROM user_objects
-WHERE object_type IN ('TABLE', 'VIEW', 'PACKAGE', 'PACKAGE BODY', 'PROCEDURE', 'INDEX')
+WHERE object_type IN ('TABLE', 'VIEW', 'PACKAGE', 'PACKAGE BODY', 'PROCEDURE', 'INDEX', 'TRIGGER')
 GROUP BY object_type, status
 ORDER BY object_type, status;
 

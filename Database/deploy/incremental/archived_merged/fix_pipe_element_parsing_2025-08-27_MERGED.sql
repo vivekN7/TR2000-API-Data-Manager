@@ -1,87 +1,11 @@
 -- ===============================================================================
--- Package: PKG_PARSE_REFERENCES
--- Purpose: Parse JSON responses from issue reference endpoints into staging tables
--- Author: TR2000 ETL Team
--- Date: 2025-08-26
+-- Fix PIPE_ELEMENT JSON Parsing
+-- Date: 2025-08-27  
+-- Issue: JSON has ElementID but parse was looking for Name field
 -- ===============================================================================
 
-CREATE OR REPLACE PACKAGE pkg_parse_references AS
-    -- Parse PCS references JSON
-    PROCEDURE parse_pcs_json(
-        p_raw_json_id IN NUMBER,
-        p_plant_id    IN VARCHAR2,
-        p_issue_rev   IN VARCHAR2
-    );
-    
-    -- Parse SC references JSON
-    PROCEDURE parse_sc_json(
-        p_raw_json_id IN NUMBER,
-        p_plant_id    IN VARCHAR2,
-        p_issue_rev   IN VARCHAR2
-    );
-    
-    -- Parse VSM references JSON
-    PROCEDURE parse_vsm_json(
-        p_raw_json_id IN NUMBER,
-        p_plant_id    IN VARCHAR2,
-        p_issue_rev   IN VARCHAR2
-    );
-    
-    -- Parse VDS references JSON
-    PROCEDURE parse_vds_json(
-        p_raw_json_id IN NUMBER,
-        p_plant_id    IN VARCHAR2,
-        p_issue_rev   IN VARCHAR2
-    );
-    
-    -- Parse EDS references JSON
-    PROCEDURE parse_eds_json(
-        p_raw_json_id IN NUMBER,
-        p_plant_id    IN VARCHAR2,
-        p_issue_rev   IN VARCHAR2
-    );
-    
-    -- Parse MDS references JSON (includes area field)
-    PROCEDURE parse_mds_json(
-        p_raw_json_id IN NUMBER,
-        p_plant_id    IN VARCHAR2,
-        p_issue_rev   IN VARCHAR2
-    );
-    
-    -- Parse VSK references JSON
-    PROCEDURE parse_vsk_json(
-        p_raw_json_id IN NUMBER,
-        p_plant_id    IN VARCHAR2,
-        p_issue_rev   IN VARCHAR2
-    );
-    
-    -- Parse ESK references JSON
-    PROCEDURE parse_esk_json(
-        p_raw_json_id IN NUMBER,
-        p_plant_id    IN VARCHAR2,
-        p_issue_rev   IN VARCHAR2
-    );
-    
-    -- Parse Pipe Element references JSON (many fields)
-    PROCEDURE parse_pipe_element_json(
-        p_raw_json_id IN NUMBER,
-        p_plant_id    IN VARCHAR2,
-        p_issue_rev   IN VARCHAR2
-    );
-    
-    -- Generic parser that routes to appropriate specific parser
-    PROCEDURE parse_reference_json(
-        p_reference_type IN VARCHAR2,
-        p_raw_json_id    IN NUMBER,
-        p_plant_id       IN VARCHAR2,
-        p_issue_rev      IN VARCHAR2
-    );
-    
-END pkg_parse_references;
-/
-
+-- Fix the parse procedure to use ElementID and convert to string
 CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
-
     -- =========================================================================
     -- Parse PCS references JSON
     -- =========================================================================
@@ -106,8 +30,8 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
         -- Parse JSON and insert into staging
         INSERT INTO STG_PCS_REFERENCES (
             plant_id, issue_revision, pcs, revision, rev_date,
-            status, official_revision, revision_suffix,
-            rating_class, material_group, historical_pcs, delta
+            status, official_revision, revision_suffix, rating_class,
+            material_group, historical_pcs, delta
         )
         SELECT 
             p_plant_id,
@@ -125,16 +49,16 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
         FROM JSON_TABLE(
             v_json_content, '$.getIssuePCSList[*]'
             COLUMNS (
-                pcs               VARCHAR2(100) PATH '$.PCS',
-                revision          VARCHAR2(50)  PATH '$.Revision',
-                rev_date          VARCHAR2(50)  PATH '$.RevDate',
-                status            VARCHAR2(50)  PATH '$.Status',
-                official_revision VARCHAR2(50)  PATH '$.OfficialRevision',
-                revision_suffix   VARCHAR2(50)  PATH '$.RevisionSuffix',
-                rating_class      VARCHAR2(100) PATH '$.RatingClass',
-                material_group    VARCHAR2(100) PATH '$.MaterialGroup',
-                historical_pcs    VARCHAR2(100) PATH '$.HistoricalPCS',
-                delta             VARCHAR2(50)  PATH '$.Delta'
+                pcs                VARCHAR2(100) PATH '$.PCS',
+                revision           VARCHAR2(50)  PATH '$.Revision',
+                rev_date           VARCHAR2(50)  PATH '$.RevDate',
+                status             VARCHAR2(50)  PATH '$.Status',
+                official_revision  VARCHAR2(50)  PATH '$.OfficialRevision',
+                revision_suffix    VARCHAR2(50)  PATH '$.RevisionSuffix',
+                rating_class       VARCHAR2(100) PATH '$.RatingClass',
+                material_group     VARCHAR2(100) PATH '$.MaterialGroup',
+                historical_pcs     VARCHAR2(100) PATH '$.HistoricalPCS',
+                delta              VARCHAR2(50)  PATH '$.Delta'
             )
         ) jt;
         
@@ -182,12 +106,12 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
         FROM JSON_TABLE(
             v_json_content, '$.getIssueSCList[*]'
             COLUMNS (
-                sc                VARCHAR2(100) PATH '$.SC',
-                revision          VARCHAR2(50)  PATH '$.Revision',
-                rev_date          VARCHAR2(50)  PATH '$.RevDate',
-                status            VARCHAR2(50)  PATH '$.Status',
-                official_revision VARCHAR2(50)  PATH '$.OfficialRevision',
-                delta             VARCHAR2(50)  PATH '$.Delta'
+                sc                 VARCHAR2(100) PATH '$.SC',
+                revision           VARCHAR2(50)  PATH '$.Revision',
+                rev_date           VARCHAR2(50)  PATH '$.RevDate',
+                status             VARCHAR2(50)  PATH '$.Status',
+                official_revision  VARCHAR2(50)  PATH '$.OfficialRevision',
+                delta              VARCHAR2(50)  PATH '$.Delta'
             )
         ) jt;
         
@@ -235,12 +159,12 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
         FROM JSON_TABLE(
             v_json_content, '$.getIssueVSMList[*]'
             COLUMNS (
-                vsm               VARCHAR2(100) PATH '$.VSM',
-                revision          VARCHAR2(50)  PATH '$.Revision',
-                rev_date          VARCHAR2(50)  PATH '$.RevDate',
-                status            VARCHAR2(50)  PATH '$.Status',
-                official_revision VARCHAR2(50)  PATH '$.OfficialRevision',
-                delta             VARCHAR2(50)  PATH '$.Delta'
+                vsm                VARCHAR2(100) PATH '$.VSM',
+                revision           VARCHAR2(50)  PATH '$.Revision',
+                rev_date           VARCHAR2(50)  PATH '$.RevDate',
+                status             VARCHAR2(50)  PATH '$.Status',
+                official_revision  VARCHAR2(50)  PATH '$.OfficialRevision',
+                delta              VARCHAR2(50)  PATH '$.Delta'
             )
         ) jt;
         
@@ -274,7 +198,8 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
         
         INSERT INTO STG_VDS_REFERENCES (
             plant_id, issue_revision, vds, revision, rev_date,
-            status, official_revision, delta
+            status, official_revision, rating_class, material_group,
+            bolt_material, gasket_type, delta
         )
         SELECT 
             p_plant_id,
@@ -284,16 +209,24 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
             jt.rev_date,
             jt.status,
             jt.official_revision,
+            jt.rating_class,
+            jt.material_group,
+            jt.bolt_material,
+            jt.gasket_type,
             jt.delta
         FROM JSON_TABLE(
             v_json_content, '$.getIssueVDSList[*]'
             COLUMNS (
-                vds               VARCHAR2(100) PATH '$.VDS',
-                revision          VARCHAR2(50)  PATH '$.Revision',
-                rev_date          VARCHAR2(50)  PATH '$.RevDate',
-                status            VARCHAR2(50)  PATH '$.Status',
-                official_revision VARCHAR2(50)  PATH '$.OfficialRevision',
-                delta             VARCHAR2(50)  PATH '$.Delta'
+                vds                VARCHAR2(100) PATH '$.VDS',
+                revision           VARCHAR2(50)  PATH '$.Revision',
+                rev_date           VARCHAR2(50)  PATH '$.RevDate',
+                status             VARCHAR2(50)  PATH '$.Status',
+                official_revision  VARCHAR2(50)  PATH '$.OfficialRevision',
+                rating_class       VARCHAR2(100) PATH '$.RatingClass',
+                material_group     VARCHAR2(100) PATH '$.MaterialGroup',
+                bolt_material      VARCHAR2(100) PATH '$.BoltMaterial',
+                gasket_type        VARCHAR2(100) PATH '$.GasketType',
+                delta              VARCHAR2(50)  PATH '$.Delta'
             )
         ) jt;
         
@@ -341,12 +274,12 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
         FROM JSON_TABLE(
             v_json_content, '$.getIssueEDSList[*]'
             COLUMNS (
-                eds               VARCHAR2(100) PATH '$.EDS',
-                revision          VARCHAR2(50)  PATH '$.Revision',
-                rev_date          VARCHAR2(50)  PATH '$.RevDate',
-                status            VARCHAR2(50)  PATH '$.Status',
-                official_revision VARCHAR2(50)  PATH '$.OfficialRevision',
-                delta             VARCHAR2(50)  PATH '$.Delta'
+                eds                VARCHAR2(100) PATH '$.EDS',
+                revision           VARCHAR2(50)  PATH '$.Revision',
+                rev_date           VARCHAR2(50)  PATH '$.RevDate',
+                status             VARCHAR2(50)  PATH '$.Status',
+                official_revision  VARCHAR2(50)  PATH '$.OfficialRevision',
+                delta              VARCHAR2(50)  PATH '$.Delta'
             )
         ) jt;
         
@@ -360,7 +293,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
     END parse_eds_json;
 
     -- =========================================================================
-    -- Parse MDS references JSON (includes area field)
+    -- Parse MDS references JSON
     -- =========================================================================
     PROCEDURE parse_mds_json(
         p_raw_json_id IN NUMBER,
@@ -379,29 +312,33 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
           AND issue_revision = p_issue_rev;
         
         INSERT INTO STG_MDS_REFERENCES (
-            plant_id, issue_revision, mds, revision, area,
-            rev_date, status, official_revision, delta
+            plant_id, issue_revision, mds, area, revision, rev_date,
+            status, official_revision, rating_class, material_group, delta
         )
         SELECT 
             p_plant_id,
             p_issue_rev,
             jt.mds,
-            jt.revision,
             jt.area,
+            jt.revision,
             jt.rev_date,
             jt.status,
             jt.official_revision,
+            jt.rating_class,
+            jt.material_group,
             jt.delta
         FROM JSON_TABLE(
             v_json_content, '$.getIssueMDSList[*]'
             COLUMNS (
-                mds               VARCHAR2(100) PATH '$.MDS',
-                revision          VARCHAR2(50)  PATH '$.Revision',
-                area              VARCHAR2(100) PATH '$.Area',
-                rev_date          VARCHAR2(50)  PATH '$.RevDate',
-                status            VARCHAR2(50)  PATH '$.Status',
-                official_revision VARCHAR2(50)  PATH '$.OfficialRevision',
-                delta             VARCHAR2(50)  PATH '$.Delta'
+                mds                VARCHAR2(100) PATH '$.MDS',
+                area               VARCHAR2(100) PATH '$.Area',
+                revision           VARCHAR2(50)  PATH '$.Revision',
+                rev_date           VARCHAR2(50)  PATH '$.RevDate',
+                status             VARCHAR2(50)  PATH '$.Status',
+                official_revision  VARCHAR2(50)  PATH '$.OfficialRevision',
+                rating_class       VARCHAR2(100) PATH '$.RatingClass',
+                material_group     VARCHAR2(100) PATH '$.MaterialGroup',
+                delta              VARCHAR2(50)  PATH '$.Delta'
             )
         ) jt;
         
@@ -449,12 +386,12 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
         FROM JSON_TABLE(
             v_json_content, '$.getIssueVSKList[*]'
             COLUMNS (
-                vsk               VARCHAR2(100) PATH '$.VSK',
-                revision          VARCHAR2(50)  PATH '$.Revision',
-                rev_date          VARCHAR2(50)  PATH '$.RevDate',
-                status            VARCHAR2(50)  PATH '$.Status',
-                official_revision VARCHAR2(50)  PATH '$.OfficialRevision',
-                delta             VARCHAR2(50)  PATH '$.Delta'
+                vsk                VARCHAR2(100) PATH '$.VSK',
+                revision           VARCHAR2(50)  PATH '$.Revision',
+                rev_date           VARCHAR2(50)  PATH '$.RevDate',
+                status             VARCHAR2(50)  PATH '$.Status',
+                official_revision  VARCHAR2(50)  PATH '$.OfficialRevision',
+                delta              VARCHAR2(50)  PATH '$.Delta'
             )
         ) jt;
         
@@ -502,12 +439,12 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
         FROM JSON_TABLE(
             v_json_content, '$.getIssueESKList[*]'
             COLUMNS (
-                esk               VARCHAR2(100) PATH '$.ESK',
-                revision          VARCHAR2(50)  PATH '$.Revision',
-                rev_date          VARCHAR2(50)  PATH '$.RevDate',
-                status            VARCHAR2(50)  PATH '$.Status',
-                official_revision VARCHAR2(50)  PATH '$.OfficialRevision',
-                delta             VARCHAR2(50)  PATH '$.Delta'
+                esk                VARCHAR2(100) PATH '$.ESK',
+                revision           VARCHAR2(50)  PATH '$.Revision',
+                rev_date           VARCHAR2(50)  PATH '$.RevDate',
+                status             VARCHAR2(50)  PATH '$.Status',
+                official_revision  VARCHAR2(50)  PATH '$.OfficialRevision',
+                delta              VARCHAR2(50)  PATH '$.Delta'
             )
         ) jt;
         
@@ -521,7 +458,8 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
     END parse_esk_json;
 
     -- =========================================================================
-    -- Parse Pipe Element references JSON (many fields)
+    -- Parse PIPE ELEMENT references JSON
+    -- FIXED: Changed from $.Name to $.ElementID and convert to string
     -- =========================================================================
     PROCEDURE parse_pipe_element_json(
         p_raw_json_id IN NUMBER,
@@ -547,7 +485,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
             p_plant_id,
             p_issue_rev,
             jt.mds,
-            TO_CHAR(jt.element_id), -- Convert ElementID number to string for name
+            TO_CHAR(jt.element_id), -- Convert ElementID number to string
             jt.revision,
             jt.rev_date,
             jt.status,
@@ -575,7 +513,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
     END parse_pipe_element_json;
 
     -- =========================================================================
-    -- Generic parser that routes to appropriate specific parser
+    -- Generic parser routing procedure
     -- =========================================================================
     PROCEDURE parse_reference_json(
         p_reference_type IN VARCHAR2,
@@ -612,10 +550,43 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
             RAISE_APPLICATION_ERROR(-20311,
                 'Error in parse_reference_json for type ' || p_reference_type || ': ' || SQLERRM);
     END parse_reference_json;
-
 END pkg_parse_references;
 /
 
 SHOW ERRORS
 
-PROMPT Package PKG_PARSE_REFERENCES created successfully.
+-- Test the fix
+PROMPT Testing PIPE_ELEMENT parsing fix...
+SET SERVEROUTPUT ON
+DECLARE
+    v_count NUMBER;
+BEGIN
+    -- Clear staging
+    DELETE FROM STG_PIPE_ELEMENT_REFERENCES;
+    
+    -- Re-parse existing JSON
+    FOR rec IN (SELECT raw_json_id, plant_id, issue_rev
+                FROM RAW_JSON 
+                WHERE endpoint_key = 'pipe_element_references'
+                AND ROWNUM = 1) LOOP
+        PKG_PARSE_REFERENCES.parse_pipe_element_json(rec.raw_json_id, rec.plant_id, rec.issue_rev);
+    END LOOP;
+    
+    -- Check if name is now populated
+    SELECT COUNT(*), COUNT(name) 
+    INTO v_count, v_count
+    FROM STG_PIPE_ELEMENT_REFERENCES;
+    
+    DBMS_OUTPUT.PUT_LINE('Total staging records: ' || v_count);
+    
+    -- Show sample
+    FOR rec IN (SELECT mds, name, revision, status
+                FROM STG_PIPE_ELEMENT_REFERENCES
+                WHERE ROWNUM <= 3) LOOP
+        DBMS_OUTPUT.PUT_LINE('MDS: ' || rec.mds || ', Name: ' || rec.name || 
+                           ', Rev: ' || rec.revision || ', Status: ' || rec.status);
+    END LOOP;
+END;
+/
+
+PROMPT Fix applied. Now run upsert to load into final table.

@@ -26,12 +26,33 @@ WHEN NOT MATCHED THEN
             2, 'Y', 'PKG_PARSE_ISSUES', 'PARSE_ISSUES_JSON', 
             'PKG_UPSERT_ISSUES', 'UPSERT_ISSUES');
 
--- Future endpoints (commented out until implementation)
--- INSERT INTO CONTROL_ENDPOINTS (endpoint_key, endpoint_url, endpoint_type, parent_endpoint, processing_order, requires_selection)
--- VALUES ('pcs_references', 'issues/{issue_id}/pcs', 'REFERENCE', 'issues', 3, 'Y');
+-- Reference endpoints (Task 7)
+INSERT INTO CONTROL_ENDPOINTS (endpoint_key, endpoint_url, endpoint_type, parent_endpoint, processing_order, is_active, requires_selection)
+VALUES ('pcs_references', 'plants/{plantid}/issues/rev/{issuerev}/pcs', 'REFERENCE', 'issues', 3, 'Y', 'Y');
 
--- INSERT INTO CONTROL_ENDPOINTS (endpoint_key, endpoint_url, endpoint_type, parent_endpoint, processing_order, requires_selection)
--- VALUES ('vds_references', 'issues/{issue_id}/vds', 'REFERENCE', 'issues', 4, 'Y');
+INSERT INTO CONTROL_ENDPOINTS (endpoint_key, endpoint_url, endpoint_type, parent_endpoint, processing_order, is_active, requires_selection)
+VALUES ('sc_references', 'plants/{plantid}/issues/rev/{issuerev}/sc', 'REFERENCE', 'issues', 4, 'Y', 'Y');
+
+INSERT INTO CONTROL_ENDPOINTS (endpoint_key, endpoint_url, endpoint_type, parent_endpoint, processing_order, is_active, requires_selection)
+VALUES ('vsm_references', 'plants/{plantid}/issues/rev/{issuerev}/vsm', 'REFERENCE', 'issues', 5, 'Y', 'Y');
+
+INSERT INTO CONTROL_ENDPOINTS (endpoint_key, endpoint_url, endpoint_type, parent_endpoint, processing_order, is_active, requires_selection)
+VALUES ('vds_references', 'plants/{plantid}/issues/rev/{issuerev}/vds', 'REFERENCE', 'issues', 6, 'Y', 'Y');
+
+INSERT INTO CONTROL_ENDPOINTS (endpoint_key, endpoint_url, endpoint_type, parent_endpoint, processing_order, is_active, requires_selection)
+VALUES ('eds_references', 'plants/{plantid}/issues/rev/{issuerev}/eds', 'REFERENCE', 'issues', 7, 'Y', 'Y');
+
+INSERT INTO CONTROL_ENDPOINTS (endpoint_key, endpoint_url, endpoint_type, parent_endpoint, processing_order, is_active, requires_selection)
+VALUES ('mds_references', 'plants/{plantid}/issues/rev/{issuerev}/mds', 'REFERENCE', 'issues', 8, 'Y', 'Y');
+
+INSERT INTO CONTROL_ENDPOINTS (endpoint_key, endpoint_url, endpoint_type, parent_endpoint, processing_order, is_active, requires_selection)
+VALUES ('vsk_references', 'plants/{plantid}/issues/rev/{issuerev}/vsk', 'REFERENCE', 'issues', 9, 'Y', 'Y');
+
+INSERT INTO CONTROL_ENDPOINTS (endpoint_key, endpoint_url, endpoint_type, parent_endpoint, processing_order, is_active, requires_selection)
+VALUES ('esk_references', 'plants/{plantid}/issues/rev/{issuerev}/esk', 'REFERENCE', 'issues', 10, 'Y', 'Y');
+
+INSERT INTO CONTROL_ENDPOINTS (endpoint_key, endpoint_url, endpoint_type, parent_endpoint, processing_order, is_active, requires_selection)
+VALUES ('pipe_element_references', 'plants/{plantid}/issues/rev/{issuerev}/pipe-elements', 'REFERENCE', 'issues', 11, 'Y', 'Y');
 
 COMMIT;
 

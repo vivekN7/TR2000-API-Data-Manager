@@ -23,6 +23,10 @@ PROMPT Creating test infrastructure tables...
 PROMPT Creating PKG_SIMPLE_TESTS package...
 @02_pkg_simple_tests.sql
 
+-- Step 3: Create comprehensive reference tests
+PROMPT Creating PKG_REFERENCE_COMPREHENSIVE_TESTS package...
+@04_reference_comprehensive_tests.sql
+
 PROMPT
 PROMPT ============================================================================
 PROMPT Testing Framework Deployment Complete

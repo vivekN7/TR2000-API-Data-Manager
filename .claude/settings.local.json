@@ -1,8 +1,13 @@
 {
-  "outputStyle": "default",
   "permissions": {
     "allow": [
-      "Bash(sqlplus:*)"
+      "Bash(sqlplus:*)",
+      "Bash(for file in fix*.sql create*.sql)",
+      "Bash(do if [ -f \"$file\" ])",
+      "Bash(then mv \"$file\" \"archived_merged/$file%.sql_MERGED.sql\")",
+      "Bash(fi)",
+      "Bash(done)"
     ]
-  }
+  },
+  "outputStyle": "default"
 }

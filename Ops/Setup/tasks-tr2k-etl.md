@@ -143,3 +143,27 @@
   - [ ] 12.3 Add job monitoring page in APEX
   - [ ] 12.4 Implement email notifications on failure (optional)
   - [ ] 12.5 Schedule PKG_SIMPLE_TESTS.run_critical_tests before each ETL run
+
+- [ ] 13.0 Performance Optimization Phase [AFTER CORE COMPLETE]
+  - [ ] 13.1 Implement full CONTROL_ENDPOINT_STATE tracking
+  - [ ] 13.2 Add HTTP HEAD request support for change detection
+  - [ ] 13.3 Implement exponential backoff for failed endpoints
+  - [ ] 13.4 Track "unchanged count" for adaptive checking frequency
+  - [ ] 13.5 Add time-of-day logic (business hours vs off-hours)
+  - [ ] 13.6 Implement batch processing for multiple plants
+  - [ ] 13.7 Add parallel processing for reference types
+  - [ ] 13.8 Optimize hash comparisons with checksums
+  - [ ] 13.9 Add API call metrics and reporting
+  - [ ] 13.10 Performance testing with large datasets
+
+- [ ] 14.0 Cleanup & Documentation Phase
+  - [ ] 14.1 Review and remove unused tables (or document future use)
+    - CONTROL_ENDPOINT_STATE (decide: implement or remove)
+    - EXTERNAL_SYSTEM_REFS (keep for future integrations?)
+    - TEMP_TEST_DATA (remove or use for mock testing?)
+  - [ ] 14.2 Complete API documentation
+  - [ ] 14.3 Create operations runbook
+  - [ ] 14.4 Document troubleshooting procedures
+  - [ ] 14.5 Create data dictionary for all tables
+  - [ ] 14.6 Archive all incremental scripts
+  - [ ] 14.7 Final code review and cleanup

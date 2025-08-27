@@ -23,13 +23,28 @@ That's it! Everything you need is in those two files:
 - 📋 Next: Run full_test_run_plan_2025-08-27.md, then Task 8 - PCS Details
 
 ## Important for Next Session
-1. **Run full test**: Execute `full_test_run_plan_2025-08-27.md` first
+
+### ⚠️ MINOR FIXES NEEDED BEFORE FULL TEST:
+1. **8 invalid database objects** - All reference old SELECTION_LOADER table
+   - PKG_API_CLIENT body (line 336-344)
+   - PKG_API_CLIENT_REFERENCES body 
+   - PKG_SIMPLE_TESTS body
+   - PKG_TEST_ISOLATION body (already fixed in file, needs recompile)
+   - TRG_ISSUES_TO_SELECTION (obsolete - can drop)
+   - TRG_PLANTS_TO_SELECTION (obsolete - can drop)
+   - VETL_EFFECTIVE_SELECTIONS view (obsolete - can drop)
+   - V_ACTIVE_PLANT_SELECTIONS view (obsolete - can drop)
+   
+2. **Quick fix**: Drop the obsolete triggers/views, update package bodies to use SELECTED_ISSUES
+
+### After fixes complete:
+1. **Run full test**: Execute `full_test_run_plan_2025-08-27.md`
 2. **Two-table design**: SELECTION_LOADER replaced with SELECTED_PLANTS and SELECTED_ISSUES
-3. **Unused tables discussion needed**:
+3. **Throttling added**: 5-minute cache prevents redundant API calls
+4. **Unused tables discussion needed**:
    - CONTROL_ENDPOINT_STATE (0 records) - for retry logic?
    - EXTERNAL_SYSTEM_REFS (0 records) - for future integrations?
    - TEMP_TEST_DATA (0 records) - for mock testing?
-4. **All incremental scripts merged** - master deployment files are up to date
 
 ## Quick Connection Test
 ```sql

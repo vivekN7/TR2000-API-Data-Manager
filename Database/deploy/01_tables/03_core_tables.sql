@@ -160,6 +160,10 @@ CREATE TABLE SELECTED_ISSUES (
     issue_guid          RAW(16),
     reference_count     NUMBER DEFAULT 0,
     api_correlation_id  VARCHAR2(36),
+    -- Throttling columns to prevent excessive API calls
+    last_ref_refresh_all TIMESTAMP,     -- When all references were last refreshed
+    last_ref_refresh_pcs TIMESTAMP,     -- When PCS specifically was refreshed
+    refresh_count       NUMBER DEFAULT 0, -- How many times refreshed today
     CONSTRAINT PK_SELECTED_ISSUES PRIMARY KEY (plant_id, issue_revision),
     CONSTRAINT CHK_SEL_ISSUE_ACTIVE CHECK (is_active IN ('Y', 'N')),
     CONSTRAINT FK_SEL_ISSUE_PLANT FOREIGN KEY (plant_id) REFERENCES SELECTED_PLANTS(plant_id),

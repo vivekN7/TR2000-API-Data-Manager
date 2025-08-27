@@ -120,7 +120,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_SIMPLE_TESTS AS
     BEGIN
         v_start_time := SYSTIMESTAMP;
         
-        -- Create test JSON with various date formats
+        -- Create test JSON with various date formats (using TEST_ prefix)
         v_test_json := '{
             "getIssueList": [
                 {"issue_id": "TEST_001", "created_date": "24.08.2025"},
@@ -130,7 +130,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_SIMPLE_TESTS AS
             ]
         }';
         
-        -- Insert test data
+        -- Insert test data (using TEST_ prefix for isolation)
         INSERT INTO RAW_JSON (response_hash, response_json, endpoint_key, plant_id)
         VALUES ('TEST_HASH_PARSE', v_test_json, 'TEST_PARSE', 'TEST_PLANT_PARSE');
         

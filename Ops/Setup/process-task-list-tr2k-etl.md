@@ -61,6 +61,13 @@ Guidelines for managing task lists in markdown files to track progress on comple
 - **Zero tolerance for data loss** - Use soft deletes (is_valid='N')
 - **NEVER use UTL_HTTP** - Only use APEX_WEB_SERVICE for all HTTP/HTTPS calls
 
+### Test Data Isolation Rules
+- **ALL test data MUST use 'TEST_' prefix** for plant_id or issue_revision
+- **NEVER mix test data with real data** - causes cascade contamination
+- **Clean test data regularly**: `EXEC PKG_TEST_ISOLATION.clean_all_test_data;`
+- **When in doubt, refresh from API**: `EXEC refresh_all_data_from_api;`
+- **Check for contamination**: `EXEC PKG_TEST_ISOLATION.validate_no_test_contamination;`
+
 ### Temporary Objects
 - **Prefix with TEMP_**: Any temporary tables/views (e.g., TEMP_DEBUG_LOG)
 - **Clean up before commit**: Remove all TEMP_ objects

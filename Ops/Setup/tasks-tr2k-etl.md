@@ -86,18 +86,18 @@
   - [x] 7.10 Test with JSP2 and GRANE selected issues
   - [x] 7.11 Extend PKG_SIMPLE_TESTS with reference tests
 
-- [ ] 8.0 Build ETL Backend for PCS Details (Section 3 of API) 🎯 IN PROGRESS
+- [x] 8.0 Build ETL Backend for PCS Details (Section 3 of API) ✅ COMPLETE
   - [x] 8.1 Review API doc Section 3: 7 PCS detail endpoints (6 detail types identified)
   - [x] 8.2 Create tables for Header, Temp/Pressure, Pipe Sizes, Pipe Elements, Valve Elements, Embedded Notes
   - [x] 8.3 Build pkg_parse_pcs_details for JSON parsing
   - [x] 8.4 Build pkg_upsert_pcs_details with FK to PCS_REFERENCES
   - [x] 8.5 Add PCS detail endpoints to CONTROL_ENDPOINTS  
-  - [ ] 8.6 Extend pkg_api_client with fetch_pcs_details
-  - [ ] 8.7 Add parameter support for different PCS detail types
-  - [ ] 8.8 Add to pkg_etl_operations workflow
-  - [ ] 8.9 Create monitoring views for PCS data
-  - [ ] 8.10 Test cascade: PCS reference removal should invalidate details
-  - [ ] 8.11 Add PCS tests to PKG_SIMPLE_TESTS
+  - [x] 8.6 Extend pkg_api_client with fetch_pcs_details (pkg_api_client_pcs_details created)
+  - [x] 8.7 Add parameter support for different PCS detail types (6 types supported)
+  - [x] 8.8 Add to pkg_etl_operations workflow (Step 4 in run_full_etl)
+  - [x] 8.9 Create monitoring views for PCS data (7 views created)
+  - [x] 8.10 Test cascade: PCS reference removal should invalidate details (trigger created)
+  - [x] 8.11 Add PCS tests to PKG_SIMPLE_TESTS (test script created)
 
 - [ ] 9.0 Build ETL Backend for VDS Details (Section 4 of API)
   - [ ] 9.1 Review Section 4: Large dataset (44,000+ records)

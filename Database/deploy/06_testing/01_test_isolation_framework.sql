@@ -156,12 +156,19 @@ CREATE OR REPLACE PACKAGE BODY PKG_TEST_ISOLATION AS
         
         DELETE FROM STG_PLANTS WHERE plant_id LIKE c_test_plant_prefix || '%';
         
-        -- Clean selection loader
-        DELETE FROM SELECTION_LOADER WHERE plant_id LIKE c_test_plant_prefix || '%';
+        -- Clean selected plants and issues
+        DELETE FROM SELECTED_ISSUES WHERE plant_id LIKE c_test_plant_prefix || '%';
         v_count := SQL%ROWCOUNT;
-        v_total_deleted := v_total_deleted + v_count;
         IF v_count > 0 THEN
-            DBMS_OUTPUT.PUT_LINE('Deleted ' || v_count || ' test records from SELECTION_LOADER');
+            DBMS_OUTPUT.PUT_LINE('Deleted ' || v_count || ' test records from SELECTED_ISSUES');
+            v_total_deleted := v_total_deleted + v_count;
+        END IF;
+        
+        DELETE FROM SELECTED_PLANTS WHERE plant_id LIKE c_test_plant_prefix || '%';
+        v_count := SQL%ROWCOUNT;
+        IF v_count > 0 THEN
+            DBMS_OUTPUT.PUT_LINE('Deleted ' || v_count || ' test records from SELECTED_PLANTS');
+            v_total_deleted := v_total_deleted + v_count;
         END IF;
         
         -- Clean raw JSON
@@ -298,7 +305,7 @@ BEGIN
     -- Step 3: Process selected issues
     DBMS_OUTPUT.PUT_LINE('Step 3: Processing selected issues...');
     FOR rec IN (SELECT plant_id, issue_revision
-                FROM SELECTION_LOADER
+                FROM SELECTED_ISSUES
                 WHERE is_active = 'Y') LOOP
         DBMS_OUTPUT.PUT_LINE('  Processing ' || rec.plant_id || '/' || rec.issue_revision);
         

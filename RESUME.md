@@ -41,7 +41,13 @@ That's it! Everything you need is in those two files:
 1. **Run full test**: Execute `full_test_run_plan_2025-08-27.md`
 2. **Two-table design**: SELECTION_LOADER replaced with SELECTED_PLANTS and SELECTED_ISSUES
 3. **Throttling added**: 5-minute cache prevents redundant API calls
-4. **Unused tables discussion needed**:
+4. **API Proxy Pattern added**: 
+   - Created API_PROXY user with centralized ACL rights
+   - PKG_API_SERVICE handles all API calls
+   - TR2000_STAGING no longer needs direct ACL privileges
+   - Run setup: `@00_users/01_create_api_proxy_user.sql` and `@00_users/02_api_proxy_package.sql`
+   - Test with: `@test_api_proxy_setup.sql`
+5. **Unused tables discussion needed**:
    - CONTROL_ENDPOINT_STATE (0 records) - for retry logic?
    - EXTERNAL_SYSTEM_REFS (0 records) - for future integrations?
    - TEMP_TEST_DATA (0 records) - for mock testing?

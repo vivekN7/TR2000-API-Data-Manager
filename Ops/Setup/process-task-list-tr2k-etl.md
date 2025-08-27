@@ -2,19 +2,26 @@
 
 Guidelines for managing task lists in markdown files to track progress on completing the TR2000 ETL System PRD.
 
-## 📊 CURRENT STATUS (Session 11 Complete - 2025-08-27)
+## 📊 CURRENT STATUS (Session 12 Complete - 2025-08-27)
 
 ### Quick Status
-- **Current Task**: Task 8 ready to start (PCS Details)
-- **Completed**: Tasks 1-7 ✅ (Schema, APEX, Selection, ETL Pipeline, API Client, Testing Framework, Reference Tables)
-- **Test Data**: JSP2 (124) and GRANE (34) plants with 76 PCS references loaded
-- **Next Priority**: Task 8 - PCS Details implementation
+- **Current Task**: Run full test (see full_test_run_plan_2025-08-27.md), then Task 8
+- **Completed**: Tasks 1-7 ✅ (All reference tables working, 1,360 records loaded)
+- **Major Changes**: Two-table selection design (SELECTED_PLANTS, SELECTED_ISSUES)
+- **Next Priority**: Full system test, then Task 8 - PCS Details
 
-### CRITICAL FIX NEEDED (Start of Session 12):
-- **PKG_UPSERT_REFERENCES** has compilation error in PIPE_ELEMENT section
-- File: `/Database/deploy/03_packages/11_pkg_upsert_references.sql`
-- Issue: Uses `element_id` instead of `element_name` (lines 760-817)
-- Fix: Replace all `element_id` with `element_name` to match table structure
+### Session 12 Achievements (2025-08-27)
+- ✅ Fixed all Task 7 compilation errors (element_name issue resolved)
+- ✅ Implemented two-table selection design (replaced SELECTION_LOADER)
+- ✅ Created test isolation framework (TEST_ prefix requirement)
+- ✅ All 9 reference types loading correctly
+- ✅ Cascade functionality working perfectly
+- ✅ All fixes merged into master deployment files
+
+### Tables Needing Discussion
+- **CONTROL_ENDPOINT_STATE**: Not used (0 records) - keep for retry logic?
+- **EXTERNAL_SYSTEM_REFS**: Not used (0 records) - keep for future integrations?
+- **TEMP_TEST_DATA**: Not used (0 records) - useful for mock testing?
 
 ### Session 11 Achievements (2025-08-27)
 - ✅ TASK 7 COMPLETE - Reference Tables Implementation

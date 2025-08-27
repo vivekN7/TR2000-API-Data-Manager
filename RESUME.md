@@ -18,7 +18,18 @@ That's it! Everything you need is in those two files:
 - ✅ All fixes merged into master deployment files
 - ✅ PKG_UPSERT_REFERENCES compilation fixed (element_name issue)
 - ✅ PKG_PARSE_REFERENCES fixed (ElementID parsing for PIPE_ELEMENT)
-- 📋 Next: Task 8 - PCS Details
+- ✅ Two-table selection design implemented (SELECTED_PLANTS, SELECTED_ISSUES)
+- ✅ Test isolation framework created (TEST_ prefix requirement)
+- 📋 Next: Run full_test_run_plan_2025-08-27.md, then Task 8 - PCS Details
+
+## Important for Next Session
+1. **Run full test**: Execute `full_test_run_plan_2025-08-27.md` first
+2. **Two-table design**: SELECTION_LOADER replaced with SELECTED_PLANTS and SELECTED_ISSUES
+3. **Unused tables discussion needed**:
+   - CONTROL_ENDPOINT_STATE (0 records) - for retry logic?
+   - EXTERNAL_SYSTEM_REFS (0 records) - for future integrations?
+   - TEMP_TEST_DATA (0 records) - for mock testing?
+4. **All incremental scripts merged** - master deployment files are up to date
 
 ## Quick Connection Test
 ```sql

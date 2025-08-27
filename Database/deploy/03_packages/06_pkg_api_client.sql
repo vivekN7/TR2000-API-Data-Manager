@@ -101,13 +101,12 @@ CREATE OR REPLACE PACKAGE BODY pkg_api_client AS
         );
         
         BEGIN
-            -- Make the actual API call
+            -- Make the actual API call using TR2000_UTIL proxy
             l_url := get_base_url() || '/plants';
-            l_response := APEX_WEB_SERVICE.make_rest_request(
+            l_response := make_api_request_util(
                 p_url => l_url,
-                p_http_method => 'GET',
-                p_wallet_path => 'file:C:\app\vivek\product\21c\dbhomeXE\network\admin\wallet',
-                p_wallet_pwd => 'WalletPass123'
+                p_method => 'GET',
+                p_correlation_id => l_correlation_id
             );
             
             -- Log success
@@ -173,11 +172,10 @@ CREATE OR REPLACE PACKAGE BODY pkg_api_client AS
         
         BEGIN
             l_url := get_base_url() || '/plants/' || p_plant_id || '/issues';
-            l_response := APEX_WEB_SERVICE.make_rest_request(
+            l_response := make_api_request_util(
                 p_url => l_url,
-                p_http_method => 'GET',
-                p_wallet_path => 'file:C:\app\vivek\product\21c\dbhomeXE\network\admin\wallet',
-                p_wallet_pwd => 'WalletPass123'
+                p_method => 'GET',
+                p_correlation_id => l_correlation_id
             );
             
             PKG_GUID_UTILS.update_api_response(
@@ -266,15 +264,13 @@ CREATE OR REPLACE PACKAGE BODY pkg_api_client AS
         -- Store in RAW_JSON with correlation
         IF NOT pkg_raw_ingest.is_duplicate_hash(l_hash) THEN
             INSERT INTO RAW_JSON (
-                endpoint_key,
-                api_url,
-                response_json,
-                response_hash,
-                correlation_id,
+                endpoint,
+                payload,
+                key_fingerprint,
+                batch_id,
                 transaction_guid
             ) VALUES (
                 'plants',
-                get_base_url() || '/plants',
                 l_json,
                 l_hash,
                 l_correlation_id,
@@ -331,16 +327,14 @@ CREATE OR REPLACE PACKAGE BODY pkg_api_client AS
         
         IF NOT pkg_raw_ingest.is_duplicate_hash(l_hash) THEN
             INSERT INTO RAW_JSON (
-                endpoint_key,
-                api_url,
-                response_json,
-                response_hash,
+                endpoint,
+                payload,
+                key_fingerprint,
                 plant_id,
-                correlation_id,
+                batch_id,
                 transaction_guid
             ) VALUES (
                 'issues',
-                get_base_url() || '/plants/' || p_plant_id || '/issues',
                 l_json,
                 l_hash,
                 p_plant_id,
@@ -386,7 +380,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_api_client AS
         
         FOR plant_rec IN (
             SELECT DISTINCT plant_id 
-            FROM SELECTION_LOADER 
+            FROM SELECTED_PLANTS 
             WHERE is_active = 'Y'
         ) LOOP
             l_plant_count := l_plant_count + 1;

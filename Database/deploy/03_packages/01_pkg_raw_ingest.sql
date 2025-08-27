@@ -23,19 +23,18 @@ CREATE OR REPLACE PACKAGE pkg_raw_ingest AS
 
     -- Insert new API response into RAW_JSON
     PROCEDURE insert_raw_json(
-        p_endpoint_key VARCHAR2,
+        p_endpoint VARCHAR2,
         p_plant_id VARCHAR2 DEFAULT NULL,
         p_issue_revision VARCHAR2 DEFAULT NULL,
-        p_api_url VARCHAR2,
-        p_response_json CLOB,
-        p_response_hash VARCHAR2,
+        p_payload CLOB,
+        p_key_fingerprint VARCHAR2,
         p_raw_json_id OUT NUMBER
     );
 
     -- Purge old responses based on retention policy
     PROCEDURE purge_old_responses(
         p_days_to_keep NUMBER DEFAULT 30,
-        p_endpoint_key VARCHAR2 DEFAULT NULL
+        p_endpoint VARCHAR2 DEFAULT NULL
     );
 
 END pkg_raw_ingest;
@@ -49,37 +48,34 @@ CREATE OR REPLACE PACKAGE BODY pkg_raw_ingest AS
     BEGIN
         SELECT COUNT(*) INTO v_count
         FROM RAW_JSON
-        WHERE response_hash = p_hash;
+        WHERE key_fingerprint = p_hash;
         
         RETURN (v_count > 0);
     END is_duplicate_hash;
 
     PROCEDURE insert_raw_json(
-        p_endpoint_key VARCHAR2,
+        p_endpoint VARCHAR2,
         p_plant_id VARCHAR2 DEFAULT NULL,
         p_issue_revision VARCHAR2 DEFAULT NULL,
-        p_api_url VARCHAR2,
-        p_response_json CLOB,
-        p_response_hash VARCHAR2,
+        p_payload CLOB,
+        p_key_fingerprint VARCHAR2,
         p_raw_json_id OUT NUMBER
     ) IS
     BEGIN
         INSERT INTO RAW_JSON (
-            endpoint_key,
+            endpoint,
             plant_id,
             issue_revision,
-            api_url,
-            response_json,
-            response_hash,
+            payload,
+            key_fingerprint,
             api_call_timestamp,
             created_date
         ) VALUES (
-            p_endpoint_key,
+            p_endpoint,
             p_plant_id,
             p_issue_revision,
-            p_api_url,
-            p_response_json,
-            p_response_hash,
+            p_payload,
+            p_key_fingerprint,
             SYSTIMESTAMP,
             SYSDATE
         ) RETURNING raw_json_id INTO p_raw_json_id;
@@ -90,17 +86,17 @@ CREATE OR REPLACE PACKAGE BODY pkg_raw_ingest AS
             -- Hash already exists - this is expected for duplicates
             SELECT raw_json_id INTO p_raw_json_id
             FROM RAW_JSON
-            WHERE response_hash = p_response_hash;
+            WHERE key_fingerprint = p_key_fingerprint;
     END insert_raw_json;
 
     PROCEDURE purge_old_responses(
         p_days_to_keep NUMBER DEFAULT 30,
-        p_endpoint_key VARCHAR2 DEFAULT NULL
+        p_endpoint VARCHAR2 DEFAULT NULL
     ) IS
     BEGIN
-        IF p_endpoint_key IS NOT NULL THEN
+        IF p_endpoint IS NOT NULL THEN
             DELETE FROM RAW_JSON
-            WHERE endpoint_key = p_endpoint_key
+            WHERE endpoint = p_endpoint
             AND created_date < SYSDATE - p_days_to_keep;
         ELSE
             DELETE FROM RAW_JSON

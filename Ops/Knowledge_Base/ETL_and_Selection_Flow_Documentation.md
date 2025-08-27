@@ -1,571 +1,322 @@
 # TR2000 ETL and Selection Flow Documentation
 
 ## Overview
-This document provides comprehensive documentation of the ETL flow from TR2000 API to Oracle database, including user selection management and data processing pipelines.
+This document provides comprehensive documentation of the ETL flow from TR2000 API to Oracle database, including the two-table selection management system and complete data processing pipelines.
 
 ## Table of Contents
-1. [Quick Reference - Key Questions](#quick-reference---key-questions)
+1. [Current System State](#current-system-state)
 2. [Architecture Overview](#architecture-overview)
-3. [Selection Management Flow](#selection-management-flow)
+3. [Selection Management (Two-Table Design)](#selection-management-two-table-design)
 4. [Complete ETL Pipeline](#complete-etl-pipeline)
 5. [Package Structure and Responsibilities](#package-structure-and-responsibilities)
-6. [Data Flow Tables](#data-flow-tables)
-7. [Error Handling](#error-handling)
+6. [Reference Tables Implementation](#reference-tables-implementation)
+7. [API Proxy Architecture](#api-proxy-architecture)
 8. [Testing and Monitoring](#testing-and-monitoring)
+9. [Known Issues and Workarounds](#known-issues-and-workarounds)
 
 ---
 
-## Quick Reference - Key Questions
+## Current System State
 
-### Q1: Who calls pkg_api_client.refresh_plants_from_api and how does it know what to do?
-**Answer:** YOU (the user) manually call this procedure from SQL*Plus or an APEX button. It's the master orchestrator that controls the entire ETL flow. It knows to read API_BASE_URL because it's hardcoded in the fetch_plants_json function to SELECT from CONTROL_SETTINGS.
+### As of 2025-08-27 (Tasks 1-7 Complete)
+- **130** plants loaded from API
+- **20** issues loaded (12 for plant 124, 8 for plant 34)
+- **4,572** valid references across 8 types
+- **2** selected plants (124/JSP2, 34/GRANE)
+- **3** selected issues (124/3.3, 34/3.0, 34/4.2)
+- **0** invalid database objects
+- **~35-40%** test coverage
 
-### Q2: Which CONTROL_SETTINGS are actually used?
-**Answer:** Only **API_BASE_URL** is used! The others (MAX_PLANTS_PER_RUN, RETENTION_DAYS, etc.) are placeholders for future functionality but NOT implemented yet.
-
-### Q3: Who controls the API call and deduplication?
-**Answer:** pkg_api_client.refresh_plants_from_api orchestrates everything sequentially. It calls fetch_plants_json → calculates hash → checks for duplicates → inserts to RAW_JSON if new.
-
-### Q4: Who parses RAW_JSON to STG_PLANTS?
-**Answer:** pkg_api_client.refresh_plants_from_api directly calls pkg_parse_plants.parse_plants_json(). Errors are caught and logged to ETL_ERROR_LOG.
-
-### Q5: Who parses STG_PLANTS to PLANTS?
-**Answer:** pkg_api_client.refresh_plants_from_api directly calls pkg_upsert_plants.upsert_plants(). Errors are caught and logged to ETL_ERROR_LOG.
+### Key Components Status
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Plants ETL | ✅ Working | Full API → DB pipeline |
+| Issues ETL | ✅ Working | Selection-based loading |
+| References ETL | ✅ Working | All 9 types implemented |
+| Cascade Operations | ✅ Working | Plant→Issues→References |
+| API Throttling | ✅ Working | 5-minute cache |
+| Test Isolation | ⚠️ Partial | Tests affect real data |
+| APEX UI | ✅ Working | Basic selection UI |
 
 ---
 
 ## Architecture Overview
 
-### Understanding Packages vs Procedures
-
-A **package** is a container that groups related procedures and functions together. Think of it like a class in object-oriented programming.
-
-```sql
--- SPECIFICATION (interface/header)
-CREATE PACKAGE pkg_api_client AS
-    FUNCTION fetch_plants_json RETURN CLOB;  -- Declaration only
-    PROCEDURE refresh_plants_from_api(...);   -- Declaration only
-END;
-
--- BODY (implementation)
-CREATE PACKAGE BODY pkg_api_client AS
-    FUNCTION fetch_plants_json RETURN CLOB IS
-        -- Actual code here
-    END;
-    
-    PROCEDURE refresh_plants_from_api(...) IS
-        -- Actual code here
-    END;
-END;
-```
-
 ### Three-Layer Data Architecture
 ```
 RAW_JSON (Bronze) → STG_* (Silver) → Production (Gold)
 ```
-- **Bronze**: Raw, immutable API responses
-- **Silver**: Parsed but unvalidated staging
-- **Gold**: Clean, validated production data
+- **Bronze**: Raw, immutable API responses with SHA256 deduplication
+- **Silver**: Parsed but unvalidated staging (all VARCHAR2)
+- **Gold**: Clean, validated production data with proper types
+
+### Two-Table Selection Design (Current)
+```sql
+SELECTED_PLANTS     -- Active plant selections
+SELECTED_ISSUES     -- Active issue selections (with plant_id + issue_revision)
+```
 
 ### Key Design Patterns
 1. **SHA256 Deduplication** - Prevents reprocessing identical API responses
 2. **Soft Delete Pattern** - Uses `is_valid = 'Y'/'N'` instead of DELETE
-3. **Comprehensive Logging** - Every ETL run tracked in ETL_RUN_LOG
-4. **Selection-Based Loading** - Only fetch data for user-selected items
+3. **Comprehensive Logging** - ETL_RUN_LOG, ETL_ERROR_LOG, CASCADE_LOG
+4. **Selection-Based Loading** - Only fetch data for selected items
+5. **5-Minute Throttling** - Prevents redundant API calls
 
 ---
 
-## Selection Management Flow
+## Selection Management (Two-Table Design)
 
-### Plant and Issue Selection Process
+### Current Implementation
+```sql
+-- SELECTED_PLANTS table
+CREATE TABLE SELECTED_PLANTS (
+    plant_id VARCHAR2(50) PRIMARY KEY,
+    is_active CHAR(1) DEFAULT 'Y',
+    selected_date TIMESTAMP DEFAULT SYSTIMESTAMP,
+    selected_by VARCHAR2(100) DEFAULT USER,
+    etl_status VARCHAR2(50),
+    last_etl_run TIMESTAMP
+);
 
-```
-USER ACTION: Select Plants in UI
-           ↓
-┌─────────────────────────────────┐
-│   1. UPDATE SELECTION_LOADER    │
-├─────────────────────────────────┤
-│ MERGE INTO SELECTION_LOADER     │
-│ - plant_id = '124' (JSP2)       │
-│ - plant_id = '34' (GRANE)       │
-│ - is_active = 'Y'               │
-│ - selected_by = USER            │
-└─────────────────────────────────┘
-           ↓
-USER ACTION: Click "Fetch Issues"
-           ↓
-┌─────────────────────────────────┐
-│  2. LOOP THROUGH SELECTIONS     │
-├─────────────────────────────────┤
-│ FOR each plant IN              │
-│   SELECTION_LOADER              │
-│   WHERE is_active = 'Y'        │
-└─────────────────────────────────┘
-           ↓
-┌─────────────────────────────────────────────┐
-│  3. CALL pkg_api_client.refresh_issues_from_api │
-├─────────────────────────────────────────────┤
-│ For each selected plant:                    │
-│   a. INSERT INTO ETL_RUN_LOG               │
-│   b. Call fetch_issues_json(plant_id)      │
-│   c. API: GET /plants/{id}/issues          │
-│   d. Calculate SHA256 hash                 │
-│   e. Check for duplicate                   │
-│   f. INSERT INTO RAW_JSON                  │
-│   g. Parse JSON → STG_ISSUES               │
-│   h. MERGE STG_ISSUES → ISSUES             │
-│   i. UPDATE ETL_RUN_LOG (SUCCESS)          │
-│   j. UPDATE SELECTION_LOADER (last_etl_run)│
-└─────────────────────────────────────────────┘
+-- SELECTED_ISSUES table  
+CREATE TABLE SELECTED_ISSUES (
+    plant_id VARCHAR2(50),
+    issue_revision VARCHAR2(50),
+    is_active CHAR(1) DEFAULT 'Y',
+    selected_date TIMESTAMP DEFAULT SYSTIMESTAMP,
+    etl_status VARCHAR2(50),
+    CONSTRAINT pk_selected_issues PRIMARY KEY (plant_id, issue_revision)
+);
 ```
 
-### Selection Management Architecture
+### Selection Flow
+```
+USER SELECTS PLANTS
+    ↓
+SELECTED_PLANTS (plant_id='124', is_active='Y')
+    ↓
+USER SELECTS ISSUES
+    ↓
+SELECTED_ISSUES (plant_id='124', issue_revision='3.3', is_active='Y')
+    ↓
+ETL PROCESSES SELECTIONS
+    ↓
+References loaded for selected issues only
+```
 
-#### 1. Initial Data Population
-- **One-time load**: Fetch ALL plants from API to populate PLANTS table
-- This provides the master list for user selection
-- No issues are loaded initially (API optimization)
-
-#### 2. User Selection Workflow
-1. **Plant Selection**:
-   - User selects plants from PLANTS table via APEX UI
-   - Selected plants saved to SELECTION_LOADER (is_active='Y')
-   - Triggers automatic fetch of issues for ONLY selected plants
-   
-2. **Issue Selection**:
-   - Issues dropdown populates with data for selected plants only
-   - User selects specific issue revisions
-   - Selected issues saved to SELECTION_LOADER with plant_id + issue_revision
-
-#### 3. Change Management & Cascade Logic
-- **Plant change**: 
-  - Deactivate old plant → cascade deactivate its issues → cascade deactivate all downstream
-  - Activate new plant → fetch its issues → user selects issues → fetch downstream
-- **Issue change**:
-  - Deactivate old issue → cascade deactivate its references and downstream data
-  - Activate new issue → fetch its references → fetch downstream details
-- **Soft delete**: All tables use is_valid='N' instead of DELETE
-
-#### 4. API Call Optimization Strategy
-- **Selection scoping**: Only fetch data for selected plants/issues (70% reduction)
-- **SHA256 deduplication**: Skip unchanged API responses
-- **Cascade fetching**: Only fetch downstream data that's actually referenced
-- **Example**: 3 plants × 2 issues = 6 API calls for issues + their references
-  (vs 100+ plants × all issues = 1000s of calls without selection)
+### Cascade Triggers
+1. **TRG_CASCADE_PLANT_TO_ISSUES** - When plant deactivated, deactivates its issues
+2. **TRG_CASCADE_ISSUE_TO_REFERENCES** - When issue marked invalid, invalidates references
 
 ---
 
 ## Complete ETL Pipeline
 
-### Complete Data Flow for Plants Endpoint
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        COMPLETE ETL FLOW                            │
-└─────────────────────────────────────────────────────────────────────┘
-
-1. API CALL INITIATED
-   └─> pkg_api_client.refresh_plants_from_api()
-
-2. ETL RUN LOGGING
-   └─> INSERT INTO ETL_RUN_LOG
-       - run_id: auto-generated
-       - run_type: 'PLANTS_API_REFRESH'
-       - endpoint_key: 'plants'
-       - start_time: SYSTIMESTAMP
-       - status: 'RUNNING'
-
-3. FETCH API CONFIGURATION
-   └─> SELECT FROM CONTROL_SETTINGS
-       - Retrieves 'API_BASE_URL'
-       - Constructs URL: base_url + 'plants'
-
-4. MAKE HTTPS API CALL
-   └─> apex_web_service.make_rest_request()
-       - URL: https://equinor.pipespec-api.presight.com/plants
-       - Method: GET
-       - Wallet: file:C:\app\vivek\product\21c\dbhomeXE\network\admin\wallet
-       - Returns: JSON response
-
-5. CALCULATE SHA256 HASH
-   └─> pkg_api_client.calculate_sha256()
-       - Creates unique fingerprint for deduplication
-
-6. CHECK FOR DUPLICATE
-   └─> pkg_raw_ingest.is_duplicate_hash()
-       - If duplicate: Skip processing
-       - If new: Continue processing
-
-7. STORE RAW RESPONSE
-   └─> pkg_raw_ingest.insert_raw_json()
-       └─> INSERT INTO RAW_JSON
-
-8. PARSE JSON TO STAGING
-   └─> pkg_parse_plants.parse_plants_json(raw_json_id)
-       - Clear staging: DELETE FROM STG_PLANTS
-       - Parse using JSON_TABLE
-       - INSERT INTO STG_PLANTS
-
-9. MERGE TO CORE TABLE
-   └─> pkg_upsert_plants.upsert_plants()
-       - Soft delete existing: UPDATE PLANTS SET is_valid = 'N'
-       - MERGE INTO PLANTS
-       - Sets is_valid = 'Y' for current data
-
-10. UPDATE ETL RUN LOG
-    └─> UPDATE ETL_RUN_LOG
-        - status: 'SUCCESS'
-        - end_time: SYSTIMESTAMP
-
-11. COMMIT TRANSACTION
-    └─> All changes committed to database
+### Master Refresh Procedure
+```sql
+-- Main entry point for full refresh
+PROCEDURE refresh_all_data_from_api IS
+BEGIN
+    -- Step 1: Clean test data
+    PKG_TEST_ISOLATION.clean_all_test_data;
+    
+    -- Step 2: Refresh plants (checks 5-min throttle)
+    pkg_api_client.refresh_plants_from_api;
+    
+    -- Step 3: Process selected issues and references
+    FOR rec IN (SELECT plant_id, issue_revision FROM SELECTED_ISSUES WHERE is_active = 'Y') LOOP
+        pkg_api_client_references.refresh_all_issue_references(
+            p_plant_id => rec.plant_id,
+            p_issue_rev => rec.issue_revision
+        );
+    END LOOP;
+    
+    -- Step 4: Validate data integrity
+    PKG_TEST_ISOLATION.validate_no_test_contamination;
+END;
 ```
 
-### Master Controller Flow
-
+### Data Flow for Each Endpoint
 ```
-pkg_api_client.refresh_plants_from_api (MASTER CONTROLLER)
-    │
-    ├─1→ INSERT INTO ETL_RUN_LOG (starts logging)
-    │
-    ├─2→ SELECT FROM CONTROL_SETTINGS WHERE setting_key = 'API_BASE_URL'
-    │
-    ├─3→ CALLS fetch_plants_json() (same package, private function)
-    │    └→ apex_web_service.make_rest_request() 
-    │
-    ├─4→ CALLS calculate_sha256() (same package, private function)
-    │
-    ├─5→ CALLS pkg_raw_ingest.is_duplicate_hash() (external package)
-    │
-    ├─6→ IF not duplicate:
-    │    ├→ CALLS pkg_raw_ingest.insert_raw_json() (external package)
-    │    ├→ CALLS pkg_parse_plants.parse_plants_json() (external package)
-    │    └→ CALLS pkg_upsert_plants.upsert_plants() (external package)
-    │
-    ├─7→ UPDATE ETL_RUN_LOG (marks success)
-    │
-    └─8→ EXCEPTION handlers catch any errors
-         └→ INSERT INTO ETL_ERROR_LOG
-         └→ UPDATE ETL_RUN_LOG (marks failure)
+API Call → RAW_JSON → STG_* → Core Table
+         ↓           ↓        ↓
+    SHA256 Hash  JSON Parse  MERGE with soft delete
 ```
 
 ---
 
 ## Package Structure and Responsibilities
 
-### Active Packages (Used in Plants Flow)
-1. **pkg_api_client** - Master orchestrator, API calls, main ETL flow control
-2. **pkg_raw_ingest** - RAW_JSON operations, SHA256 deduplication
-3. **pkg_parse_plants** - JSON parsing to staging (STG_PLANTS)
-4. **pkg_upsert_plants** - Staging to production merge (PLANTS)
+### Core ETL Packages
+| Package | Purpose | Key Procedures |
+|---------|---------|----------------|
+| **pkg_api_client** | Plant/Issue API calls | refresh_plants_from_api, refresh_issues_for_plant |
+| **pkg_api_client_references** | Reference API calls | refresh_all_issue_references |
+| **pkg_raw_ingest** | SHA256 deduplication | insert_raw_json, is_duplicate_hash |
+| **pkg_parse_plants** | JSON→STG_PLANTS | parse_plants_json |
+| **pkg_parse_issues** | JSON→STG_ISSUES | parse_issues_json |
+| **pkg_parse_references** | JSON→STG_*_REFERENCES | parse_[type]_references (9 types) |
+| **pkg_upsert_plants** | STG→PLANTS merge | upsert_plants |
+| **pkg_upsert_issues** | STG→ISSUES merge | upsert_issues |
+| **pkg_upsert_references** | STG→*_REFERENCES merge | upsert_[type]_references (9 types) |
+| **pkg_etl_operations** | Orchestration | run_full_etl, run_references_etl_for_all_selected |
+| **pkg_selection_mgmt** | Selection management | add_plant_selection, remove_plant_selection |
 
-### Active Packages (For Issues - Similar Pattern)
-5. **pkg_parse_issues** - JSON parsing for issues endpoint
-6. **pkg_upsert_issues** - Issues staging to production
-7. **pkg_selection_mgmt** - Manages user selections and cascade operations
-
-### Reference Data Packages (Task 7 - Session 10)
-11. **pkg_parse_references** - Parses JSON for all 9 reference types (PCS, SC, VSM, VDS, EDS, MDS, VSK, ESK, PIPE_ELEMENT)
-12. **pkg_upsert_references** - Merges reference data from staging to core with FK validation
-13. **pkg_api_client_references** - API calls for fetching issue references
-
-### GUID and Cascade Management Packages (Session 9-10)
-8. **pkg_cascade_manager** - Handles cascade soft deletes across all tables
-9. **pkg_guid_utils** - GUID generation and conversion utilities
-
-### Future/Alternative Package
-10. **pkg_etl_operations** - Dynamic ETL using CONTROL_ENDPOINTS table (not currently used)
-
-### Why This Architecture?
-- **Single Responsibility**: One place to understand the flow
-- **Transaction Control**: Can COMMIT/ROLLBACK entire operation
-- **Error Handling**: Centralized exception management
-- **Logging**: Consistent ETL_RUN_LOG updates
-- **Modularity**: Can reprocess without re-fetching
-- **Testing**: Can test parsing separately from merging
-- **Reusability**: Same pattern for plants, issues, and future endpoints
+### Testing Packages
+| Package | Tests | Coverage |
+|---------|-------|----------|
+| **PKG_SIMPLE_TESTS** | 5 implemented (of 21 declared) | Core functionality |
+| **PKG_CONDUCTOR_TESTS** | 5 tests | ETL orchestration |
+| **PKG_CONDUCTOR_EXTENDED_TESTS** | 8 tests | Advanced scenarios |
+| **PKG_REFERENCE_COMPREHENSIVE_TESTS** | 3 tests | Reference validation |
+| **PKG_TEST_ISOLATION** | Test data cleanup | Handles TEST_%, COND_TEST_%, EXT_TEST_% |
 
 ---
 
-## GUID Architecture (Session 10)
+## Reference Tables Implementation
 
-### Purpose
-GUIDs (Globally Unique Identifiers) provide unique identification across systems, enabling:
-- Multi-system integration without ID conflicts
-- API idempotency to prevent duplicate operations
-- Cross-system correlation tracking
-- Business key independence
-
-### Implementation
-All core tables now include GUID columns:
+### All 9 Reference Types (Task 7 Complete)
 ```sql
--- Example from PLANTS table
-plant_guid     RAW(16) DEFAULT SYS_GUID()  -- Internal GUID (Primary Key)
-external_guid  VARCHAR2(36)                -- From external systems
-api_sync_guid  VARCHAR2(36)                -- For API sync tracking
+-- Core reference tables with soft delete pattern
+PCS_REFERENCES          -- 206 records
+VDS_REFERENCES          -- 2,047 records (largest)
+MDS_REFERENCES          -- 752 records
+PIPE_ELEMENT_REFERENCES -- 1,309 records
+VSK_REFERENCES          -- 230 records
+EDS_REFERENCES          -- 23 records
+SC_REFERENCES           -- 2 records
+VSM_REFERENCES          -- 3 records
+ESK_REFERENCES          -- 0 records (no data from API)
 ```
 
-### Key Tables with GUIDs
-- **PLANTS** - plant_guid as unique identifier
-- **ISSUES** - issue_guid with FK to plant_guid
-- **SELECTION_LOADER** - selection_guid for tracking
-- **RAW_JSON** - Uses api_correlation_id for tracking
+### Reference Loading Process
+1. Selected issue triggers reference fetch
+2. API returns JSON with all 9 reference types
+3. PKG_PARSE_REFERENCES parses each type to staging
+4. PKG_UPSERT_REFERENCES merges to core with FK validation
+5. Cascade trigger invalidates references if issue becomes invalid
 
 ---
 
-## CASCADE Management System (Session 9)
+## API Proxy Architecture
 
-### Overview
-Implements automatic cascade soft deletes to maintain referential integrity without hard deletes.
-
-### Components
-
-#### CASCADE_LOG Table
-Tracks all cascade operations for audit:
+### TR2000_UTIL Package (DBA-Owned)
 ```sql
-CASCADE_LOG
-├── log_id (NUMBER) - Primary key
-├── trigger_name (VARCHAR2) - Which trigger fired
-├── table_name (VARCHAR2) - Table being updated
-├── operation_type (VARCHAR2) - 'PLANT_CASCADE', 'ISSUE_CASCADE', etc.
-├── affected_records (NUMBER) - Count of records marked invalid
-└── log_timestamp (TIMESTAMP) - When cascade occurred
+-- Centralized API access through DBA proxy
+TR2000_UTIL.make_api_request(
+    p_endpoint VARCHAR2,
+    p_method VARCHAR2,
+    p_body CLOB
+) RETURN CLOB;
 ```
 
-#### PKG_CASCADE_MANAGER Package
-Central logic for cascade operations:
-- **cascade_plant_deletion()** - When plant marked invalid, cascades to issues
-- **cascade_issue_deletion()** - When issue marked invalid, cascades to references (future)
-- **cascade_selection_deletion()** - When selection removed, deactivates downstream
-- Uses AUTONOMOUS_TRANSACTION to ensure cascade completes even if main transaction fails
+### Benefits
+- Single point for network access control
+- No wallet management in application schema
+- Simplified security model
+- Future: Can add logging, throttling, retry logic
 
-#### Cascade Triggers
-1. **TRG_CASCADE_PLANT_TO_SELECTION** - Plant changes cascade to SELECTION_LOADER
-2. **TRG_CASCADE_SELECTION_TO_ALL** - Selection changes cascade to all downstream
-3. **TRG_CASCADE_ISSUES_TO_SELECTION** - Issue changes update SELECTION_LOADER
-
-### Cascade Flow Example
-```
-Plant marked invalid (is_valid='N')
-    ↓ TRG_CASCADE_PLANT_TO_SELECTION fires
-    ↓ PKG_CASCADE_MANAGER.cascade_plant_deletion()
-SELECTION_LOADER entries deactivated
-    ↓ TRG_CASCADE_SELECTION_TO_ALL fires
-All issues for that plant marked invalid
-    ↓ (Future: cascade to reference tables)
-Log entry created in CASCADE_LOG
-```
-
-### Testing Cascade Operations
-```sql
--- Test cascade by marking plant invalid
-UPDATE PLANTS SET is_valid = 'N' WHERE plant_id = '34';
-
--- Check cascade results
-SELECT * FROM CASCADE_LOG ORDER BY log_timestamp DESC;
-SELECT COUNT(*) FROM ISSUES WHERE plant_id = '34' AND is_valid = 'N';
-```
-
----
-
-## Data Flow Tables
-
-### Input/Configuration Tables
-1. **CONTROL_SETTINGS**
-   - Provides: API_BASE_URL
-   - Future: Timeout, batch size, retention settings
-
-2. **CONTROL_ENDPOINTS**
-   - Defines available endpoints
-   - Used for dynamic ETL processing
-
-3. **SELECTION_LOADER**
-   - Tracks user-selected plants and issues
-   - Controls what data gets fetched from API
-
-### Logging Tables
-4. **ETL_RUN_LOG**
-   - Records: Start/end time, status, duration
-   - One record per ETL execution
-
-5. **ETL_ERROR_LOG**
-   - Records: Error details if process fails
-   - Full error stack for debugging
-
-### Data Flow Tables
-6. **RAW_JSON**
-   - Stores: Complete API response as-is
-   - Purpose: Audit trail, deduplication, reprocessing
-
-7. **STG_PLANTS** / **STG_ISSUES**
-   - Stores: Parsed JSON data in tabular format
-   - Purpose: Staging area for validation/transformation
-   - Format: All VARCHAR2 columns
-
-8. **PLANTS** / **ISSUES**
-   - Stores: Final normalized data
-   - Purpose: Production tables for application use
-   - Format: Proper data types, constraints
-
-### Reference Tables (Future Implementation)
-9. **PCS_REFERENCES, VDS_REFERENCES, etc.**
-   - Store references from issues to other entities
-   - Enable cascade fetching of related data
-
----
-
-## Error Handling
-
-### Error Handling at Each Level
-
-1. **API Call Errors** (in fetch_*_json):
-   - Raises: `RAISE_APPLICATION_ERROR(-20002, 'Error fetching: ' || SQLERRM)`
-   - Caught by: refresh_*_from_api's EXCEPTION block
-   - Logged to: ETL_ERROR_LOG with error_type = 'API_REFRESH_ERROR'
-
-2. **Hash Calculation Errors** (in calculate_sha256):
-   - Raises: `RAISE_APPLICATION_ERROR(-20005, 'Error calculating SHA256: ' || SQLERRM)`
-   - Caught by: refresh_*_from_api's EXCEPTION block
-
-3. **Parsing Errors** (in parse_*_json):
-   - Any SQL errors during JSON_TABLE parsing
-   - Caught by: refresh_*_from_api's EXCEPTION block
-   - Logged with full error stack
-
-4. **Merge Errors** (in upsert_*):
-   - Any constraint violations or data type conversion errors
-   - Caught by: refresh_*_from_api's EXCEPTION block
-
-### What if Scenarios
-
-#### API Fails?
-- Error logged to ETL_ERROR_LOG
-- ETL_RUN_LOG marked as FAILED
-- Transaction rolled back
-- SELECTION_LOADER keeps last successful timestamp
-
-#### Parsing Fails?
-- Caught by refresh_*_from_api
-- Logged with full error stack
-- Raw JSON still preserved for debugging
-
-#### Duplicate Data?
-- SHA256 hash detects identical response
-- Processing skipped
-- Marked as "duplicate" in logs
-- Saves processing time
+### Current Implementation
+- All API calls route through TR2000_UTIL
+- 5-minute cache prevents redundant calls
+- Correlation IDs track requests
 
 ---
 
 ## Testing and Monitoring
 
-### Key Monitoring Queries
+### Test Execution Sequence
+```bash
+# Run tests
+@Database/scripts/run_comprehensive_tests.sql
 
-```sql
--- Current selections
-SELECT * FROM SELECTION_LOADER WHERE is_active = 'Y';
+# Fix references (MANDATORY after tests!)
+@Database/scripts/fix_reference_validity.sql
 
--- Active plants only
-SELECT * FROM PLANTS WHERE is_valid = 'Y';
-
--- Issues for selected plants  
-SELECT i.* 
-FROM ISSUES i
-JOIN SELECTION_LOADER s ON i.plant_id = s.plant_id
-WHERE s.is_active = 'Y' AND i.is_valid = 'Y';
-
--- Check ETL history
-SELECT * FROM ETL_RUN_LOG ORDER BY start_time DESC;
-
--- ETL history for selections
-SELECT * FROM ETL_RUN_LOG 
-WHERE plant_id IN (
-  SELECT plant_id FROM SELECTION_LOADER WHERE is_active = 'Y'
-)
-ORDER BY start_time DESC;
-
--- Check for errors
-SELECT * FROM ETL_ERROR_LOG WHERE error_timestamp > SYSDATE - 1;
-
--- Find potential plant ID changes
-SELECT old.plant_id as old_id, new.plant_id as new_id, old.short_description
-FROM PLANTS old
-JOIN PLANTS new ON old.short_description = new.short_description
-WHERE old.is_valid = 'N' AND new.is_valid = 'Y'
-  AND old.plant_id != new.plant_id;
+# Verify system state
+@Database/scripts/final_system_test.sql
 ```
 
-### Testing the Flow
-
-To see the data at each stage:
+### Key Monitoring Views
 ```sql
--- Check raw JSON
-SELECT raw_json_id, endpoint_key, LENGTH(response_json) as json_length, created_date 
-FROM RAW_JSON WHERE endpoint_key = 'plants';
+-- System health dashboard
+SELECT * FROM V_SYSTEM_HEALTH_DASHBOARD;
 
--- Check staging
-SELECT COUNT(*) as staging_count FROM STG_PLANTS;
+-- ETL success rates
+SELECT * FROM V_ETL_SUCCESS_RATE;
 
--- Check final data
-SELECT COUNT(*) as active_plants FROM PLANTS WHERE is_valid = 'Y';
+-- Reference summary by issue
+SELECT * FROM V_REFERENCE_SUMMARY;
 
--- Check ETL history
-SELECT * FROM ETL_RUN_LOG WHERE endpoint_key = 'plants' ORDER BY start_time DESC;
+-- Recent ETL activity
+SELECT * FROM V_RECENT_ETL_ACTIVITY;
 ```
 
-### What Happens on Subsequent Runs?
-
-1. **If API returns same data:**
-   - Hash matches existing RAW_JSON record
-   - Process stops at deduplication check
-   - ETL_RUN_LOG shows "Data unchanged (duplicate hash)"
-   - No database changes occur
-
-2. **If API returns different data:**
-   - New RAW_JSON record created
-   - All plants marked is_valid='N'
-   - New/updated plants merged with is_valid='Y'
-   - Deleted plants remain with is_valid='N'
-
-### Success Metrics Example
-- **API Response**: 28,643 characters
-- **Plants Loaded**: 130
-- **Tables Updated**: 4 (RAW_JSON, STG_PLANTS, PLANTS, ETL_RUN_LOG)
-- **Processing**: Successful end-to-end
+### Current Test Coverage
+- **27** tests implemented across 4 packages
+- **24** passing, 1 failing (empty selection), 2 warnings
+- Known issue: Tests invalidate real reference data
 
 ---
 
-## CONTROL_SETTINGS Reference
+## Known Issues and Workarounds
 
-### Currently Used Settings
-| Setting Key | Value | Where Used | Purpose |
-|------------|-------|------------|----------|
-| API_BASE_URL | https://equinor.pipespec-api.presight.com/ | pkg_api_client.fetch_*_json() | Base URL for API calls |
+### Issue 1: Test Suite Invalidates References
+**Problem**: Conductor tests call `run_full_etl()` which processes real plants (124, 34)
+**Workaround**: Always run `@Database/scripts/fix_reference_validity.sql` after tests
+**Future Fix**: Improve test isolation to use only TEST_* data
 
-### Future Settings (NOT Implemented)
-| Setting Key | Value | Status |
-|------------|-------|---------|
-| API_TIMEOUT_SECONDS | 60 | NOT IMPLEMENTED |
-| MAX_PLANTS_PER_RUN | 10 | NOT IMPLEMENTED |
-| RAW_JSON_RETENTION_DAYS | 30 | NOT IMPLEMENTED (no purge job) |
-| ETL_LOG_RETENTION_DAYS | 90 | NOT IMPLEMENTED (no purge job) |
-| ENABLE_PARALLEL_PROCESSING | N | NOT IMPLEMENTED |
-| BATCH_SIZE | 1000 | NOT IMPLEMENTED |
+### Issue 2: Empty Selection Test Failure
+**Problem**: Test expects NO_DATA but gets PARTIAL status
+**Impact**: One test shows as failed
+**Status**: Low priority, doesn't affect production
 
-These settings exist but no code references them. They're ready for future enhancements.
+### Issue 3: CONTROL_SETTINGS Confusion
+**Active Settings**:
+- API_BASE_URL: Used for all API calls
 
----
-
-## Next Steps After Selection
-
-Once plants are selected and issues loaded:
-
-1. **View Issues**: Display in UI for user review
-2. **Select Specific Issues**: User can choose which issue revisions
-3. **Load Reference Data**: Fetch PCS, VDS, etc. for selected issues
-4. **Run Full ETL**: Process all downstream data
+**Placeholder Settings** (NOT implemented):
+- API_TIMEOUT_SECONDS
+- MAX_PLANTS_PER_RUN  
+- RAW_JSON_RETENTION_DAYS
+- ETL_LOG_RETENTION_DAYS
+- ENABLE_PARALLEL_PROCESSING
+- BATCH_SIZE
 
 ---
 
-*Last Updated: 2025-08-26*
-*Version: 2.2 - Added Reference Tables architecture and packages (Task 7)*
+## Performance Metrics
+
+### Current Performance
+- Plants ETL: 0.03 seconds average
+- Issues ETL: <1 second average
+- Reference ETL: 5-10 seconds per issue
+- Total refresh (3 issues): ~30 seconds
+
+### API Call Reduction
+- Selection-based: 70% reduction in API calls
+- 5-minute throttling: Prevents redundant calls
+- SHA256 deduplication: Skips unchanged data
+
+---
+
+## Next Steps (Task 8: PCS Details)
+
+### Ready for Implementation
+1. Create PCS detail tables (Line, Gasket, Stud, Nut, etc.)
+2. Extend pkg_parse_references for PCS details
+3. Add FK constraints to PCS_REFERENCES
+4. Implement cascade from PCS references to details
+
+### System Readiness
+- ✅ All prerequisites complete
+- ✅ Reference tables working
+- ✅ Cascade logic tested
+- ✅ 0 invalid objects
+- ✅ Production data loaded
+
+---
+
+*Last Updated: 2025-08-27*
+*Version: 3.0 - Complete rewrite for current state*

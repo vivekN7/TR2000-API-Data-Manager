@@ -78,7 +78,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_plants AS
             WindowsRemarkText,
             UserProtected
         FROM RAW_JSON r,
-        JSON_TABLE(r.response_json, '$.getPlant[*]'
+        JSON_TABLE(r.payload, '$.getPlant[*]'
             COLUMNS (
                 OperatorID NUMBER PATH '$.OperatorID',
                 OperatorName VARCHAR2(255) PATH '$.OperatorName',

@@ -94,7 +94,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
         v_record_count NUMBER := 0;
     BEGIN
         -- Get JSON content from RAW_JSON
-        SELECT response_json INTO v_json_content
+        SELECT payload INTO v_json_content
         FROM RAW_JSON
         WHERE raw_json_id = p_raw_json_id;
         
@@ -158,7 +158,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
         v_json_content CLOB;
         v_record_count NUMBER := 0;
     BEGIN
-        SELECT response_json INTO v_json_content
+        SELECT payload INTO v_json_content
         FROM RAW_JSON
         WHERE raw_json_id = p_raw_json_id;
         
@@ -211,7 +211,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
         v_json_content CLOB;
         v_record_count NUMBER := 0;
     BEGIN
-        SELECT response_json INTO v_json_content
+        SELECT payload INTO v_json_content
         FROM RAW_JSON
         WHERE raw_json_id = p_raw_json_id;
         
@@ -264,7 +264,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
         v_json_content CLOB;
         v_record_count NUMBER := 0;
     BEGIN
-        SELECT response_json INTO v_json_content
+        SELECT payload INTO v_json_content
         FROM RAW_JSON
         WHERE raw_json_id = p_raw_json_id;
         
@@ -317,7 +317,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
         v_json_content CLOB;
         v_record_count NUMBER := 0;
     BEGIN
-        SELECT response_json INTO v_json_content
+        SELECT payload INTO v_json_content
         FROM RAW_JSON
         WHERE raw_json_id = p_raw_json_id;
         
@@ -370,7 +370,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
         v_json_content CLOB;
         v_record_count NUMBER := 0;
     BEGIN
-        SELECT response_json INTO v_json_content
+        SELECT payload INTO v_json_content
         FROM RAW_JSON
         WHERE raw_json_id = p_raw_json_id;
         
@@ -425,7 +425,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
         v_json_content CLOB;
         v_record_count NUMBER := 0;
     BEGIN
-        SELECT response_json INTO v_json_content
+        SELECT payload INTO v_json_content
         FROM RAW_JSON
         WHERE raw_json_id = p_raw_json_id;
         
@@ -478,7 +478,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
         v_json_content CLOB;
         v_record_count NUMBER := 0;
     BEGIN
-        SELECT response_json INTO v_json_content
+        SELECT payload INTO v_json_content
         FROM RAW_JSON
         WHERE raw_json_id = p_raw_json_id;
         
@@ -531,7 +531,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_references AS
         v_json_content CLOB;
         v_record_count NUMBER := 0;
     BEGIN
-        SELECT response_json INTO v_json_content
+        SELECT payload INTO v_json_content
         FROM RAW_JSON
         WHERE raw_json_id = p_raw_json_id;
         

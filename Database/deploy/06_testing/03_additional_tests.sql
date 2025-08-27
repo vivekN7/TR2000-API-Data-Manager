@@ -42,7 +42,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADDITIONAL_TESTS AS
         v_json := '{"plants":[{"PlantID":999,"ShortDescription":"TEST_PLANT"}]}';
         
         -- Insert test JSON
-        INSERT INTO RAW_JSON (endpoint_key, response_json, response_hash, created_date)
+        INSERT INTO RAW_JSON (endpoint, payload, key_fingerprint, created_date)
         VALUES ('plants', v_json, 'TEST_HASH_PATH_001', SYSDATE)
         RETURNING raw_json_id INTO v_raw_json_id;
         
@@ -50,7 +50,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADDITIONAL_TESTS AS
         BEGIN
             SELECT COUNT(*) INTO v_count
             FROM RAW_JSON r,
-                 JSON_TABLE(r.response_json, '$.getPlant[*]'
+                 JSON_TABLE(r.payload, '$.getPlant[*]'
                      COLUMNS (
                          PlantID NUMBER PATH '$.PlantID',
                          ShortDescription VARCHAR2(100) PATH '$.ShortDescription'
@@ -94,7 +94,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADDITIONAL_TESTS AS
         -- Test: API returns camelCase instead of PascalCase
         v_json := '{"getPlant":[{"plantId":888,"shortDescription":"CASE_TEST"}]}';
         
-        INSERT INTO RAW_JSON (endpoint_key, response_json, response_hash, created_date)
+        INSERT INTO RAW_JSON (endpoint, payload, key_fingerprint, created_date)
         VALUES ('plants', v_json, 'TEST_HASH_CASE_001', SYSDATE)
         RETURNING raw_json_id INTO v_raw_json_id;
         
@@ -102,7 +102,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_ADDITIONAL_TESTS AS
         BEGIN
             SELECT PlantID INTO v_plant_id
             FROM RAW_JSON r,
-                 JSON_TABLE(r.response_json, '$.getPlant[*]'
+                 JSON_TABLE(r.payload, '$.getPlant[*]'
                      COLUMNS (
                          PlantID NUMBER PATH '$.PlantID'  -- Expects PascalCase
                      )

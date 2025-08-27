@@ -84,7 +84,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_issues AS
             UserEntryTime,
             UserProtected
         FROM RAW_JSON r,
-        JSON_TABLE(r.response_json, ''$.getIssueList[*]''
+        JSON_TABLE(r.payload, ''$.getIssueList[*]''
             COLUMNS (
                 IssueRevision VARCHAR2(50) PATH ''$.IssueRevision'',
                 Status VARCHAR2(50) PATH ''$.Status'',

@@ -15,6 +15,9 @@ CREATE OR REPLACE PACKAGE PKG_TEST_ISOLATION AS
     -- Test data prefixes (NEVER change these)
     c_test_plant_prefix CONSTANT VARCHAR2(10) := 'TEST_';
     c_test_issue_prefix CONSTANT VARCHAR2(10) := 'TEST_';
+    -- Additional test prefixes from conductor tests
+    c_cond_test_prefix CONSTANT VARCHAR2(15) := 'COND_TEST_';
+    c_ext_test_prefix CONSTANT VARCHAR2(15) := 'EXT_TEST_';
     
     -- Procedure to clean ALL test data from ALL tables
     PROCEDURE clean_all_test_data;
@@ -38,13 +41,18 @@ CREATE OR REPLACE PACKAGE BODY PKG_TEST_ISOLATION AS
     -- =========================================================================
     FUNCTION is_test_data(p_plant_id VARCHAR2, p_issue_rev VARCHAR2 DEFAULT NULL) RETURN BOOLEAN IS
     BEGIN
-        -- Check if plant starts with TEST_
-        IF p_plant_id LIKE c_test_plant_prefix || '%' THEN
+        -- Check if plant starts with any test prefix
+        IF p_plant_id LIKE c_test_plant_prefix || '%' OR 
+           p_plant_id LIKE c_cond_test_prefix || '%' OR 
+           p_plant_id LIKE c_ext_test_prefix || '%' THEN
             RETURN TRUE;
         END IF;
         
-        -- Check if issue starts with TEST_
-        IF p_issue_rev IS NOT NULL AND p_issue_rev LIKE c_test_issue_prefix || '%' THEN
+        -- Check if issue starts with any test prefix
+        IF p_issue_rev IS NOT NULL AND 
+           (p_issue_rev LIKE c_test_issue_prefix || '%' OR
+            p_issue_rev LIKE c_cond_test_prefix || '%' OR
+            p_issue_rev LIKE c_ext_test_prefix || '%') THEN
             RETURN TRUE;
         END IF;
         
@@ -63,63 +71,90 @@ CREATE OR REPLACE PACKAGE BODY PKG_TEST_ISOLATION AS
         DBMS_OUTPUT.PUT_LINE('========================================');
         
         -- Clean reference tables
-        DELETE FROM PIPE_ELEMENT_REFERENCES WHERE plant_id LIKE c_test_plant_prefix || '%';
+        DELETE FROM PIPE_ELEMENT_REFERENCES 
+        WHERE plant_id LIKE c_test_plant_prefix || '%'
+           OR plant_id LIKE c_cond_test_prefix || '%'
+           OR plant_id LIKE c_ext_test_prefix || '%';
         v_count := SQL%ROWCOUNT;
         v_total_deleted := v_total_deleted + v_count;
         IF v_count > 0 THEN
             DBMS_OUTPUT.PUT_LINE('Deleted ' || v_count || ' test records from PIPE_ELEMENT_REFERENCES');
         END IF;
         
-        DELETE FROM ESK_REFERENCES WHERE plant_id LIKE c_test_plant_prefix || '%';
+        DELETE FROM ESK_REFERENCES 
+        WHERE plant_id LIKE c_test_plant_prefix || '%'
+           OR plant_id LIKE c_cond_test_prefix || '%'
+           OR plant_id LIKE c_ext_test_prefix || '%';
         v_count := SQL%ROWCOUNT;
         v_total_deleted := v_total_deleted + v_count;
         IF v_count > 0 THEN
             DBMS_OUTPUT.PUT_LINE('Deleted ' || v_count || ' test records from ESK_REFERENCES');
         END IF;
         
-        DELETE FROM VSK_REFERENCES WHERE plant_id LIKE c_test_plant_prefix || '%';
+        DELETE FROM VSK_REFERENCES 
+        WHERE plant_id LIKE c_test_plant_prefix || '%'
+           OR plant_id LIKE c_cond_test_prefix || '%'
+           OR plant_id LIKE c_ext_test_prefix || '%';
         v_count := SQL%ROWCOUNT;
         v_total_deleted := v_total_deleted + v_count;
         IF v_count > 0 THEN
             DBMS_OUTPUT.PUT_LINE('Deleted ' || v_count || ' test records from VSK_REFERENCES');
         END IF;
         
-        DELETE FROM MDS_REFERENCES WHERE plant_id LIKE c_test_plant_prefix || '%';
+        DELETE FROM MDS_REFERENCES 
+        WHERE plant_id LIKE c_test_plant_prefix || '%'
+           OR plant_id LIKE c_cond_test_prefix || '%'
+           OR plant_id LIKE c_ext_test_prefix || '%';
         v_count := SQL%ROWCOUNT;
         v_total_deleted := v_total_deleted + v_count;
         IF v_count > 0 THEN
             DBMS_OUTPUT.PUT_LINE('Deleted ' || v_count || ' test records from MDS_REFERENCES');
         END IF;
         
-        DELETE FROM EDS_REFERENCES WHERE plant_id LIKE c_test_plant_prefix || '%';
+        DELETE FROM EDS_REFERENCES 
+        WHERE plant_id LIKE c_test_plant_prefix || '%'
+           OR plant_id LIKE c_cond_test_prefix || '%'
+           OR plant_id LIKE c_ext_test_prefix || '%';
         v_count := SQL%ROWCOUNT;
         v_total_deleted := v_total_deleted + v_count;
         IF v_count > 0 THEN
             DBMS_OUTPUT.PUT_LINE('Deleted ' || v_count || ' test records from EDS_REFERENCES');
         END IF;
         
-        DELETE FROM VDS_REFERENCES WHERE plant_id LIKE c_test_plant_prefix || '%';
+        DELETE FROM VDS_REFERENCES 
+        WHERE plant_id LIKE c_test_plant_prefix || '%'
+           OR plant_id LIKE c_cond_test_prefix || '%'
+           OR plant_id LIKE c_ext_test_prefix || '%';
         v_count := SQL%ROWCOUNT;
         v_total_deleted := v_total_deleted + v_count;
         IF v_count > 0 THEN
             DBMS_OUTPUT.PUT_LINE('Deleted ' || v_count || ' test records from VDS_REFERENCES');
         END IF;
         
-        DELETE FROM VSM_REFERENCES WHERE plant_id LIKE c_test_plant_prefix || '%';
+        DELETE FROM VSM_REFERENCES 
+        WHERE plant_id LIKE c_test_plant_prefix || '%'
+           OR plant_id LIKE c_cond_test_prefix || '%'
+           OR plant_id LIKE c_ext_test_prefix || '%';
         v_count := SQL%ROWCOUNT;
         v_total_deleted := v_total_deleted + v_count;
         IF v_count > 0 THEN
             DBMS_OUTPUT.PUT_LINE('Deleted ' || v_count || ' test records from VSM_REFERENCES');
         END IF;
         
-        DELETE FROM SC_REFERENCES WHERE plant_id LIKE c_test_plant_prefix || '%';
+        DELETE FROM SC_REFERENCES 
+        WHERE plant_id LIKE c_test_plant_prefix || '%'
+           OR plant_id LIKE c_cond_test_prefix || '%'
+           OR plant_id LIKE c_ext_test_prefix || '%';
         v_count := SQL%ROWCOUNT;
         v_total_deleted := v_total_deleted + v_count;
         IF v_count > 0 THEN
             DBMS_OUTPUT.PUT_LINE('Deleted ' || v_count || ' test records from SC_REFERENCES');
         END IF;
         
-        DELETE FROM PCS_REFERENCES WHERE plant_id LIKE c_test_plant_prefix || '%';
+        DELETE FROM PCS_REFERENCES 
+        WHERE plant_id LIKE c_test_plant_prefix || '%'
+           OR plant_id LIKE c_cond_test_prefix || '%'
+           OR plant_id LIKE c_ext_test_prefix || '%';
         v_count := SQL%ROWCOUNT;
         v_total_deleted := v_total_deleted + v_count;
         IF v_count > 0 THEN

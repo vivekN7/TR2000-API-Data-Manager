@@ -1,83 +1,9 @@
 -- ===============================================================================
--- PKG_PARSE_PCS_DETAILS - Parse PCS List and PCS Detail JSON Data
+-- Fix PCS Details JSON Parsing Paths
 -- Date: 2025-12-01
--- Purpose: Parse JSON data for PCS list and all 6 PCS detail types
+-- Purpose: Fix JSON paths to correctly parse arrays from API responses
+-- Issue: API returns arrays wrapped in objects, not direct arrays
 -- ===============================================================================
-
-CREATE OR REPLACE PACKAGE pkg_parse_pcs_details AS
-    
-    -- Parse PCS list from plant endpoint (3.1)
-    PROCEDURE parse_plant_pcs_list(
-        p_raw_json_id    IN NUMBER,
-        p_plant_id       IN VARCHAR2
-    );
-    
-    -- Parse PCS header properties (endpoint 3.2)
-    PROCEDURE parse_header_properties(
-        p_raw_json_id    IN NUMBER,
-        p_plant_id       IN VARCHAR2,
-        p_issue_rev      IN VARCHAR2,
-        p_pcs_name       IN VARCHAR2,
-        p_pcs_revision   IN VARCHAR2
-    );
-    
-    -- Parse temperature/pressure data (endpoint 3.3)
-    PROCEDURE parse_temp_pressures(
-        p_raw_json_id    IN NUMBER,
-        p_plant_id       IN VARCHAR2,
-        p_issue_rev      IN VARCHAR2,
-        p_pcs_name       IN VARCHAR2,
-        p_pcs_revision   IN VARCHAR2
-    );
-    
-    -- Parse pipe sizes (endpoint 3.4)
-    PROCEDURE parse_pipe_sizes(
-        p_raw_json_id    IN NUMBER,
-        p_plant_id       IN VARCHAR2,
-        p_issue_rev      IN VARCHAR2,
-        p_pcs_name       IN VARCHAR2,
-        p_pcs_revision   IN VARCHAR2
-    );
-    
-    -- Parse pipe elements (endpoint 3.5)
-    PROCEDURE parse_pipe_elements(
-        p_raw_json_id    IN NUMBER,
-        p_plant_id       IN VARCHAR2,
-        p_issue_rev      IN VARCHAR2,
-        p_pcs_name       IN VARCHAR2,
-        p_pcs_revision   IN VARCHAR2
-    );
-    
-    -- Parse valve elements (endpoint 3.6)
-    PROCEDURE parse_valve_elements(
-        p_raw_json_id    IN NUMBER,
-        p_plant_id       IN VARCHAR2,
-        p_issue_rev      IN VARCHAR2,
-        p_pcs_name       IN VARCHAR2,
-        p_pcs_revision   IN VARCHAR2
-    );
-    
-    -- Parse embedded notes (endpoint 3.7)
-    PROCEDURE parse_embedded_notes(
-        p_raw_json_id    IN NUMBER,
-        p_plant_id       IN VARCHAR2,
-        p_issue_rev      IN VARCHAR2,
-        p_pcs_name       IN VARCHAR2,
-        p_pcs_revision   IN VARCHAR2
-    );
-    
-    -- Generic dispatcher procedure
-    PROCEDURE parse_pcs_detail_json(
-        p_detail_type    IN VARCHAR2,
-        p_raw_json_id    IN NUMBER,
-        p_plant_id       IN VARCHAR2,
-        p_issue_rev      IN VARCHAR2,
-        p_pcs_name       IN VARCHAR2,
-        p_pcs_revision   IN VARCHAR2
-    );
-    
-END pkg_parse_pcs_details;
-/
 
 CREATE OR REPLACE PACKAGE BODY pkg_parse_pcs_details AS
 
@@ -91,17 +17,14 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_pcs_details AS
         v_json_content CLOB;
         v_record_count NUMBER := 0;
     BEGIN
-        -- Get JSON content from RAW_JSON
         SELECT payload INTO v_json_content
         FROM RAW_JSON
         WHERE raw_json_id = p_raw_json_id;
         
-        -- Clear staging table for this plant
         DELETE FROM STG_PCS_LIST
         WHERE plant_id = p_plant_id;
         
-        -- Parse JSON and insert into staging
-        -- The API returns an array of PCS objects under $.getPCS
+        -- CORRECT PATH: $.getPCS[*]
         INSERT INTO STG_PCS_LIST (
             plant_id, pcs, revision, status, rev_date,
             rating_class, test_pressure, material_group, design_code,
@@ -126,7 +49,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_pcs_details AS
             jt.tube_pcs,
             jt.new_vds_section
         FROM JSON_TABLE(
-            v_json_content, '$.getPCS[*]'
+            v_json_content, '$.getPCS[*]'  -- Already correct
             COLUMNS (
                 pcs               VARCHAR2(100)  PATH '$.PCS',
                 revision          VARCHAR2(50)   PATH '$.Revision',
@@ -157,6 +80,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_pcs_details AS
 
     -- =========================================================================
     -- Parse PCS header properties (endpoint 3.2)
+    -- Note: Header endpoint returns a single object, not an array
     -- =========================================================================
     PROCEDURE parse_header_properties(
         p_raw_json_id    IN NUMBER,
@@ -174,10 +98,10 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_pcs_details AS
         
         DELETE FROM STG_PCS_HEADER_PROPERTIES
         WHERE plant_id = p_plant_id
-          AND issue_revision = p_issue_rev
           AND pcs_name = p_pcs_name
           AND revision = p_pcs_revision;
         
+        -- Header is a single object at root level
         INSERT INTO STG_PCS_HEADER_PROPERTIES (
             plant_id, issue_revision, pcs_name, revision, status, rev_date,
             rating_class, test_pressure, material_group, design_code,
@@ -209,7 +133,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_pcs_details AS
             p_pcs_revision,
             jt.*
         FROM JSON_TABLE(
-            v_json_content, '$'
+            v_json_content, '$'  -- Root level object
             COLUMNS (
                 status                      VARCHAR2(50)   PATH '$.Status',
                 rev_date                    VARCHAR2(50)   PATH '$.RevDate',
@@ -289,6 +213,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_pcs_details AS
 
     -- =========================================================================
     -- Parse temperature/pressure JSON (endpoint 3.3)
+    -- FIX: Use $.getTempPressure[*] instead of $[*]
     -- =========================================================================
     PROCEDURE parse_temp_pressures(
         p_raw_json_id    IN NUMBER,
@@ -306,7 +231,6 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_pcs_details AS
         
         DELETE FROM STG_PCS_TEMP_PRESSURES
         WHERE plant_id = p_plant_id
-          AND issue_revision = p_issue_rev
           AND pcs_name = p_pcs_name
           AND revision = p_pcs_revision;
         
@@ -322,7 +246,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_pcs_details AS
             jt.temperature,
             jt.pressure
         FROM JSON_TABLE(
-            v_json_content, '$.getTempPressure[*]'
+            v_json_content, '$.getTempPressure[*]'  -- FIXED PATH
             COLUMNS (
                 temperature VARCHAR2(50) PATH '$.Temperature',
                 pressure    VARCHAR2(50) PATH '$.Pressure'
@@ -340,6 +264,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_pcs_details AS
 
     -- =========================================================================
     -- Parse pipe sizes JSON (endpoint 3.4)
+    -- FIX: Use $.getPipeSize[*] instead of $[*]
     -- =========================================================================
     PROCEDURE parse_pipe_sizes(
         p_raw_json_id    IN NUMBER,
@@ -357,7 +282,6 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_pcs_details AS
         
         DELETE FROM STG_PCS_PIPE_SIZES
         WHERE plant_id = p_plant_id
-          AND issue_revision = p_issue_rev
           AND pcs_name = p_pcs_name
           AND revision = p_pcs_revision;
         
@@ -374,7 +298,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_pcs_details AS
             p_pcs_revision,
             jt.*
         FROM JSON_TABLE(
-            v_json_content, '$.getPipeSize[*]'
+            v_json_content, '$.getPipeSize[*]'  -- FIXED PATH
             COLUMNS (
                 nom_size            VARCHAR2(50) PATH '$.NomSize',
                 outer_diam          VARCHAR2(50) PATH '$.OuterDiam',
@@ -399,6 +323,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_pcs_details AS
 
     -- =========================================================================
     -- Parse pipe elements JSON (endpoint 3.5)
+    -- FIX: Use $.getPipeElement[*] instead of $[*]
     -- =========================================================================
     PROCEDURE parse_pipe_elements(
         p_raw_json_id    IN NUMBER,
@@ -416,7 +341,6 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_pcs_details AS
         
         DELETE FROM STG_PCS_PIPE_ELEMENTS
         WHERE plant_id = p_plant_id
-          AND issue_revision = p_issue_rev
           AND pcs_name = p_pcs_name
           AND revision = p_pcs_revision;
         
@@ -435,7 +359,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_pcs_details AS
             p_pcs_revision,
             jt.*
         FROM JSON_TABLE(
-            v_json_content, '$.getPipeElement[*]'
+            v_json_content, '$.getPipeElement[*]'  -- FIXED PATH
             COLUMNS (
                 material_group_id  VARCHAR2(50)  PATH '$.MaterialGroupID',
                 element_group_no   VARCHAR2(50)  PATH '$.ElementGroupNo',
@@ -476,6 +400,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_pcs_details AS
 
     -- =========================================================================
     -- Parse valve elements JSON (endpoint 3.6)
+    -- FIX: Use $.getValveElement[*] instead of $[*]
     -- =========================================================================
     PROCEDURE parse_valve_elements(
         p_raw_json_id    IN NUMBER,
@@ -493,7 +418,6 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_pcs_details AS
         
         DELETE FROM STG_PCS_VALVE_ELEMENTS
         WHERE plant_id = p_plant_id
-          AND issue_revision = p_issue_rev
           AND pcs_name = p_pcs_name
           AND revision = p_pcs_revision;
         
@@ -512,7 +436,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_pcs_details AS
             p_pcs_revision,
             jt.*
         FROM JSON_TABLE(
-            v_json_content, '$.getValveElement[*]'
+            v_json_content, '$.getValveElement[*]'  -- FIXED PATH
             COLUMNS (
                 valve_group_no    VARCHAR2(50)  PATH '$.ValveGroupNo',
                 line_no           VARCHAR2(50)  PATH '$.LineNo',
@@ -546,6 +470,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_pcs_details AS
 
     -- =========================================================================
     -- Parse embedded notes JSON (endpoint 3.7)
+    -- FIX: Use $.getEmbeddedNotes[*] instead of $[*]
     -- =========================================================================
     PROCEDURE parse_embedded_notes(
         p_raw_json_id    IN NUMBER,
@@ -563,7 +488,6 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_pcs_details AS
         
         DELETE FROM STG_PCS_EMBEDDED_NOTES
         WHERE plant_id = p_plant_id
-          AND issue_revision = p_issue_rev
           AND pcs_name = p_pcs_name
           AND revision = p_pcs_revision;
         
@@ -582,7 +506,7 @@ CREATE OR REPLACE PACKAGE BODY pkg_parse_pcs_details AS
             jt.page_break,
             jt.html_clob
         FROM JSON_TABLE(
-            v_json_content, '$.getEmbeddedNotes[*]'
+            v_json_content, '$.getEmbeddedNotes[*]'  -- FIXED PATH
             COLUMNS (
                 text_section_id          VARCHAR2(50)  PATH '$.TextSectionID',
                 text_section_description VARCHAR2(500) PATH '$.TextSectionDescription',

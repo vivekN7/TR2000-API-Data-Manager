@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(C:\\Repos\\Docker\\DockerContainer\\TR2000/**)",
+      "Read(C:\\Repos\\Docker\\DockerContainer\\TR2000\\TR2K\\Database\\deploy\\01_tables/**)",
+      "Read(C:\\Repos\\Docker\\DockerContainer\\TR2000\\TR2K\\Database\\deploy\\01_tables/**)",
+      "Read(C:\\Repos\\Docker\\DockerContainer\\TR2000\\TR2K\\Database\\deploy\\01_tables/**)",
+      "Read(C:\\Repos\\Docker\\DockerContainer\\TR2000/**)",
+      "Read(C:\\Repos\\Docker\\DockerContainer\\TR2000\\TR2K\\TR2KBlazorLibrary\\Services/**)",
+      "Read(C:\\Repos\\Docker\\DockerContainer\\TR2000/**)",
+      "Read(C:\\Repos\\Docker\\DockerContainer\\TR2000\\TR2K\\TR2KApp\\Components\\Pages/**)",
+      "Read(C:\\Repos\\Docker\\DockerContainer\\TR2000\\TR2K\\Database\\deploy\\incremental/**)",
+      "Read(C:\\Repos\\Docker\\DockerContainer\\TR2000/**)",
+      "Read(C:\\Repos\\Docker\\DockerContainer\\TR2000/**)",
+      "Read(C:\\Repos\\Docker\\DockerContainer\\TR2000\\TR2K\\TR2KApp/**)",
+      "Read(C:\\Repos\\Docker\\DockerContainer\\TR2000/**)",
+      "Read(C:\\Repos\\Docker\\DockerContainer\\TR2000\\TR2K/**)",
+      "Read(C:\\Repos\\Docker\\DockerContainer\\TR2000\\TR2K\\TR2KBlazorLibrary\\Services/**)",
+      "Read(C:\\Repos\\Docker\\DockerContainer\\TR2000\\TR2K\\Database\\deploy\\01_tables/**)",
+      "Read(C:\\Repos\\Docker\\DockerContainer\\TR2000/**)",
+      "Read(C:\\Repos\\Docker\\DockerContainer\\TR2000/**)",
+      "Read(C:\\Repos\\Docker\\DockerContainer\\TR2000/**)",
+      "Read(C:\\Repos\\Docker\\DockerContainer\\TR2000/**)",
+      "Read(C:\\Repos\\Docker\\DockerContainer\\TR2000\\TR2K\\Database\\deploy\\01_tables/**)",
+      "Read(C:\\Repos\\Docker\\DockerContainer\\TR2000/**)",
+      "Read(C:\\Repos\\Docker\\DockerContainer\\TR2000\\TR2K\\TR2KApp\\Components\\Pages\\Legacy/**)",
+      "Read(C:\\Repos\\Docker\\DockerContainer\\TR2000\\TR2K\\Ops\\Knowledge_Base/**)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

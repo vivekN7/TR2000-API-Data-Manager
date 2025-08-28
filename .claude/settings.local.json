@@ -6,7 +6,12 @@
       "Bash(do if [ -f \"$file\" ])",
       "Bash(then mv \"$file\" \"archived_merged/$file%.sql_MERGED.sql\")",
       "Bash(fi)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ],
+    "additionalDirectories": [
+      "C:\\c\\Repos\\Docker\\DockerContainer\\TR2000\\TR2K\\Database\\deploy"
     ]
   },
   "outputStyle": "default"

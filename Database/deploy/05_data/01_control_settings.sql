@@ -44,6 +44,24 @@ WHEN NOT MATCHED THEN
     INSERT (setting_key, setting_value, setting_type, description)
     VALUES ('ETL_LOG_RETENTION_DAYS', '90', 'NUMBER', 'Days to retain ETL logs');
 
+-- PCS Loading Mode (OFFICIAL_ONLY reduces API calls from 2,172 to 396)
+MERGE INTO CONTROL_SETTINGS tgt
+USING (SELECT 'PCS_LOADING_MODE' as key FROM dual) src
+ON (tgt.setting_key = src.key)
+WHEN NOT MATCHED THEN
+    INSERT (setting_key, setting_value, setting_type, description)
+    VALUES ('PCS_LOADING_MODE', 'OFFICIAL_ONLY', 'STRING', 
+            'Controls PCS detail loading: OFFICIAL_ONLY (default - only revisions in PCS_REFERENCES) or ALL_REVISIONS (all from PCS_LIST)');
+
+-- Reference Loading Mode
+MERGE INTO CONTROL_SETTINGS tgt
+USING (SELECT 'REFERENCE_LOADING_MODE' as key FROM dual) src
+ON (tgt.setting_key = src.key)
+WHEN NOT MATCHED THEN
+    INSERT (setting_key, setting_value, setting_type, description)
+    VALUES ('REFERENCE_LOADING_MODE', 'OFFICIAL_ONLY', 'STRING',
+            'Controls reference detail loading: OFFICIAL_ONLY (default - only official revisions) or ALL_REVISIONS');
+
 COMMIT;
 
 PROMPT Control settings loaded successfully

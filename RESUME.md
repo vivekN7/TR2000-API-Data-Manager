@@ -14,9 +14,9 @@ These files contain essential project rules, deployment procedures, and task tra
 2. **Task Progress**: `@Ops\Setup\tasks-tr2k-etl.md` - MUST BE READ AUTOMATICALLY  
 3. **Reference docs**: See Key Documentation below (read as needed)
 
-## 📊 Current Status (Session 16 Complete - 2025-08-29)
+## 📊 Current Status (Session 17 In Progress - 2025-12-29)
 
-### System State - TASK 8 FIXED & READY ✅
+### System State - IMPROVED & OPTIMIZED ✅
 - **130** plants loaded (only GRANE/34 active now)
 - **20** issues loaded (only 34/4.2 active now)
 - **4,572** valid references across 8 types
@@ -25,6 +25,7 @@ These files contain essential project rules, deployment procedures, and task tra
 - **1** selected issue active (34/4.2 only)
 - **0** invalid database objects
 - **PCS_LIST** table populated with all plant PCS
+- **NEW**: PCS_LOADING_MODE setting (OFFICIAL_ONLY reduces API calls by 82%)
 
 ### What Works
 - ✅ Complete ETL pipeline (Plants → Issues → References)
@@ -74,25 +75,24 @@ EXEC refresh_all_data_from_api;
 SELECT * FROM V_SYSTEM_HEALTH_DASHBOARD;
 ```
 
-## 🚀 Session 16 Achievements - Task 8 FIXED
+## 🚀 Session 17 Achievements - Optimization & Cleanup
 
-### Critical Fix Implemented
-**CORRECTED 3-STEP FLOW FOR PCS DETAILS:**
-1. **Step 1**: Get issue PCS refs (OfficialRevision) - already done
-2. **Step 2**: Get ALL PCS revisions from plant endpoint - **362 for GRANE**
-3. **Step 3**: Load details for ALL PCS revisions (6 endpoints each)
+### Key Improvements Implemented
+1. **API Call Optimization**:
+   - Added `PCS_LOADING_MODE` setting (OFFICIAL_ONLY vs ALL_REVISIONS)
+   - OFFICIAL_ONLY mode reduces API calls from 2,172 to 396 (82% reduction)
+   - Added `V_PCS_TO_LOAD` view to control which revisions to load
 
-### Key Changes Made
-- Created **PCS_LIST** table for ALL plant PCS revisions
-- Fixed JSON parsing path: `$.getPCS[*]`
-- Using REAL issue_revision (4.2) - NO DUMMY VALUES
-- Created **pkg_api_client_pcs_details_v2** with correct flow
+2. **Incremental Scripts Merged**:
+   - PCS loading mode control settings → merged to `05_data/01_control_settings.sql`
+   - PCS to load view → merged to `02_views/04_pcs_monitoring_views.sql`
+   - PCS details FK fixes → already applied in `01_tables/09_pcs_details_tables.sql`
+   - JSON parsing paths → already applied in `03_packages/14_pkg_parse_pcs_details.sql`
 
-### Ready to Execute
-```sql
--- To load ALL PCS details for GRANE (362 revisions × 6 endpoints = 2,172 API calls)
-EXEC pkg_api_client_pcs_details_v2.process_pcs_details_correct_flow(:status, :message);
-```
+3. **Fixes from Previous Session**:
+   - PCS details now link to PCS_LIST (not issues)
+   - JSON parsing paths corrected for all 6 PCS detail endpoints
+   - All 3 incremental scripts archived with _MERGED_2025-12-29 suffix
 
 ## 🎯 Next Priority: Complete Task 8 Testing or Move to Task 9
 

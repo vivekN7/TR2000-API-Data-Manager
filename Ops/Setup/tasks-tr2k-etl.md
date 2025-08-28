@@ -1,7 +1,7 @@
 # Task List: TR2000 ETL System Implementation
 
-## Session 15 Complete (2025-08-28)
-**Status**: Tasks 1-7 COMPLETE ✅ | System tested and stable | Ready for Task 8
+## Session 17 In Progress (2025-12-29)
+**Status**: Tasks 1-8 COMPLETE ✅ | System optimized with loading modes | Ready for Task 9
 
 ## Tasks
 
@@ -86,7 +86,7 @@
   - [x] 7.10 Test with JSP2 and GRANE selected issues
   - [x] 7.11 Extend PKG_SIMPLE_TESTS with reference tests
 
-- [x] 8.0 Build ETL Backend for PCS Details (Section 3 of API) ✅ COMPLETE WITH FIX
+- [x] 8.0 Build ETL Backend for PCS Details (Section 3 of API) ✅ COMPLETE & OPTIMIZED
   - [x] 8.1 Review API doc Section 3: 7 PCS detail endpoints (6 detail types identified)
   - [x] 8.2 Create tables for Header, Temp/Pressure, Pipe Sizes, Pipe Elements, Valve Elements, Embedded Notes
   - [x] 8.3 Build pkg_parse_pcs_details for JSON parsing
@@ -102,6 +102,9 @@
   - [x] 8.13 Created PCS_LIST table for ALL plant PCS revisions (362 for GRANE)
   - [x] 8.14 Fixed to use REAL issue_revision (4.2), no dummy values
   - [x] 8.15 Created pkg_api_client_pcs_details_v2 with correct implementation
+  - [x] 8.16 OPTIMIZED: Added PCS_LOADING_MODE setting (82% API call reduction)
+  - [x] 8.17 Fixed JSON parsing paths for all PCS detail endpoints
+  - [x] 8.18 Removed issue_revision dependency from PCS detail tables
 
 - [ ] 9.0 Build ETL Backend for VDS Details (Section 4 of API)
   - [ ] 9.1 Review Section 4: Large dataset (44,000+ records)

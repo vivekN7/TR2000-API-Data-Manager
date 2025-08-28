@@ -204,6 +204,40 @@ FETCH FIRST 100 ROWS ONLY;
 
 COMMENT ON VIEW V_PCS_RECENT_UPDATES IS 'Most recently updated PCS revisions (top 100)';
 
+-- View to identify which PCS revisions to load based on loading mode
+CREATE OR REPLACE VIEW V_PCS_TO_LOAD AS
+SELECT DISTINCT
+    pl.plant_id,
+    pl.pcs_name,
+    pl.revision,
+    CASE 
+        WHEN cs.setting_value = 'OFFICIAL_ONLY' THEN
+            CASE WHEN pr.pcs_name IS NOT NULL THEN 'Y' ELSE 'N' END
+        ELSE 'Y'
+    END as should_load,
+    CASE 
+        WHEN pr.pcs_name IS NOT NULL THEN 'OFFICIAL' 
+        ELSE 'ADDITIONAL' 
+    END as revision_type
+FROM PCS_LIST pl
+LEFT JOIN (
+    -- Get unique official revisions from PCS_REFERENCES
+    SELECT DISTINCT plant_id, pcs_name, 
+           NVL(official_revision, revision) as revision
+    FROM PCS_REFERENCES
+    WHERE is_valid = 'Y'
+) pr ON pl.plant_id = pr.plant_id 
+    AND pl.pcs_name = pr.pcs_name 
+    AND pl.revision = pr.revision
+CROSS JOIN (
+    SELECT NVL(setting_value, 'OFFICIAL_ONLY') as setting_value
+    FROM CONTROL_SETTINGS
+    WHERE setting_key = 'PCS_LOADING_MODE'
+) cs
+WHERE pl.is_valid = 'Y';
+
+COMMENT ON VIEW V_PCS_TO_LOAD IS 'Identifies which PCS revisions should be loaded based on PCS_LOADING_MODE setting';
+
 -- Grant select permissions on all views
 GRANT SELECT ON V_PCS_LIST_SUMMARY TO TR2000_STAGING;
 GRANT SELECT ON V_PCS_DETAILS_COMPLETENESS TO TR2000_STAGING;
@@ -212,3 +246,4 @@ GRANT SELECT ON V_PCS_PROCESSING_STATUS TO TR2000_STAGING;
 GRANT SELECT ON V_PCS_MATERIAL_GROUPS TO TR2000_STAGING;
 GRANT SELECT ON V_PCS_PIPE_ELEMENT_MATERIALS TO TR2000_STAGING;
 GRANT SELECT ON V_PCS_RECENT_UPDATES TO TR2000_STAGING;
+GRANT SELECT ON V_PCS_TO_LOAD TO TR2000_STAGING;

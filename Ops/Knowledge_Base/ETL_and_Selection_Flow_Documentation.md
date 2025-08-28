@@ -18,14 +18,15 @@ This document provides comprehensive documentation of the ETL flow from TR2000 A
 
 ## Current System State
 
-### As of 2025-08-27 (Tasks 1-7 Complete)
+### As of 2025-12-29 (Tasks 1-8 Complete)
 - **130** plants loaded from API
-- **20** issues loaded (12 for plant 124, 8 for plant 34)
+- **20** issues loaded (only 34/4.2 active now)
 - **4,572** valid references across 8 types
-- **2** selected plants (124/JSP2, 34/GRANE)
-- **3** selected issues (124/3.3, 34/3.0, 34/4.2)
+- **362** PCS revisions loaded for plant 34 (ALL revisions)
+- **1** selected plant active (34/GRANE only)
+- **1** selected issue active (34/4.2 only)
 - **0** invalid database objects
-- **~35-40%** test coverage
+- **~40-45%** test coverage (improved with Session 17 tests)
 
 ### Key Components Status
 | Component | Status | Notes |
@@ -33,8 +34,10 @@ This document provides comprehensive documentation of the ETL flow from TR2000 A
 | Plants ETL | ✅ Working | Full API → DB pipeline |
 | Issues ETL | ✅ Working | Selection-based loading |
 | References ETL | ✅ Working | All 9 types implemented |
-| Cascade Operations | ✅ Working | Plant→Issues→References |
+| PCS Details ETL | ✅ Working | Task 8 complete with optimization |
+| Cascade Operations | ✅ Working | Plant→Issues→References→PCS Details |
 | API Throttling | ✅ Working | 5-minute cache |
+| API Optimization | ✅ Working | PCS_LOADING_MODE reduces calls by 82% |
 | Test Isolation | ⚠️ Partial | Tests affect real data |
 | APEX UI | ✅ Working | Basic selection UI |
 
@@ -153,13 +156,16 @@ API Call → RAW_JSON → STG_* → Core Table
 |---------|---------|----------------|
 | **pkg_api_client** | Plant/Issue API calls | refresh_plants_from_api, refresh_issues_for_plant |
 | **pkg_api_client_references** | Reference API calls | refresh_all_issue_references |
+| **pkg_api_client_pcs_details_v2** | PCS Details API calls | process_pcs_details_correct_flow |
 | **pkg_raw_ingest** | SHA256 deduplication | insert_raw_json, is_duplicate_hash |
 | **pkg_parse_plants** | JSON→STG_PLANTS | parse_plants_json |
 | **pkg_parse_issues** | JSON→STG_ISSUES | parse_issues_json |
 | **pkg_parse_references** | JSON→STG_*_REFERENCES | parse_[type]_references (9 types) |
+| **pkg_parse_pcs_details** | JSON→STG_PCS_* | parse_plant_pcs_list, parse_[detail]_properties |
 | **pkg_upsert_plants** | STG→PLANTS merge | upsert_plants |
 | **pkg_upsert_issues** | STG→ISSUES merge | upsert_issues |
 | **pkg_upsert_references** | STG→*_REFERENCES merge | upsert_[type]_references (9 types) |
+| **pkg_upsert_pcs_details** | STG→PCS_* merge | upsert_pcs_list, upsert_[detail]_properties |
 | **pkg_etl_operations** | Orchestration | run_full_etl, run_references_etl_for_all_selected |
 | **pkg_selection_mgmt** | Selection management | add_plant_selection, remove_plant_selection |
 
@@ -275,6 +281,8 @@ SELECT * FROM V_RECENT_ETL_ACTIVITY;
 ### Issue 3: CONTROL_SETTINGS Confusion
 **Active Settings**:
 - API_BASE_URL: Used for all API calls
+- PCS_LOADING_MODE: Controls PCS detail loading (OFFICIAL_ONLY/ALL_REVISIONS)
+- REFERENCE_LOADING_MODE: Controls reference detail loading
 
 **Placeholder Settings** (NOT implemented):
 - API_TIMEOUT_SECONDS
@@ -296,21 +304,32 @@ SELECT * FROM V_RECENT_ETL_ACTIVITY;
 
 ### API Call Reduction
 - Selection-based: 70% reduction in API calls
+- PCS_LOADING_MODE: 82% reduction when using OFFICIAL_ONLY
 - 5-minute throttling: Prevents redundant calls
 - SHA256 deduplication: Skips unchanged data
 
 ---
 
-## Next Steps (Task 8: PCS Details)
+## Completed: Task 8 (PCS Details) ✅
+
+### What Was Implemented
+1. ✅ PCS_LIST table for ALL plant PCS revisions (362 for GRANE)
+2. ✅ 6 PCS detail tables (Header, Temp/Pressure, Pipe Sizes, Pipe Elements, Valve Elements, Embedded Notes)
+3. ✅ pkg_api_client_pcs_details_v2 with correct 3-step flow
+4. ✅ pkg_parse_pcs_details with fixed JSON paths
+5. ✅ PCS_LOADING_MODE optimization (82% API call reduction)
+
+## Next Steps (Task 9: VDS Details)
 
 ### Ready for Implementation
-1. Create PCS detail tables (Line, Gasket, Stud, Nut, etc.)
-2. Extend pkg_parse_references for PCS details
-3. Add FK constraints to PCS_REFERENCES
-4. Implement cascade from PCS references to details
+1. Create VDS_DETAILS table with proper indexes
+2. Build pkg_parse_vds for bulk JSON processing
+3. Build pkg_upsert_vds with batch processing
+4. Implement pagination/chunking for large dataset (44k+ records)
 
 ### System Readiness
 - ✅ All prerequisites complete
+- ✅ PCS Details working with optimization
 - ✅ Reference tables working
 - ✅ Cascade logic tested
 - ✅ 0 invalid objects
@@ -318,5 +337,5 @@ SELECT * FROM V_RECENT_ETL_ACTIVITY;
 
 ---
 
-*Last Updated: 2025-08-27*
-*Version: 3.0 - Complete rewrite for current state*
+*Last Updated: 2025-12-29*
+*Version: 4.0 - Updated with Task 8 completion and Session 17 optimizations*

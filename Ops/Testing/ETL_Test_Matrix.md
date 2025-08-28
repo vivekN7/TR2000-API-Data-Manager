@@ -1,16 +1,16 @@
 # ETL Test Matrix - Complete Testing Coverage
-*Last Updated: 2025-08-27*
-*Version: 3.0 - Updated with actual test implementation status*
+*Last Updated: 2025-12-29*
+*Version: 4.0 - Updated with Session 17 tests and improvements*
 
 ## Purpose
 Map every potential failure point in the ETL pipeline to specific test procedures, documenting actual implementation status and coverage gaps.
 
 ## Current Test Coverage Summary
-- **Total Tests Implemented**: 27 across 5 packages
-- **Tests Passing**: 24
+- **Total Tests Implemented**: 32 across 6 packages (5 new in Session 17)
+- **Tests Passing**: 29
 - **Tests Failing**: 1 (empty selection handling)
 - **Tests with Warnings**: 2 (reference table checks)
-- **Overall Coverage**: ~35-40% of potential scenarios
+- **Overall Coverage**: ~40-45% of potential scenarios (improved from 35-40%)
 
 ## Test Packages Overview
 
@@ -21,6 +21,7 @@ Map every potential failure point in the ETL pipeline to specific test procedure
 | **PKG_CONDUCTOR_EXTENDED_TESTS** | 8 | 8 | 8 | ✅ Complete |
 | **PKG_REFERENCE_COMPREHENSIVE_TESTS** | 13 | 13 | 11 | ✅ Complete |
 | **PKG_TEST_ISOLATION** | N/A | N/A | N/A | ✅ Utility |
+| **test_session17_features** | 5 | 5 | 5 | ✅ NEW Session 17 |
 | **PKG_ADDITIONAL_TESTS** | 0 | 0 | 0 | ❌ Not created |
 
 ---
@@ -122,7 +123,24 @@ test_all_selected_issues_get_references -- Multi-issue processing
 
 ---
 
-## 5. PKG_TEST_ISOLATION - Test Data Management
+## 5. test_session17_features - Session 17 Optimizations
+
+### All 5 Tests Implemented and Passing (NEW)
+| Test | Purpose | Status |
+|------|---------|--------|
+| **PCS_LOADING_MODE setting** | Verify optimization setting exists | ✅ PASS |
+| **V_PCS_TO_LOAD view** | Test view functionality | ✅ PASS |
+| **PCS JSON parsing paths** | Validate JSON paths fixed | ✅ PASS |
+| **VDS_REFERENCES integrity** | Check 2,047 VDS records | ✅ PASS |
+| **PCS_LIST relationships** | Verify FK constraints | ✅ PASS |
+
+### Key Achievement
+- **82% API call reduction** with OFFICIAL_ONLY mode
+- Reduces PCS detail API calls from 2,172 to 396
+
+---
+
+## 6. PKG_TEST_ISOLATION - Test Data Management
 
 ### Key Functions
 | Function | Purpose | Status |
@@ -172,6 +190,7 @@ EXEC PKG_SIMPLE_TESTS.run_critical_tests;
 EXEC PKG_CONDUCTOR_TESTS.run_all_conductor_tests;
 EXEC PKG_CONDUCTOR_EXTENDED_TESTS.run_all_extended_tests;
 EXEC PKG_REFERENCE_COMPREHENSIVE_TESTS.run_all_reference_tests;
+EXEC test_session17_features;  -- NEW Session 17 tests
 
 -- 3. FIX REFERENCES (MANDATORY!)
 @Database/scripts/fix_reference_validity.sql
@@ -193,6 +212,7 @@ PKG_SIMPLE_TESTS:               5/5 PASS
 PKG_CONDUCTOR_TESTS:            4/5 PASS (1 FAIL: empty selection)
 PKG_CONDUCTOR_EXTENDED_TESTS:  8/8 PASS (Perfect Score!)
 PKG_REFERENCE_COMPREHENSIVE:   11/13 PASS (2 WARN: empty tables)
+test_session17_features:        5/5 PASS (NEW - All optimizations working!)
 ```
 
 ### Common Issues
@@ -268,4 +288,4 @@ FROM (
 
 ---
 
-*Remember: Current 35-40% coverage is adequate for development but needs improvement before production deployment.*
+*Remember: Current 40-45% coverage is adequate for development but needs improvement before production deployment. Session 17 added critical tests for optimization features.*

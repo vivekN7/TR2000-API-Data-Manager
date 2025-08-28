@@ -86,7 +86,7 @@
   - [x] 7.10 Test with JSP2 and GRANE selected issues
   - [x] 7.11 Extend PKG_SIMPLE_TESTS with reference tests
 
-- [x] 8.0 Build ETL Backend for PCS Details (Section 3 of API) ✅ COMPLETE
+- [x] 8.0 Build ETL Backend for PCS Details (Section 3 of API) ✅ COMPLETE WITH FIX
   - [x] 8.1 Review API doc Section 3: 7 PCS detail endpoints (6 detail types identified)
   - [x] 8.2 Create tables for Header, Temp/Pressure, Pipe Sizes, Pipe Elements, Valve Elements, Embedded Notes
   - [x] 8.3 Build pkg_parse_pcs_details for JSON parsing
@@ -98,6 +98,10 @@
   - [x] 8.9 Create monitoring views for PCS data (7 views created)
   - [x] 8.10 Test cascade: PCS reference removal should invalidate details (trigger created)
   - [x] 8.11 Add PCS tests to PKG_SIMPLE_TESTS (test script created)
+  - [x] 8.12 FIX: Implemented correct 3-step flow (Issue refs → ALL plant PCS → Details for ALL)
+  - [x] 8.13 Created PCS_LIST table for ALL plant PCS revisions (362 for GRANE)
+  - [x] 8.14 Fixed to use REAL issue_revision (4.2), no dummy values
+  - [x] 8.15 Created pkg_api_client_pcs_details_v2 with correct implementation
 
 - [ ] 9.0 Build ETL Backend for VDS Details (Section 4 of API)
   - [ ] 9.1 Review Section 4: Large dataset (44,000+ records)

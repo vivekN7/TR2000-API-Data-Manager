@@ -14,16 +14,17 @@ These files contain essential project rules, deployment procedures, and task tra
 2. **Task Progress**: `@Ops\Setup\tasks-tr2k-etl.md` - MUST BE READ AUTOMATICALLY  
 3. **Reference docs**: See Key Documentation below (read as needed)
 
-## 📊 Current Status (Session 15 Complete - 2025-08-28)
+## 📊 Current Status (Session 16 Complete - 2025-08-29)
 
-### System State - FULLY OPERATIONAL ✅
-- **130** plants loaded
-- **20** issues loaded (12 for plant 124, 8 for plant 34)
+### System State - TASK 8 FIXED & READY ✅
+- **130** plants loaded (only GRANE/34 active now)
+- **20** issues loaded (only 34/4.2 active now)
 - **4,572** valid references across 8 types
-- **2** selected plants (124/JSP2, 34/GRANE)
-- **3** selected issues (124/3.3, 34/3.0, 34/4.2)
+- **362** PCS revisions loaded for plant 34 (ALL revisions)
+- **1** selected plant active (34/GRANE only)
+- **1** selected issue active (34/4.2 only)
 - **0** invalid database objects
-- **27** tests implemented (~35-40% coverage)
+- **PCS_LIST** table populated with all plant PCS
 
 ### What Works
 - ✅ Complete ETL pipeline (Plants → Issues → References)
@@ -73,15 +74,27 @@ EXEC refresh_all_data_from_api;
 SELECT * FROM V_SYSTEM_HEALTH_DASHBOARD;
 ```
 
-## 🚀 Next Priority: Task 8 - PCS Details
+## 🚀 Session 16 Achievements - Task 8 FIXED
 
-### Ready to Implement
-Task 8.0 Build ETL Backend for PCS Details (Section 3 of API)
-- 8.1 Review API doc Section 3: 7 PCS detail endpoints
-- 8.2 Create tables for Line, Gasket, Stud, Nut, Isolation, Spool, Joint
-- 8.3 Build pkg_parse_pcs_details for JSON parsing
-- 8.4 Build pkg_upsert_pcs_details with FK to PCS_REFERENCES
-- ... (see tasks-tr2k-etl.md for full list)
+### Critical Fix Implemented
+**CORRECTED 3-STEP FLOW FOR PCS DETAILS:**
+1. **Step 1**: Get issue PCS refs (OfficialRevision) - already done
+2. **Step 2**: Get ALL PCS revisions from plant endpoint - **362 for GRANE**
+3. **Step 3**: Load details for ALL PCS revisions (6 endpoints each)
+
+### Key Changes Made
+- Created **PCS_LIST** table for ALL plant PCS revisions
+- Fixed JSON parsing path: `$.getPCS[*]`
+- Using REAL issue_revision (4.2) - NO DUMMY VALUES
+- Created **pkg_api_client_pcs_details_v2** with correct flow
+
+### Ready to Execute
+```sql
+-- To load ALL PCS details for GRANE (362 revisions × 6 endpoints = 2,172 API calls)
+EXEC pkg_api_client_pcs_details_v2.process_pcs_details_correct_flow(:status, :message);
+```
+
+## 🎯 Next Priority: Complete Task 8 Testing or Move to Task 9
 
 ### Prerequisites Complete ✅
 - PCS_REFERENCES table exists with 206 records

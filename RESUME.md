@@ -14,7 +14,7 @@ These files contain essential project rules, deployment procedures, and task tra
 2. **Task Progress**: `@Ops\Setup\tasks-tr2k-etl.md` - MUST BE READ AUTOMATICALLY  
 3. **Reference docs**: See Key Documentation below (read as needed)
 
-## 📊 Current Status (Session 17 In Progress - 2025-12-29)
+## 📊 Current Status (Session 17 Complete - 2025-12-29)
 
 ### System State - IMPROVED & OPTIMIZED ✅
 - **130** plants loaded (only GRANE/34 active now)
@@ -94,13 +94,26 @@ SELECT * FROM V_SYSTEM_HEALTH_DASHBOARD;
    - JSON parsing paths corrected for all 6 PCS detail endpoints
    - All 3 incremental scripts archived with _MERGED_2025-12-29 suffix
 
-## 🎯 Next Priority: Complete Task 8 Testing or Move to Task 9
+## 🎯 Next Priority: Task 9 - VDS Details Implementation
 
-### Prerequisites Complete ✅
-- PCS_REFERENCES table exists with 206 records
-- Reference loading pipeline working
-- Cascade logic tested and functional
-- FK constraints in place
+### Why Task 9 is Critical
+- **Large Dataset**: 2,047 VDS references already loaded
+- **Performance Challenge**: Must handle 44,000+ detail records efficiently
+- **API Endpoints Ready**: Section 4 of API documentation reviewed
+- **Infrastructure Complete**: All ETL patterns established in Task 8
+
+### Task 9 Sub-tasks Overview
+- [ ] 9.1 Review Section 4: Large dataset (44,000+ records)
+- [ ] 9.2 Create VDS_DETAILS table with proper indexes
+- [ ] 9.3 Build pkg_parse_vds for bulk JSON processing
+- [ ] 9.4 Build pkg_upsert_vds with batch processing
+- [ ] 9.5 Add VDS endpoint to CONTROL_ENDPOINTS
+- [ ] 9.6 Extend pkg_api_client with fetch_vds_details
+- [ ] 9.7 Implement pagination/chunking for large dataset
+- [ ] 9.8 Add to ETL workflow with performance monitoring
+- [ ] 9.9 Create analysis views for VDS data
+- [ ] 9.10 Performance test with test data
+- [ ] 9.11 Run PKG_SIMPLE_TESTS with performance metrics
 
 ## 💡 Important Rules for Next Session
 
@@ -132,17 +145,37 @@ SELECT * FROM V_SYSTEM_HEALTH_DASHBOARD;
 - PKG_CONDUCTOR_EXTENDED: 8/8 PASS
 - PKG_REFERENCE_COMPREHENSIVE: 11/13 PASS
 
-## 🔄 Session Handoff Checklist
+## 🔄 Session 18 Startup Checklist
 
-✅ All incremental scripts merged
-✅ Documentation updated (ETL Flow & Test Matrix)
-✅ Test issues documented with workarounds
-✅ System verified stable
-✅ No uncommitted critical changes
-✅ Clear next steps defined (Task 8)
+### For AI Assistant - START HERE:
+1. **Read Required Files** (in this order):
+   - `@RESUME.md` (this file)
+   - `@Ops\Setup\process-task-list-tr2k-etl.md`
+   - `@Ops\Setup\tasks-tr2k-etl.md`
+   - `@Ops\Setup\TR2000_API_Endpoints_Documentation.md` (Section 4 for VDS)
+
+2. **Check System State**:
+   ```sql
+   sqlplus TR2000_STAGING/piping@localhost:1521/XEPDB1
+   SELECT COUNT(*) FROM VDS_REFERENCES WHERE is_valid='Y';  -- Should be 2,047
+   SELECT * FROM V_SYSTEM_HEALTH_DASHBOARD;
+   ```
+
+3. **Review VDS Task Requirements**:
+   - VDS endpoint: `vds/{vdsname}/rev/{revision}`
+   - Expected volume: 44,000+ detail records
+   - Performance critical: Implement batch processing
+   - Follow PCS Details pattern but optimize for scale
+
+### Session 17 Handoff Complete ✅
+- **System State**: Stable and optimized
+- **Task 8**: Complete with 82% API optimization
+- **Test Coverage**: 40-45% with 32 tests
+- **Documentation**: Version 4.0 across all docs
+- **Next Focus**: Task 9 - VDS Details (Performance Critical)
 
 ---
 
-**Ready for Task 8: PCS Details Implementation**
+**Ready for Task 9: VDS Details Implementation**
 
-*The system is stable, tested, and fully documented. Begin next session with Task 8.*
+*The system is stable, optimized, and fully documented. Task 9 requires focus on performance due to large dataset (44k+ records).*

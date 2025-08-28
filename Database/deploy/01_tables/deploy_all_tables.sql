@@ -65,6 +65,9 @@ PROMPT Creating tables...
 -- Reference tables for issue references
 @06_reference_tables.sql
 
+-- PCS details tables (PCS_LIST and 6 detail types)
+@09_pcs_details_tables.sql
+
 PROMPT
 PROMPT ===============================================================================
 PROMPT Table deployment complete

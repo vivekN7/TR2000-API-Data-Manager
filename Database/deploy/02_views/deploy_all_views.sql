@@ -30,6 +30,9 @@ PROMPT =========================================================================
 -- System Views
 @03_system_views.sql
 
+-- PCS Monitoring Views (Task 8)
+@04_pcs_monitoring_views.sql
+
 PROMPT
 PROMPT ===============================================================================
 PROMPT View deployment complete

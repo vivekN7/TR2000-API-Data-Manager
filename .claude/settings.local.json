@@ -8,7 +8,8 @@
       "Bash(fi)",
       "Bash(done)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "additionalDirectories": [
       "C:\\c\\Repos\\Docker\\DockerContainer\\TR2000\\TR2K\\Database\\deploy"

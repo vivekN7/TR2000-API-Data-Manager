@@ -46,10 +46,6 @@ PROMPT Step 5d: Loading global VDS list...
 @scripts/05d_load_vds_list_no_exit.sql
 
 PROMPT
-PROMPT Step 5e: Loading VDS details...
-@scripts/05e_load_vds_details_no_exit.sql
-
-PROMPT
 PROMPT ===============================================
 PROMPT All Steps Complete!
 PROMPT ===============================================

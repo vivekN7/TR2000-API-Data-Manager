@@ -49,11 +49,13 @@ BEGIN
                 DBMS_OUTPUT.PUT_LINE('  Loading details for ' || pcs.pcs_name || 
                                      ' Rev: ' || pcs.official_revision);
                 -- Call the 6 detail endpoints for this PCS/revision
-                -- pkg_api_client_pcs_details.fetch_pcs_details(
-                --     p_plant_id => pcs.plant_id,
-                --     p_pcs_name => pcs.pcs_name,
-                --     p_revision => pcs.official_revision
-                -- );
+                pkg_api_client_pcs_details.refresh_pcs_details(
+                    p_plant_id => pcs.plant_id,
+                    p_pcs_name => pcs.pcs_name,
+                    p_revision => pcs.official_revision,
+                    p_status => v_status,
+                    p_message => v_msg
+                );
             END LOOP;
         ELSE
             DBMS_OUTPUT.PUT_LINE('Loading PCS details for ALL revisions...');
@@ -65,11 +67,13 @@ BEGIN
                 DBMS_OUTPUT.PUT_LINE('  Loading details for ' || pcs.pcs_name || 
                                      ' Rev: ' || pcs.revision);
                 -- Call the 6 detail endpoints for this PCS/revision
-                -- pkg_api_client_pcs_details.fetch_pcs_details(
-                --     p_plant_id => pcs.plant_id,
-                --     p_pcs_name => pcs.pcs_name,
-                --     p_revision => pcs.revision
-                -- );
+                pkg_api_client_pcs_details.refresh_pcs_details(
+                    p_plant_id => pcs.plant_id,
+                    p_pcs_name => pcs.pcs_name,
+                    p_revision => pcs.revision,
+                    p_status => v_status,
+                    p_message => v_msg
+                );
             END LOOP;
         END IF;
         

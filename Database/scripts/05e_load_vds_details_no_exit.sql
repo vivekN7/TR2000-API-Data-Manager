@@ -62,12 +62,12 @@ BEGIN
                     DBMS_OUTPUT.PUT_LINE('  Loading details for ' || vds.vds_name || 
                                          ' Rev: ' || vds.official_revision);
                     -- Call VDS detail API
-                    -- pkg_api_client_vds.fetch_vds_details(
-                    --     p_vds_name => vds.vds_name,
-                    --     p_revision => vds.official_revision,
-                    --     p_status => v_status,
-                    --     p_message => v_msg
-                    -- );
+                    pkg_api_client_vds.fetch_vds_details(
+                        p_vds_name => vds.vds_name,
+                        p_revision => vds.official_revision,
+                        p_status => v_status,
+                        p_message => v_msg
+                    );
                 END LOOP;
             ELSE
                 -- Use existing workflow for ALL mode

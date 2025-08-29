@@ -26,37 +26,36 @@ BEGIN
     
     DBMS_OUTPUT.PUT_LINE('VDS Loading Mode: ' || v_mode);
     
-    IF v_mode = 'OFFICIAL_ONLY' THEN
+    -- Always load VDS list regardless of mode
+    -- Check if VDS list already loaded
+    SELECT COUNT(*) INTO v_vds_count FROM VDS_LIST WHERE is_valid = 'Y';
+    
+    DBMS_OUTPUT.PUT_LINE('Current VDS list entries: ' || v_vds_count);
+    
+    IF v_vds_count = 0 THEN
         DBMS_OUTPUT.PUT_LINE('');
-        DBMS_OUTPUT.PUT_LINE('SKIPPING VDS list load in OFFICIAL_ONLY mode');
-        DBMS_OUTPUT.PUT_LINE('(VDS details will use VDS_REFERENCES directly for official revisions)');
-    ELSE
-        -- Check if VDS list already loaded
+        DBMS_OUTPUT.PUT_LINE('Loading VDS list from API...');
+        DBMS_OUTPUT.PUT_LINE('WARNING: This loads 50,000+ records and may take time');
+        
+        -- Call VDS list API
+        pkg_api_client_vds.fetch_vds_list(
+            p_status => v_status,
+            p_message => v_msg
+        );
+        
+        DBMS_OUTPUT.PUT_LINE('Result: ' || v_status);
+        DBMS_OUTPUT.PUT_LINE('Message: ' || SUBSTR(v_msg, 1, 500));
+        
+        -- Check what was loaded
         SELECT COUNT(*) INTO v_vds_count FROM VDS_LIST WHERE is_valid = 'Y';
+        DBMS_OUTPUT.PUT_LINE('');
+        DBMS_OUTPUT.PUT_LINE('VDS list entries loaded: ' || v_vds_count);
         
-        DBMS_OUTPUT.PUT_LINE('Current VDS list entries: ' || v_vds_count);
-        
-        IF v_vds_count = 0 THEN
-            DBMS_OUTPUT.PUT_LINE('');
-            DBMS_OUTPUT.PUT_LINE('Loading VDS list from API...');
-            DBMS_OUTPUT.PUT_LINE('WARNING: This loads 50,000+ records and may take time');
-            
-            -- Call VDS list API
-            pkg_api_client_vds.fetch_vds_list(
-                p_status => v_status,
-                p_message => v_msg
-            );
-            
-            DBMS_OUTPUT.PUT_LINE('Result: ' || v_status);
-            DBMS_OUTPUT.PUT_LINE('Message: ' || SUBSTR(v_msg, 1, 500));
-            
-            -- Check what was loaded
-            SELECT COUNT(*) INTO v_vds_count FROM VDS_LIST WHERE is_valid = 'Y';
-            DBMS_OUTPUT.PUT_LINE('');
-            DBMS_OUTPUT.PUT_LINE('VDS list entries loaded: ' || v_vds_count);
-        ELSE
-            DBMS_OUTPUT.PUT_LINE('VDS list already loaded - skipping');
+        IF v_mode = 'OFFICIAL_ONLY' THEN
+            DBMS_OUTPUT.PUT_LINE('Note: In OFFICIAL_ONLY mode, only official VDS details will be loaded in step 5e');
         END IF;
+    ELSE
+        DBMS_OUTPUT.PUT_LINE('VDS list already loaded - skipping');
     END IF;
     
     DBMS_OUTPUT.PUT_LINE('===============================================');

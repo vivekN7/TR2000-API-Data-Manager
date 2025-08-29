@@ -222,8 +222,21 @@ CREATE OR REPLACE PACKAGE BODY pkg_api_client_references AS
         v_success_count NUMBER := 0;
         v_error_count NUMBER := 0;
         v_messages CLOB;
+        l_run_id NUMBER;
+        l_start_time TIMESTAMP := SYSTIMESTAMP;
+        l_total_records NUMBER := 0;
     BEGIN
         l_correlation_id := NVL(p_correlation_id, SYS_GUID());
+        
+        -- Log to ETL_RUN_LOG for statistics
+        INSERT INTO ETL_RUN_LOG (
+            run_type, endpoint_key, plant_id, issue_revision, 
+            start_time, status, initiated_by
+        ) VALUES (
+            'REFERENCES_API_REFRESH', 'references_all', p_plant_id, p_issue_rev,
+            l_start_time, 'RUNNING', USER
+        )
+        RETURNING run_id INTO l_run_id;
         
         -- Process each reference type
         FOR ref_type IN (
@@ -257,6 +270,20 @@ CREATE OR REPLACE PACKAGE BODY pkg_api_client_references AS
             END;
         END LOOP;
         
+        -- Count total records loaded
+        SELECT 
+            (SELECT COUNT(*) FROM PCS_REFERENCES WHERE plant_id = p_plant_id AND issue_revision = p_issue_rev) +
+            (SELECT COUNT(*) FROM VDS_REFERENCES WHERE plant_id = p_plant_id AND issue_revision = p_issue_rev) +
+            (SELECT COUNT(*) FROM MDS_REFERENCES WHERE plant_id = p_plant_id AND issue_revision = p_issue_rev) +
+            (SELECT COUNT(*) FROM EDS_REFERENCES WHERE plant_id = p_plant_id AND issue_revision = p_issue_rev) +
+            (SELECT COUNT(*) FROM VSK_REFERENCES WHERE plant_id = p_plant_id AND issue_revision = p_issue_rev) +
+            (SELECT COUNT(*) FROM ESK_REFERENCES WHERE plant_id = p_plant_id AND issue_revision = p_issue_rev) +
+            (SELECT COUNT(*) FROM PIPE_ELEMENT_REFERENCES WHERE plant_id = p_plant_id AND issue_revision = p_issue_rev) +
+            (SELECT COUNT(*) FROM SC_REFERENCES WHERE plant_id = p_plant_id AND issue_revision = p_issue_rev) +
+            (SELECT COUNT(*) FROM VSM_REFERENCES WHERE plant_id = p_plant_id AND issue_revision = p_issue_rev)
+        INTO l_total_records
+        FROM DUAL;
+        
         -- Set overall status
         IF v_error_count = 0 THEN
             p_status := 'SUCCESS';
@@ -271,6 +298,20 @@ CREATE OR REPLACE PACKAGE BODY pkg_api_client_references AS
             p_message := 'All reference types failed';
         END IF;
         
+        -- Update ETL_RUN_LOG with final status
+        UPDATE ETL_RUN_LOG
+        SET end_time = SYSTIMESTAMP,
+            status = p_status,
+            records_processed = l_total_records,
+            records_inserted = l_total_records,
+            error_count = v_error_count,
+            duration_seconds = EXTRACT(SECOND FROM (SYSTIMESTAMP - l_start_time)) +
+                             EXTRACT(MINUTE FROM (SYSTIMESTAMP - l_start_time)) * 60,
+            notes = SUBSTR(v_messages, 1, 4000)
+        WHERE run_id = l_run_id;
+        
+        COMMIT;
+        
         -- Add detailed messages
         p_message := p_message || CHR(10) || CHR(10) || 'Details:' || CHR(10) || v_messages;
         
@@ -278,6 +319,20 @@ CREATE OR REPLACE PACKAGE BODY pkg_api_client_references AS
         WHEN OTHERS THEN
             p_status := 'ERROR';
             p_message := 'Failed to process references: ' || SQLERRM;
+            
+            -- Update ETL_RUN_LOG on error
+            IF l_run_id IS NOT NULL THEN
+                UPDATE ETL_RUN_LOG
+                SET end_time = SYSTIMESTAMP,
+                    status = 'ERROR',
+                    error_count = 1,
+                    duration_seconds = EXTRACT(SECOND FROM (SYSTIMESTAMP - l_start_time)) +
+                                     EXTRACT(MINUTE FROM (SYSTIMESTAMP - l_start_time)) * 60,
+                    notes = SUBSTR(p_message, 1, 4000)
+                WHERE run_id = l_run_id;
+                
+                COMMIT;
+            END IF;
     END refresh_all_issue_references;
 
 END pkg_api_client_references;

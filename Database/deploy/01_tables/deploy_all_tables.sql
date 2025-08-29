@@ -22,7 +22,7 @@ BEGIN
     FOR t IN (
         SELECT table_name FROM user_tables 
         WHERE table_name IN (
-            'ETL_ERROR_LOG', 'ETL_RUN_LOG', 'CONTROL_ENDPOINT_STATE', 
+            'ETL_ERROR_LOG', 'ETL_RUN_LOG', 'ETL_STATS', 
             'CONTROL_ENDPOINTS', 'CONTROL_SETTINGS', 'SELECTION_LOADER',
             'ISSUES', 'PLANTS', 'STG_ISSUES', 'STG_PLANTS', 
             'RAW_JSON'
@@ -67,6 +67,9 @@ PROMPT Creating tables...
 
 -- PCS details tables (PCS_LIST and 6 detail types)
 @09_pcs_details_tables.sql
+
+-- VDS details tables (VDS_LIST and VDS_DETAILS)
+@10_vds_details_tables.sql
 
 PROMPT
 PROMPT ===============================================================================

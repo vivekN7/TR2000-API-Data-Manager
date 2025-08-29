@@ -1,11 +1,11 @@
 -- ===============================================================================
--- PKG_API_CLIENT_PCS_DETAILS_V2 - FIXED API Client for PCS Detail Data
+-- PKG_API_CLIENT_PCS_DETAILS - API Client for PCS Detail Data
 -- Date: 2025-12-01
 -- Purpose: Correct implementation using proper 3-step flow
 -- Flow: 1) Get issue PCS refs, 2) Get ALL plant PCS, 3) Load details for ALL PCS
 -- ===============================================================================
 
-CREATE OR REPLACE PACKAGE pkg_api_client_pcs_details_v2 AS
+CREATE OR REPLACE PACKAGE pkg_api_client_pcs_details AS
 
     -- Fetch ALL PCS for a plant (endpoint 3.1)
     FUNCTION fetch_plant_pcs_list(
@@ -57,10 +57,10 @@ CREATE OR REPLACE PACKAGE pkg_api_client_pcs_details_v2 AS
         p_message         OUT VARCHAR2
     );
 
-END pkg_api_client_pcs_details_v2;
+END pkg_api_client_pcs_details;
 /
 
-CREATE OR REPLACE PACKAGE BODY pkg_api_client_pcs_details_v2 AS
+CREATE OR REPLACE PACKAGE BODY pkg_api_client_pcs_details AS
 
     -- Private function to get base URL
     FUNCTION get_base_url RETURN VARCHAR2 IS
@@ -128,7 +128,18 @@ CREATE OR REPLACE PACKAGE BODY pkg_api_client_pcs_details_v2 AS
         l_correlation_id VARCHAR2(36);
         l_endpoint_key VARCHAR2(100);
         l_count NUMBER;
+        l_run_id NUMBER;
+        l_start_time TIMESTAMP := SYSTIMESTAMP;
     BEGIN
+        -- Log to ETL_RUN_LOG for statistics
+        INSERT INTO ETL_RUN_LOG (
+            run_type, endpoint_key, plant_id, 
+            start_time, status, initiated_by
+        ) VALUES (
+            'PCS_LIST_REFRESH', 'pcs_list', p_plant_id,
+            l_start_time, 'RUNNING', USER
+        )
+        RETURNING run_id INTO l_run_id;
         IF p_correlation_id IS NULL THEN
             SELECT SYS_GUID() INTO l_correlation_id FROM DUAL;
         ELSE
@@ -180,11 +191,38 @@ CREATE OR REPLACE PACKAGE BODY pkg_api_client_pcs_details_v2 AS
         p_status := 'SUCCESS';
         p_message := 'Loaded ' || l_count || ' PCS revisions for plant ' || p_plant_id;
         
+        -- Update ETL_RUN_LOG with success
+        UPDATE ETL_RUN_LOG
+        SET end_time = SYSTIMESTAMP,
+            status = p_status,
+            records_processed = l_count,
+            records_inserted = l_count,
+            duration_seconds = EXTRACT(SECOND FROM (SYSTIMESTAMP - l_start_time)) +
+                             EXTRACT(MINUTE FROM (SYSTIMESTAMP - l_start_time)) * 60,
+            notes = p_message
+        WHERE run_id = l_run_id;
+        
+        COMMIT;
+        
     EXCEPTION
         WHEN OTHERS THEN
             ROLLBACK;
             p_status := 'ERROR';
             p_message := 'Error refreshing PCS list: ' || SUBSTR(SQLERRM, 1, 200);
+            
+            -- Update ETL_RUN_LOG with error
+            IF l_run_id IS NOT NULL THEN
+                UPDATE ETL_RUN_LOG
+                SET end_time = SYSTIMESTAMP,
+                    status = 'ERROR',
+                    error_count = 1,
+                    duration_seconds = EXTRACT(SECOND FROM (SYSTIMESTAMP - l_start_time)) +
+                                     EXTRACT(MINUTE FROM (SYSTIMESTAMP - l_start_time)) * 60,
+                    notes = p_message
+                WHERE run_id = l_run_id;
+                
+                COMMIT;
+            END IF;
     END refresh_plant_pcs_list;
 
     -- =========================================================================
@@ -517,5 +555,5 @@ CREATE OR REPLACE PACKAGE BODY pkg_api_client_pcs_details_v2 AS
             DBMS_OUTPUT.PUT_LINE('Fatal error: ' || SQLERRM);
     END process_pcs_details_correct_flow;
     
-END pkg_api_client_pcs_details_v2;
+END pkg_api_client_pcs_details;
 /

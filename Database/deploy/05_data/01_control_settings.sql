@@ -62,6 +62,15 @@ WHEN NOT MATCHED THEN
     VALUES ('REFERENCE_LOADING_MODE', 'OFFICIAL_ONLY', 'STRING',
             'Controls reference detail loading: OFFICIAL_ONLY (default - only official revisions) or ALL_REVISIONS');
 
+-- VDS Loading Mode (Session 18)
+MERGE INTO CONTROL_SETTINGS tgt
+USING (SELECT 'VDS_LOADING_MODE' as key FROM dual) src
+ON (tgt.setting_key = src.key)
+WHEN NOT MATCHED THEN
+    INSERT (setting_key, setting_value, setting_type, description)
+    VALUES ('VDS_LOADING_MODE', 'OFFICIAL_ONLY', 'STRING',
+            'Controls VDS detail loading: OFFICIAL_ONLY (default - only official revisions) or ALL_REVISIONS');
+
 COMMIT;
 
 PROMPT Control settings loaded successfully

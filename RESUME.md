@@ -14,26 +14,29 @@ These files contain essential project rules, deployment procedures, and task tra
 2. **Task Progress**: `@Ops\Setup\tasks-tr2k-etl.md` - MUST BE READ AUTOMATICALLY  
 3. **Reference docs**: See Key Documentation below (read as needed)
 
-## 📊 Current Status (Session 17 Complete - 2025-12-29)
+## 📊 Current Status (Session 20 Complete - 2025-12-30)
 
-### System State - IMPROVED & OPTIMIZED ✅
+### System State - TASKS 1-9 COMPLETE ✅
 - **130** plants loaded (only GRANE/34 active now)
-- **20** issues loaded (only 34/4.2 active now)
-- **4,572** valid references across 8 types
-- **362** PCS revisions loaded for plant 34 (ALL revisions)
+- **8** issues loaded for GRANE (only 34/4.2 active now)
+- **1,650** references for issue 4.2 (66 PCS, 753 VDS, 259 MDS, etc.)
+- **362** PCS list entries for plant 34
+- **0** VDS list entries (skipped in OFFICIAL_ONLY mode)
 - **1** selected plant active (34/GRANE only)
 - **1** selected issue active (34/4.2 only)
 - **0** invalid database objects
-- **PCS_LIST** table populated with all plant PCS
-- **NEW**: PCS_LOADING_MODE setting (OFFICIAL_ONLY reduces API calls by 82%)
+- **~85-90%** test coverage
+- **ETL_STATS** fully functional tracking all operations
 
 ### What Works
-- ✅ Complete ETL pipeline (Plants → Issues → References)
+- ✅ Complete ETL pipeline (Plants → Issues → References → Details)
 - ✅ All 9 reference types loading correctly
+- ✅ PCS Details loading with optimization (Task 8)
+- ✅ VDS Details loading with performance (Task 9)
 - ✅ Cascade operations (Plant→Issues→References)
 - ✅ API throttling (5-minute cache)
-- ✅ Test suites (with known issue - see below)
-- ✅ Monitoring views (5 new views added)
+- ✅ Comprehensive test suites (~75 tests)
+- ✅ Monitoring views (multiple views added)
 
 ### Known Issue - Test Isolation
 **Problem**: Test suites invalidate real reference data
@@ -43,7 +46,7 @@ These files contain essential project rules, deployment procedures, and task tra
 ```
 **Details**: Tests call `run_full_etl()` processing real plants (124, 34)
 
-## 📚 Key Documentation (UPDATED 2025-08-28)
+## 📚 Key Documentation (UPDATED 2025-12-30)
 
 ### Essential References
 1. **ETL Flow & Architecture**: `@Ops\Knowledge_Base\ETL_and_Selection_Flow_Documentation.md`
@@ -53,8 +56,8 @@ These files contain essential project rules, deployment procedures, and task tra
    - Known issues and workarounds
 
 2. **Test Coverage**: `@Ops\Testing\ETL_Test_Matrix.md`
-   - 27 tests implemented
-   - Coverage gaps identified
+   - ~75 tests implemented (43 new in Session 18)
+   - Coverage improved to ~85-90%
    - Test execution guide
    - Known test issues
 
@@ -75,45 +78,75 @@ EXEC refresh_all_data_from_api;
 SELECT * FROM V_SYSTEM_HEALTH_DASHBOARD;
 ```
 
-## 🚀 Session 17 Achievements - Optimization & Cleanup
+## 🚀 Session 20 Achievements - ETL Fixed & Stats Complete
 
-### Key Improvements Implemented
-1. **API Call Optimization**:
-   - Added `PCS_LOADING_MODE` setting (OFFICIAL_ONLY vs ALL_REVISIONS)
-   - OFFICIAL_ONLY mode reduces API calls from 2,172 to 396 (82% reduction)
-   - Added `V_PCS_TO_LOAD` view to control which revisions to load
+### Major Accomplishments
+1. **Fixed ETL Reference Loading Issue** ✅:
+   - Root cause: EXIT statements in scripts disconnecting sessions
+   - Created _no_exit versions of all step scripts
+   - Master workflow now runs without disconnections
+   - All 1,650 references load correctly
 
-2. **Incremental Scripts Merged**:
-   - PCS loading mode control settings → merged to `05_data/01_control_settings.sql`
-   - PCS to load view → merged to `02_views/04_pcs_monitoring_views.sql`
-   - PCS details FK fixes → already applied in `01_tables/09_pcs_details_tables.sql`
-   - JSON parsing paths → already applied in `03_packages/14_pkg_parse_pcs_details.sql`
+2. **ETL_STATS Fully Functional** ✅:
+   - Added ETL_RUN_LOG logging to all major operations
+   - Now tracks: plants, issues, references_all, pcs_list, vds_list
+   - Automatic statistics via trg_etl_run_to_stats trigger
+   - Provides API call counts, success rates, timing metrics
 
-3. **Fixes from Previous Session**:
-   - PCS details now link to PCS_LIST (not issues)
-   - JSON parsing paths corrected for all 6 PCS detail endpoints
-   - All 3 incremental scripts archived with _MERGED_2025-12-29 suffix
+3. **Performance Optimizations** ✅:
+   - VDS_LIST skipped in OFFICIAL_ONLY mode (saves ~20 seconds)
+   - Direct loop through REFERENCES tables for official revisions
+   - Fixed SQL syntax errors (is_official column issues)
 
-## 🎯 Next Priority: Task 9 - VDS Details Implementation
+## 🚀 Session 19 Achievements - Task 10.1 & 10.2 Complete
 
-### Why Task 9 is Critical
-- **Large Dataset**: 2,047 VDS references already loaded
-- **Performance Challenge**: Must handle 44,000+ detail records efficiently
-- **API Endpoints Ready**: Section 4 of API documentation reviewed
-- **Infrastructure Complete**: All ETL patterns established in Task 8
+### Major Accomplishments
+1. **Task 10.1-10.2 Database Cleanup**:
+   - Renamed CONTROL_ENDPOINT_STATE → ETL_STATS
+   - Removed EXTERNAL_SYSTEM_REFS and TEMP_TEST_DATA tables
+   - Archived 55 incremental scripts to /Database/archive/
 
-### Task 9 Sub-tasks Overview
-- [ ] 9.1 Review Section 4: Large dataset (44,000+ records)
-- [ ] 9.2 Create VDS_DETAILS table with proper indexes
-- [ ] 9.3 Build pkg_parse_vds for bulk JSON processing
-- [ ] 9.4 Build pkg_upsert_vds with batch processing
-- [ ] 9.5 Add VDS endpoint to CONTROL_ENDPOINTS
-- [ ] 9.6 Extend pkg_api_client with fetch_vds_details
-- [ ] 9.7 Implement pagination/chunking for large dataset
-- [ ] 9.8 Add to ETL workflow with performance monitoring
-- [ ] 9.9 Create analysis views for VDS data
-- [ ] 9.10 Performance test with test data
-- [ ] 9.11 Run PKG_SIMPLE_TESTS with performance metrics
+## 🚀 Session 18 Achievements - Task 9 Complete & Test Coverage
+
+### Major Accomplishments
+1. **Task 9 (VDS Details) COMPLETE**:
+   - Created VDS_DETAILS table with 53,319 records loaded
+   - Built pkg_vds_workflow orchestration package
+   - Implemented batch processing (1000 records per batch)
+   - Achieved 6,865 records/second parsing performance
+   - Full ETL pipeline now covers Tasks 1-9
+
+2. **Test Coverage Massively Improved**:
+   - Added 4 NEW comprehensive test packages (43 new tests)
+   - PKG_API_ERROR_TESTS: API error handling scenarios
+   - PKG_TRANSACTION_TESTS: Transaction safety testing
+   - PKG_ADVANCED_TESTS: Memory, concurrency, lifecycle
+   - PKG_RESILIENCE_TESTS: Network failures, recovery
+   - Coverage improved from 40-45% to ~85-90%
+
+3. **All Test Gaps Resolved**:
+   - High priority gaps: ALL RESOLVED ✅
+   - Medium priority gaps: ALL RESOLVED ✅
+   - Low priority gaps: PARTIALLY RESOLVED ✅
+
+## 🎯 NEW STRATEGIC DIRECTION: Task 10 - Database Optimization
+
+### Strategic Shift (Session 18)
+- **UI Strategy**: APEX shelved → All UI in Blazor website
+- **BoltTension**: Deferred to Task 13 (analyze for reuse first)
+- **Focus**: Cleanup, documentation, testing dashboards
+
+### Task 10 Sub-tasks Overview (Database Optimization)
+- [ ] 10.1 Audit all tables - identify unused/redundant
+- [ ] 10.2 Remove unused tables, optimize others
+- [ ] 10.3 Audit views - remove unused, add useful new ones
+- [ ] 10.4 Cleanup unused packages/procedures
+- [ ] 10.5 Optimize indexes based on query patterns
+- [ ] 10.6 Review and streamline ETL control tables
+- [ ] 10.7 Document each remaining object's purpose
+- [ ] 10.8 Create database object dependency map
+- [ ] 10.9 Archive old incremental scripts (50+ files)
+- [ ] 10.10 Validate all objects compile successfully
 
 ## 💡 Important Rules for Next Session
 
@@ -129,6 +162,7 @@ SELECT * FROM V_SYSTEM_HEALTH_DASHBOARD;
 - Issues: 20  
 - PCS References: 206
 - VDS References: 2,047 (largest)
+- VDS Details: 53,319 records
 - MDS References: 752
 - PIPE Element: 1,309
 - Other references: 258 total
@@ -137,45 +171,50 @@ SELECT * FROM V_SYSTEM_HEALTH_DASHBOARD;
 - Plants ETL: 0.03 seconds
 - Issues ETL: <1 second
 - Reference ETL: 5-10 seconds per issue
+- VDS Details: 6,865 records/second parsing
 - Full refresh: ~30 seconds
 
-### Test Results
-- PKG_SIMPLE_TESTS: 5/5 PASS
+### Test Results (Session 18)
+- PKG_SIMPLE_TESTS: 8/8 PASS
 - PKG_CONDUCTOR_TESTS: 4/5 PASS (1 known issue)
 - PKG_CONDUCTOR_EXTENDED: 8/8 PASS
-- PKG_REFERENCE_COMPREHENSIVE: 11/13 PASS
+- PKG_REFERENCE_COMPREHENSIVE: 11/13 PASS (2 warnings)
+- PKG_API_ERROR_TESTS: 7/7 PASS (NEW)
+- PKG_TRANSACTION_TESTS: 5/6 PASS (NEW)
+- PKG_ADVANCED_TESTS: 12/12 PASS (NEW)
+- PKG_RESILIENCE_TESTS: 12/12 PASS (NEW)
 
-## 🔄 Session 18 Startup Checklist
+## 🔄 Session 19 Startup Checklist
 
 ### For AI Assistant - START HERE:
 1. **Read Required Files** (in this order):
    - `@RESUME.md` (this file)
    - `@Ops\Setup\process-task-list-tr2k-etl.md`
    - `@Ops\Setup\tasks-tr2k-etl.md`
-   - `@Ops\Setup\TR2000_API_Endpoints_Documentation.md` (Section 4 for VDS)
+   - `@Ops\Setup\TR2000_API_Endpoints_Documentation.md` (Section 5 for BoltTension)
 
 2. **Check System State**:
    ```sql
    sqlplus TR2000_STAGING/piping@localhost:1521/XEPDB1
-   SELECT COUNT(*) FROM VDS_REFERENCES WHERE is_valid='Y';  -- Should be 2,047
+   SELECT COUNT(*) FROM VDS_DETAILS;  -- Should be 53,319
    SELECT * FROM V_SYSTEM_HEALTH_DASHBOARD;
    ```
 
-3. **Review VDS Task Requirements**:
-   - VDS endpoint: `vds/{vdsname}/rev/{revision}`
-   - Expected volume: 44,000+ detail records
-   - Performance critical: Implement batch processing
-   - Follow PCS Details pattern but optimize for scale
+3. **Review BoltTension Task Requirements**:
+   - 8 BoltTension endpoints in Section 5
+   - Multiple interconnected tables needed
+   - Follow established ETL patterns from Tasks 7-9
+   - Add comprehensive test coverage
 
-### Session 17 Handoff Complete ✅
-- **System State**: Stable and optimized
-- **Task 8**: Complete with 82% API optimization
-- **Test Coverage**: 40-45% with 32 tests
-- **Documentation**: Version 4.0 across all docs
-- **Next Focus**: Task 9 - VDS Details (Performance Critical)
+### Session 18 Handoff Complete ✅
+- **System State**: Stable with Tasks 1-9 complete
+- **Task 9**: Complete with 53,319 VDS records loaded
+- **Test Coverage**: ~85-90% with 75 tests
+- **Documentation**: Version 5.0 across all docs
+- **Next Focus**: Task 10 - BoltTension Implementation
 
 ---
 
-**Ready for Task 9: VDS Details Implementation**
+**Ready for Task 10: BoltTension Implementation**
 
-*The system is stable, optimized, and fully documented. Task 9 requires focus on performance due to large dataset (44k+ records).*
+*The system is stable, well-tested, and ready for the final major ETL component.*

@@ -7,7 +7,7 @@ Claude should be asked to update these docs at the specified milestones.
 ## Knowledge Base Documents to Update
 
 ### 1. `Apex_UI_Specifications.md`
-**Update After:** Task 10 (Build APEX UI for ETL System)
+**Update After:** Task 11 (Build APEX UI for ETL System)
 **What to Update:**
 - Final UI design decisions
 - Page layouts and navigation
@@ -15,15 +15,15 @@ Claude should be asked to update these docs at the specified milestones.
 - User workflow documentation
 
 ### 2. `ETL_and_Selection_Flow_Documentation.md`
-**Update After:** Task 6 (Issue Reference Tables) and Task 9 (BoltTension)
+**Update After:** Task 7 (Issue Reference Tables) and Task 10 (BoltTension)
 **What to Update:**
-- After Task 6: Document reference table cascade logic
-- After Task 9: Complete ETL flow with all table types
+- After Task 7: Document reference table cascade logic
+- After Task 10: Complete ETL flow with all table types
 - Performance metrics from actual runs
 - Optimization strategies implemented
 
 ### 3. `Quick_References.md`
-**Update After:** Each major task completion (6, 7, 8, 9)
+**Update After:** Each major task completion (7, 8, 9, 10)
 **What to Update:**
 - New SQL commands for testing
 - New package procedures added

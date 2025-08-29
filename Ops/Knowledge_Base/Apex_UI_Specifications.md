@@ -11,7 +11,7 @@
 SELECT plant_id, 
        short_description || ' (' || plant_id || ')' as display_value,
        CASE 
-         WHEN plant_id IN (SELECT plant_id FROM SELECTION_LOADER WHERE is_active = 'Y')
+         WHEN plant_id IN (SELECT plant_id FROM SELECTED_PLANTS WHERE is_active = 'Y')
          THEN 'Y' 
          ELSE 'N' 
        END as selected
@@ -26,16 +26,16 @@ ORDER BY short_description;
 **Action**: PL/SQL Process
 ```sql
 BEGIN
-  -- Add selected plants to SELECTION_LOADER
+  -- Add selected plants to SELECTED_PLANTS
   FOR i IN 1..APEX_APPLICATION.G_F01.COUNT LOOP
-    MERGE INTO SELECTION_LOADER tgt
+    MERGE INTO SELECTED_PLANTS tgt
     USING (SELECT APEX_APPLICATION.G_F01(i) as plant_id FROM DUAL) src
-    ON (tgt.plant_id = src.plant_id AND tgt.issue_revision IS NULL)
+    ON (tgt.plant_id = src.plant_id)
     WHEN NOT MATCHED THEN
-      INSERT (plant_id, is_active, selection_type, created_by, created_date)
-      VALUES (src.plant_id, 'Y', 'MANUAL', :APP_USER, SYSDATE)
+      INSERT (plant_id, is_active, selected_date, selected_by)
+      VALUES (src.plant_id, 'Y', SYSTIMESTAMP, :APP_USER)
     WHEN MATCHED THEN
-      UPDATE SET is_active = 'Y', last_modified_date = SYSDATE;
+      UPDATE SET is_active = 'Y', selected_date = SYSTIMESTAMP;
   END LOOP;
   COMMIT;
 END;
@@ -47,9 +47,9 @@ END;
 BEGIN
   -- Deactivate selected plants
   FOR i IN 1..APEX_APPLICATION.G_F01.COUNT LOOP
-    UPDATE SELECTION_LOADER 
+    UPDATE SELECTED_PLANTS 
     SET is_active = 'N', 
-        last_modified_date = SYSDATE
+        selected_date = SYSTIMESTAMP
     WHERE plant_id = APEX_APPLICATION.G_F01(i);
   END LOOP;
   COMMIT;
@@ -60,10 +60,16 @@ END;
 **Action**: PL/SQL Process
 ```sql
 BEGIN
-  UPDATE SELECTION_LOADER 
+  UPDATE SELECTED_PLANTS 
   SET is_active = 'N', 
-      last_modified_date = SYSDATE
+      selected_date = SYSTIMESTAMP
   WHERE is_active = 'Y';
+  
+  UPDATE SELECTED_ISSUES
+  SET is_active = 'N',
+      selected_date = SYSTIMESTAMP
+  WHERE is_active = 'Y';
+  
   COMMIT;
 END;
 ```
@@ -78,7 +84,7 @@ DECLARE
 BEGIN
   FOR plant_rec IN (
     SELECT DISTINCT plant_id 
-    FROM SELECTION_LOADER 
+    FROM SELECTED_PLANTS 
     WHERE is_active = 'Y'
   ) LOOP
     pkg_api_client.refresh_issues_from_api(
@@ -103,10 +109,10 @@ END;
 **Source**:
 ```sql
 SELECT plant_id,
-       (SELECT short_description FROM PLANTS WHERE PLANTS.plant_id = s.plant_id) as plant_name,
-       created_date as selected_date,
-       NVL(last_etl_run, 'Never') as last_processed
-FROM SELECTION_LOADER s
+       (SELECT short_description FROM PLANTS WHERE PLANTS.plant_id = sp.plant_id) as plant_name,
+       selected_date,
+       NVL(TO_CHAR(last_etl_run), 'Never') as last_processed
+FROM SELECTED_PLANTS sp
 WHERE is_active = 'Y'
 ORDER BY plant_id;
 ```
@@ -115,7 +121,8 @@ ORDER BY plant_id;
 **Type**: Static Content with Substitution Strings
 **Items to Create**:
 - P_TOTAL_PLANTS (from PLANTS where is_valid='Y')
-- P_SELECTED_PLANTS (from SELECTION_LOADER where is_active='Y')  
+- P_SELECTED_PLANTS (from SELECTED_PLANTS where is_active='Y')  
+- P_SELECTED_ISSUES (from SELECTED_ISSUES where is_active='Y')
 - P_ISSUES_COUNT (from ISSUES where plant_id in selected and is_valid='Y')
 
 ---
@@ -125,14 +132,15 @@ ORDER BY plant_id;
 ### To Select Plants (Backend Only):
 ```sql
 -- Clear previous selections
-UPDATE SELECTION_LOADER SET is_active = 'N';
+UPDATE SELECTED_PLANTS SET is_active = 'N';
+UPDATE SELECTED_ISSUES SET is_active = 'N';
 
--- Add JSP2 and GRANE
-INSERT INTO SELECTION_LOADER (plant_id, issue_revision, is_active, selection_type, created_by)
-VALUES ('JSP2', NULL, 'Y', 'MANUAL', USER);
+-- Add plant selections (using plant IDs 124 and 34)
+INSERT INTO SELECTED_PLANTS (plant_id, is_active, selected_date, selected_by)
+VALUES ('124', 'Y', SYSTIMESTAMP, USER);
 
-INSERT INTO SELECTION_LOADER (plant_id, issue_revision, is_active, selection_type, created_by)
-VALUES ('GRANE', NULL, 'Y', 'MANUAL', USER);
+INSERT INTO SELECTED_PLANTS (plant_id, is_active, selected_date, selected_by)
+VALUES ('34', 'Y', SYSTIMESTAMP, USER);
 
 COMMIT;
 ```
@@ -140,8 +148,14 @@ COMMIT;
 ### To Fetch Issues:
 ```sql
 -- For each selected plant
-EXEC pkg_api_client.refresh_issues_from_api('JSP2', :status, :message);
-EXEC pkg_api_client.refresh_issues_from_api('GRANE', :status, :message);
+EXEC pkg_api_client.refresh_issues_from_api('124', :status, :message);
+EXEC pkg_api_client.refresh_issues_from_api('34', :status, :message);
+
+-- Then select specific issues
+INSERT INTO SELECTED_ISSUES (plant_id, issue_revision, is_active, selected_date)
+VALUES ('34', '4.2', 'Y', SYSTIMESTAMP);
+
+COMMIT;
 ```
 
 ---
@@ -150,10 +164,10 @@ EXEC pkg_api_client.refresh_issues_from_api('GRANE', :status, :message);
 
 1. User sees list of all active plants
 2. Selects checkboxes for desired plants
-3. Clicks "Add Selected Plants" → Updates SELECTION_LOADER
+3. Clicks "Add Selected Plants" → Updates SELECTED_PLANTS table
 4. Clicks "Fetch Issues" → Calls API for each plant
 5. Views issues in separate region/page
-6. Selects specific issue revisions if needed
+6. Selects specific issue revisions → Updates SELECTED_ISSUES table
 7. Runs full ETL for selected data
 
 ---

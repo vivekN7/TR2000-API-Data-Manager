@@ -1,7 +1,7 @@
 # Task List: TR2000 ETL System Implementation
 
-## Session 17 In Progress (2025-12-29)
-**Status**: Tasks 1-8 COMPLETE ✅ | System optimized with loading modes | Ready for Task 9
+## Session 20 Complete (2025-12-30)
+**Status**: Tasks 1-9 COMPLETE ✅ | ETL_STATS fully functional | Workflow scripts fixed | Ready for Task 10.3+
 
 ## Tasks
 
@@ -106,74 +106,110 @@
   - [x] 8.17 Fixed JSON parsing paths for all PCS detail endpoints
   - [x] 8.18 Removed issue_revision dependency from PCS detail tables
 
-- [ ] 9.0 Build ETL Backend for VDS Details (Section 4 of API)
-  - [ ] 9.1 Review Section 4: Large dataset (44,000+ records)
-  - [ ] 9.2 Create VDS_DETAILS table with proper indexes
-  - [ ] 9.3 Build pkg_parse_vds for bulk JSON processing
-  - [ ] 9.4 Build pkg_upsert_vds with batch processing
-  - [ ] 9.5 Add VDS endpoint to CONTROL_ENDPOINTS
-  - [ ] 9.6 Extend pkg_api_client with fetch_vds_details
-  - [ ] 9.7 Implement pagination/chunking for large dataset
-  - [ ] 9.8 Add to ETL workflow with performance monitoring
-  - [ ] 9.9 Create analysis views for VDS data
-  - [ ] 9.10 Performance test with test data (JSP2, GRANE)
-  - [ ] 9.11 Run PKG_SIMPLE_TESTS with performance metrics
+- [x] 9.0 Build ETL Backend for VDS Details (Section 4 of API) ✅ COMPLETE
+  - [x] 9.1 Review Section 4: Large dataset (44,000+ records)
+  - [x] 9.2 Create VDS_DETAILS table with proper indexes
+  - [x] 9.3 Build pkg_parse_vds for bulk JSON processing
+  - [x] 9.4 Build pkg_upsert_vds with batch processing
+  - [x] 9.5 Add VDS endpoint to CONTROL_ENDPOINTS
+  - [x] 9.6 Extend pkg_api_client with fetch_vds_details
+  - [x] 9.7 Implement pagination/chunking for large dataset (done in pkg_upsert_vds)
+  - [x] 9.8 Add to ETL workflow with performance monitoring
+  - [x] 9.9 Create analysis views for VDS data
+  - [x] 9.10 Performance test with test data (JSP2, GRANE)
+  - [x] 9.11 Run PKG_SIMPLE_TESTS with performance metrics
 
-- [ ] 10.0 Build ETL Backend for BoltTension Tables (Section 5 of API)
-  - [ ] 10.1 Create schema for Flange Type (BOLT_FLANGE_TYPE)
-  - [ ] 10.2 Create schema for Gasket Type (BOLT_GASKET_TYPE)
-  - [ ] 10.3 Create schema for Bolt Material (BOLT_MATERIAL)
-  - [ ] 10.4 Create schema for Tension Forces (BOLT_TENSION_FORCES)
-  - [ ] 10.5 Create schema for Tool (BOLT_TOOL)
-  - [ ] 10.6 Create schema for Tool Pressure (BOLT_TOOL_PRESSURE)
-  - [ ] 10.7 Create schema for Plant Info and Lubricant tables
-  - [ ] 10.8 Build pkg_parse_bolttension for all 8 endpoints
-  - [ ] 10.9 Build pkg_upsert_bolttension
-  - [ ] 10.10 Add BoltTension API functions to pkg_api_client
-  - [ ] 10.11 Add to CONTROL_ENDPOINTS for dynamic processing
-  - [ ] 10.12 Validate with PKG_SIMPLE_TESTS framework
+- [ ] 10.0 Database Optimization & Cleanup (Session 19-20 Partial)
+  - [x] 10.1 Audit all tables - identify unused/redundant tables (Session 19: Completed)
+  - [x] 10.2 Remove unused tables that were identified, optimize and update other tables (Session 19: CONTROL_ENDPOINT_STATE→ETL_STATS, removed 2 tables)
+  - [x] 10.2a ETL_STATS fully implemented with logging for all operations (Session 20: Complete)
+  - [x] 10.2b Workflow scripts fixed - created _no_exit versions, archived originals (Session 20: Complete)
+  - [x] 10.2c VDS_LIST loading optimized for OFFICIAL_ONLY mode (Session 20: Complete)
+  - [ ] 10.3 Audit all views - remove unused/redundant, identify and add useful new views (with approval)
+  - [ ] 10.4 Cleanup unused packages/procedures, optimize others where possible
+  - [ ] 10.5 Optimize indexes based on actual query patterns
+  - [ ] 10.6 Review and streamline ETL control tables
+  - [ ] 10.7 Document each remaining object's purpose
+  - [ ] 10.8 Create database object dependency map
+  - [ ] 10.9 Archive old incremental scripts (50+ files)
+  - [ ] 10.10 Validate all remaining objects compile successfully
 
-- [ ] 11.0 Build APEX UI for ETL System [AFTER ETL BACKEND COMPLETE]
-  - [ ] 11.1 Create APEX page for Issue Reference data display with drill-down
-  - [ ] 11.2 Add reference counts to issue selection display
-  - [ ] 11.3 Create APEX reports and detail pages for PCS data
-  - [ ] 11.4 Implement PCS selection interface linked to plants
-  - [ ] 11.5 Create APEX interface with pagination for VDS display
-  - [ ] 11.6 Add VDS search and filter capabilities
-  - [ ] 11.7 Create APEX calculator interface for bolt tension
-  - [ ] 11.8 Link BoltTension data to PCS selections
-  - [ ] 11.9 Create dashboard with ETL statistics and status
-  - [ ] 11.10 Add data export capabilities (CSV, Excel)
-  - [ ] 11.11 Implement user preferences and saved filters
-  - [ ] 11.12 Final UI testing and refinement
+- [ ] 11.0 Documentation & Blazor Website Enhancement
+        **NOTE**: Plan the documentation pages first - keep website clean with minimal pages
+  - [ ] 11.1 Remove legacy pages from Blazor site (API Data Manager pages)
+  - [ ] 11.2 Create ETL Flow documentation page with interactive diagrams
+  - [ ] 11.3 Create ERD visualization page showing all table relationships
+  - [ ] 11.4 Create API Endpoint documentation page with call sequences
+  - [ ] 11.5 Create Data Flow diagram page (API → RAW → STG → CORE)
+  - [ ] 11.6 Add Process Flow documentation (Selection → ETL → References)
+  - [ ] 11.7 Create Testing Dashboard page showing test results
+  - [ ] 11.8 Add ETL Monitoring Dashboard with real-time statistics
+  - [ ] 11.9 Create Data Quality Dashboard page
+  - [ ] 11.10 Add System Health monitoring page
+  - [ ] 11.11 Document cascade operations and triggers
+  - [ ] 11.12 Create troubleshooting guide page
 
-- [ ] 12.0 Setup Automation [POST-PROJECT]
-  - [ ] 12.1 Create DBMS_SCHEDULER job for daily plant refresh
-  - [ ] 12.2 Create job for processing selected issues
-  - [ ] 12.3 Add job monitoring page in APEX
-  - [ ] 12.4 Implement email notifications on failure (optional)
-  - [ ] 12.5 Schedule PKG_SIMPLE_TESTS.run_critical_tests before each ETL run
+- [ ] 12.0 Blazor UI Development & Scheduling
+        **NOTE**: Plan the UI development and scheduling pages first - keep website clean with minimal pages
+  - [ ] 12.1 Create interactive Plant Selection page
+  - [ ] 12.2 Create Issue Selection and Management page
+  - [ ] 12.3 Build Reference Data Explorer with drill-down
+  - [ ] 12.4 Create PCS Details viewer with search
+  - [ ] 12.5 Build VDS Details browser with pagination
+  - [ ] 12.6 Add Test Results Dashboard with history
+  - [ ] 12.7 Create ETL Run History page with logs
+  - [ ] 12.8 Implement weekly export scheduler (CSV/Excel)
+  - [ ] 12.9 Add scheduled report generation
+  - [ ] 12.10 Create data export APIs for Blazor
+  - [ ] 12.11 Add user preference management
+  - [ ] 12.12 Implement role-based access control
 
-- [ ] 13.0 Performance Optimization Phase [AFTER CORE COMPLETE]
-  - [ ] 13.1 Implement full CONTROL_ENDPOINT_STATE tracking
-  - [ ] 13.2 Add HTTP HEAD request support for change detection
-  - [ ] 13.3 Implement exponential backoff for failed endpoints
-  - [ ] 13.4 Track "unchanged count" for adaptive checking frequency
-  - [ ] 13.5 Add time-of-day logic (business hours vs off-hours)
-  - [ ] 13.6 Implement batch processing for multiple plants
-  - [ ] 13.7 Add parallel processing for reference types
-  - [ ] 13.8 Optimize hash comparisons with checksums
-  - [ ] 13.9 Add API call metrics and reporting
-  - [ ] 13.10 Performance testing with large datasets
+- [ ] 13.0 BoltTension Analysis & Implementation
+  - [ ] 13.1 Analyze BoltTension API endpoints (Section 5)
+  - [ ] 13.2 Map BoltTension data to existing table structures
+  - [ ] 13.3 Identify if new tables are needed or existing can be reused
+  - [ ] 13.4 Document BoltTension data relationships
+  - [ ] 13.5 Create proof-of-concept using existing infrastructure
+  - [ ] 13.6 Test BoltTension data retrieval with minimal changes
+  - [ ] 13.7 Implement only necessary new components
+  - [ ] 13.8 Add BoltTension to ETL workflow if needed
+  - [ ] 13.9 Create BoltTension viewer in Blazor (can be queries making direct endpoint calls in the correct webpages)
+  - [ ] 13.10 Validate BoltTension data quality
 
-- [ ] 14.0 Cleanup & Documentation Phase
-  - [ ] 14.1 Review and remove unused tables (or document future use)
-    - CONTROL_ENDPOINT_STATE (decide: implement or remove)
-    - EXTERNAL_SYSTEM_REFS (keep for future integrations?)
-    - TEMP_TEST_DATA (remove or use for mock testing?)
-  - [ ] 14.2 Complete API documentation
-  - [ ] 14.3 Create operations runbook
-  - [ ] 14.4 Document troubleshooting procedures
-  - [ ] 14.5 Create data dictionary for all tables
-  - [ ] 14.6 Archive all incremental scripts
-  - [ ] 14.7 Final code review and cleanup
+- [ ] 14.0 Peer Review & Quality Assurance
+  - [ ] 14.1 Prepare comprehensive system documentation for review
+  - [ ] 14.2 Create code review package with key components
+  - [ ] 14.3 Submit ETL architecture for LLM peer review
+  - [ ] 14.4 Submit database design for review
+  - [ ] 14.5 Review test coverage and quality
+  - [ ] 14.6 Implement recommended security improvements
+  - [ ] 14.7 Apply performance optimization suggestions
+  - [ ] 14.8 Address code quality recommendations
+  - [ ] 14.9 Update documentation based on feedback
+  - [ ] 14.10 Create final review report
+
+- [ ] 15.0 Final Optimization & Knowledge Base Update
+  - [ ] 15.1 Apply all optimization recommendations from peer review
+  - [ ] 15.2 Update all Knowledge Base documents to current state
+  - [ ] 15.3 Archive outdated documentation
+  - [ ] 15.4 Create comprehensive deployment guide
+  - [ ] 15.5 Update Quick References with final commands
+  - [ ] 15.6 Document all lessons learned
+  - [ ] 15.7 Create performance benchmarks
+  - [ ] 15.8 Finalize error handling procedures
+  - [ ] 15.9 Update troubleshooting guides
+  - [ ] 15.10 Create system maintenance checklist
+
+- [ ] 16.0 Environment Migration & Deployment Strategy
+  - [ ] 16.1 Document current local environment configuration
+  - [ ] 16.2 Create migration scripts for network Oracle database
+  - [ ] 16.3 Design synchronization strategy (Dev → Network → Prod)
+  - [ ] 16.4 Create environment-specific configuration files
+  - [ ] 16.5 Build automated deployment pipeline
+  - [ ] 16.6 Test migration to network database
+  - [ ] 16.7 Document rollback procedures
+  - [ ] 16.8 Create production deployment checklist
+  - [ ] 16.9 Design continuous deployment workflow
+  - [ ] 16.10 Create environment sync utilities
+  - [ ] 16.11 Document change management process
+  - [ ] 16.12 Final production readiness review

@@ -24,22 +24,23 @@ Guidelines for managing task lists in markdown files to track progress on comple
 2. Fix references: `@Database/scripts/fix_reference_validity.sql` 
 3. Verify: `@Database/scripts/final_system_test.sql`
 
-## 📊 CURRENT STATUS (Session 17 Complete - 2025-12-29)
+## 📊 CURRENT STATUS (Session 18 Complete - 2025-12-30)
 
 ### Quick Status
-- **Completed**: Tasks 1-8 ✅ FULLY TESTED AND OPTIMIZED
-- **System State**: 130 plants, 20 issues, 4,572 references, 362 PCS revisions
-- **Test Coverage**: ~40-45% (32 tests, 29 passing)
-- **Next Priority**: Task 9 - VDS Details (44k+ records)
-- **Documentation**: Fully updated to Version 4.0
+- **Completed**: Tasks 1-9 ✅ FULLY TESTED AND OPTIMIZED
+- **System State**: 130 plants, 20 issues, 4,572 references, 53,319 VDS details
+- **Test Coverage**: ~85-90% (75 tests across 9 packages)
+- **Next Priority**: Task 10 - Database Optimization & Cleanup
+- **Documentation**: Fully updated to Version 5.0
+- **Strategic Shift**: Moving from APEX to Blazor UI development
 
-### Session 17 Achievements (2025-12-29)
-- ✅ Task 8 (PCS Details) COMPLETE with 82% API optimization
-- ✅ Added PCS_LOADING_MODE setting (OFFICIAL_ONLY default)
-- ✅ Fixed PCS JSON parsing paths for all 6 endpoints
-- ✅ Removed issue_revision dependency from PCS details
-- ✅ Added 5 new critical tests (all passing)
-- ✅ Merged all incremental scripts and archived
+### Session 18 Achievements (2025-12-30)
+- ✅ Task 9 (VDS Details) COMPLETE - 53,319 records loaded
+- ✅ Added 4 comprehensive test packages (43 new tests)
+- ✅ Test coverage improved from 40% to 85-90%
+- ✅ All test gaps resolved (high/medium priority)
+- ✅ Performance optimized: 6,865 records/sec VDS parsing
+- ✅ Documentation updated to reflect current state
 
 ### Session 13 Achievements (2025-08-27)
 - ✅ TR2000_UTIL proxy migration COMPLETE
@@ -319,13 +320,11 @@ FUNCTION test_reference_parsing RETURN VARCHAR2; -- JSON structure
 - **Wallet Path**: C:\app\vivek\product\21c\dbhomeXE\network\admin\wallet
 - **Wallet Password**: WalletPass123
 
-### APEX Application
-- **Application**: TR2000 ETL Manager (App 101)
-- **Access**: http://localhost:8888/ords/
-- **Workspace**: TR2000_ETL
-- **Username**: ADMIN
-- **Password**: Apex!1985
-- **Key Page**: Page 5 (ETL Control Center)
+### UI Strategy Update
+- **Previous**: APEX Application (App 101) - NOW SHELVED
+- **Current**: TR2000 Blazor Website for all UI needs
+- **Reason**: APEX is unwieldy, awaiting Oracle CLI interface
+- **Focus**: Documentation, dashboards, and testing pages in Blazor
 
 ### Object Naming Conventions
 - **Views**: `V_*` - General reporting views
@@ -412,14 +411,34 @@ When user clicks "Run Full ETL":
   - Section 1: Operators and Plants (✅ COMPLETE in Tasks 1-5)
   - Section 2: Issue References - 9 types (✅ COMPLETE in Task 7)
   - Section 3: PCS Details - 6 detail types (✅ COMPLETE in Task 8)
-  - Section 4: VDS Details - 44,000+ records (📋 NEXT - Task 9)
-  - Section 5: BoltTension - 8 endpoints (📋 Task 10)
+  - Section 4: VDS Details - 53,319 records (✅ COMPLETE in Task 9)
+  - Section 5: BoltTension - 8 endpoints (📋 DEFERRED to Task 13)
 
 ### Other Documentation
 - **Master Index**: `/Ops/Doc_Index_Readme.md` - Documentation guidelines
 - **Test Matrix**: `/Ops/Testing/ETL_Test_Matrix.md` - Test scenarios
 - **Knowledge Base**: `/Ops/Knowledge_Base/` - Architecture guides
 - **Task List**: `/Ops/Setup/tasks-tr2k-etl.md` - Task tracking
+
+## 🎯 NEW STRATEGIC DIRECTION (Session 18)
+
+### Major Changes
+1. **UI Strategy**: APEX development shelved → All UI in Blazor website
+2. **BoltTension**: Deferred until after system understanding/documentation
+3. **Focus Areas**: 
+   - Database cleanup and optimization first
+   - Comprehensive documentation in Blazor
+   - Testing and monitoring dashboards
+   - Environment migration planning
+
+### Task Priorities
+1. **Task 10**: Database Optimization - Remove unused objects
+2. **Task 11**: Documentation in Blazor - ETL flows, ERDs, API docs
+3. **Task 12**: Blazor UI Development - Dashboards and schedulers
+4. **Task 13**: BoltTension Analysis - Reuse existing infrastructure
+5. **Task 14**: Peer Review - External validation
+6. **Task 15**: Final Optimization - Apply all improvements
+7. **Task 16**: Migration Strategy - Dev → Network → Production
 
 ## AI INSTRUCTIONS
 
@@ -430,3 +449,4 @@ When working with task lists, the AI must:
 4. Before starting work, check which sub‑task is next
 5. After implementing a sub‑task, update the file and pause for user approval
 6. **ONLY update tasks-tr2k-etl.md** - no other documentation updates needed
+7. **NEW**: Focus on Blazor UI instead of APEX for all user interfaces

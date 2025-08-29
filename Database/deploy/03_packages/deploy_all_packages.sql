@@ -36,7 +36,7 @@ PROMPT =========================================================================
 -- PCS Details packages (Task 8)
 @14_pkg_parse_pcs_details.sql
 @15_pkg_upsert_pcs_details.sql
-@16_pkg_api_client_pcs_details_v2.sql
+@16_pkg_api_client_pcs_details.sql
 
 PROMPT
 PROMPT ===============================================================================

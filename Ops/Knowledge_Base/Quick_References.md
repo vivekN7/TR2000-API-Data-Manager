@@ -15,8 +15,11 @@ SELECT * FROM PLANTS WHERE is_valid = 'Y';
 -- Check ETL history
 SELECT * FROM ETL_RUN_LOG ORDER BY start_time DESC;
 
--- Current selections
-SELECT * FROM SELECTION_LOADER WHERE is_active = 'Y';
+-- Current plant selections
+SELECT * FROM SELECTED_PLANTS WHERE is_active = 'Y';
+
+-- Current issue selections
+SELECT * FROM SELECTED_ISSUES WHERE is_active = 'Y';
 
 -- Find potential plant ID changes
 SELECT old.plant_id as old_id, new.plant_id as new_id, old.short_description
@@ -44,13 +47,13 @@ SELECT COUNT(*) as active_plants FROM PLANTS WHERE is_valid = 'Y';
 -- Issues for selected plants  
 SELECT i.* 
 FROM ISSUES i
-JOIN SELECTION_LOADER s ON i.plant_id = s.plant_id
-WHERE s.is_active = 'Y' AND i.is_valid = 'Y';
+JOIN SELECTED_PLANTS sp ON i.plant_id = sp.plant_id
+WHERE sp.is_active = 'Y' AND i.is_valid = 'Y';
 
--- ETL history for selections
+-- ETL history for selected plants
 SELECT * FROM ETL_RUN_LOG 
 WHERE plant_id IN (
-  SELECT plant_id FROM SELECTION_LOADER WHERE is_active = 'Y'
+  SELECT plant_id FROM SELECTED_PLANTS WHERE is_active = 'Y'
 )
 ORDER BY start_time DESC;
 ```
@@ -176,15 +179,45 @@ SELECT COUNT(*) FROM PLANTS WHERE is_valid = 'Y';  -- Should be 130
 SELECT COUNT(*) FROM ISSUES WHERE plant_id IN ('124','34');  -- Should be 20
 ```
 
+## Additional Important Queries
+
+### VDS Data Monitoring
+```sql
+-- Check VDS reference counts
+SELECT COUNT(*) FROM VDS_REFERENCES WHERE is_valid = 'Y';
+
+-- Check VDS details loaded
+SELECT COUNT(*) FROM VDS_DETAILS;
+
+-- VDS details for specific reference
+SELECT * FROM VDS_DETAILS 
+WHERE vds_name = 'your_vds_name' 
+AND revision = 'your_revision';
+```
+
+### Reference Tables Overview
+```sql
+-- Count all references by type
+SELECT 'PCS' as type, COUNT(*) as count FROM PCS_REFERENCES WHERE is_valid = 'Y'
+UNION ALL SELECT 'VDS', COUNT(*) FROM VDS_REFERENCES WHERE is_valid = 'Y'
+UNION ALL SELECT 'MDS', COUNT(*) FROM MDS_REFERENCES WHERE is_valid = 'Y'
+UNION ALL SELECT 'PIPE_ELEMENT', COUNT(*) FROM PIPE_ELEMENT_REFERENCES WHERE is_valid = 'Y'
+UNION ALL SELECT 'VSK', COUNT(*) FROM VSK_REFERENCES WHERE is_valid = 'Y'
+UNION ALL SELECT 'EDS', COUNT(*) FROM EDS_REFERENCES WHERE is_valid = 'Y'
+UNION ALL SELECT 'SC', COUNT(*) FROM SC_REFERENCES WHERE is_valid = 'Y'
+UNION ALL SELECT 'VSM', COUNT(*) FROM VSM_REFERENCES WHERE is_valid = 'Y'
+UNION ALL SELECT 'ESK', COUNT(*) FROM ESK_REFERENCES WHERE is_valid = 'Y';
+```
+
 ## Current Database Status
-- **Tables**: 11 (all documented with COMMENT ON)
-- **Views**: 11 (all documented with COMMENT ON)  
-- **Indexes**: 44 (optimized with composite indexes)
-- **Packages**: 8 (with inline -- comments in source)
-- **Procedure**: 1 (APEX_ETL_CONTROL_ACTION)
+- **Tables**: 30+ (including all reference and detail tables)
+- **Views**: 15+ (monitoring and analysis views)  
+- **Indexes**: 50+ (optimized with composite indexes)
+- **Packages**: 20+ (full ETL pipeline)
+- **Test Coverage**: ~85-90% (75 tests across 9 packages)
 - **All Objects**: VALID ✅
 
 ---
 
-*Last Updated: 2025-08-24 Session 4*
-*Version: 1.2 - Consolidated documentation*
+*Last Updated: 2025-12-30 Session 18*
+*Version: 2.0 - Updated with current architecture*

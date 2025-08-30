@@ -46,53 +46,37 @@ WHERE plant_id = '124';
 ### 2. Running the ETL - Three Separate Processes
 
 #### Process 1: Reference Data ETL
-```sql
--- Load all reference data based on ETL_FILTER
-EXEC PKG_ETL_CONTROL.run_full_etl();
-```
-This will:
+**Command**: Execute the main reference ETL procedure
+
+**What it does:**
 1. Clear all reference tables
 2. Process each entry in ETL_FILTER
 3. Load 9 reference types per issue
 4. Log the results
 
 #### Process 2: PCS Details ETL
-```sql
--- Load detailed PCS information (run AFTER references)
-EXEC PKG_ETL_CONTROL.run_pcs_details_etl();
-```
-This will:
+**Command**: Execute the PCS details ETL procedure (run AFTER references)
+
+**What it does:**
 1. Clear all PCS detail tables
 2. Extract unique PCS from PCS_REFERENCES
 3. Fetch 6 detail endpoints per PCS
 4. Load temperature/pressure, pipe sizes, elements, etc.
 
 #### Process 3: VDS Catalog ETL (Independent)
-```sql
--- Load entire VDS catalog (44,000+ items)
-EXEC PKG_ETL_CONTROL.run_vds_catalog_etl();
-```
-This will:
+**Command**: Execute the VDS catalog ETL procedure
+
+**What it does:**
 1. Clear VDS_LIST table
 2. Fetch entire VDS catalog from API
 3. Load all VDS items
 4. Takes 30+ seconds due to volume
 
 #### Complete ETL Sequence
-```sql
--- Run all three processes in correct order
-BEGIN
-    -- 1. Load references first
-    PKG_ETL_CONTROL.run_full_etl();
-    
-    -- 2. Then load PCS details (depends on references)
-    PKG_ETL_CONTROL.run_pcs_details_etl();
-    
-    -- 3. Load VDS catalog (independent, can run anytime)
-    PKG_ETL_CONTROL.run_vds_catalog_etl();
-END;
-/
-```
+To run all three processes in the correct order:
+1. **Load references first** - Establishes base data
+2. **Then load PCS details** - Depends on references
+3. **Load VDS catalog** - Independent, can run anytime
 
 #### Check Progress
 ```sql
@@ -158,55 +142,29 @@ FETCH FIRST 20 ROWS ONLY;
 
 ### Task: Load a New Plant/Issue with Details
 
-```sql
--- Step 1: Add to filter
-INSERT INTO ETL_FILTER (plant_id, plant_name, issue_revision, added_by_user_id)
-VALUES ('35', 'NEWPLANT', '1.0', 'your.name');
-
--- Step 2: Run reference ETL
-EXEC PKG_ETL_CONTROL.run_full_etl();
-
--- Step 3: Load PCS details
-EXEC PKG_ETL_CONTROL.run_pcs_details_etl();
-
--- Step 4: Verify
-SELECT 
-    (SELECT COUNT(*) FROM PCS_REFERENCES 
-     WHERE plant_id = '35' AND issue_revision = '1.0') as pcs_refs,
-    (SELECT COUNT(*) FROM PCS_HEADER_PROPERTIES 
-     WHERE plant_id = '35') as pcs_details
-FROM DUAL;
-```
+**Steps:**
+1. **Add to filter** - Insert new plant/issue into ETL_FILTER table
+2. **Run reference ETL** - Load all reference data
+3. **Load PCS details** - Fetch detailed PCS information
+4. **Verify** - Check counts in reference and detail tables
 
 ### Task: Refresh All Data
 
-```sql
--- Complete refresh of all three ETL processes
-BEGIN
-    PKG_ETL_CONTROL.run_full_etl();         -- References
-    PKG_ETL_CONTROL.run_pcs_details_etl();  -- PCS Details
-    PKG_ETL_CONTROL.run_vds_catalog_etl();  -- VDS Catalog
-END;
-/
-```
+**Process:**
+Run all three ETL processes in sequence:
+1. Reference ETL for all configured plant/issues
+2. PCS Details ETL for all loaded references
+3. VDS Catalog ETL for complete valve data
 
 ### Task: Update VDS Catalog Only
 
-```sql
--- VDS catalog is independent - can update anytime
-EXEC PKG_ETL_CONTROL.run_vds_catalog_etl();
-```
+Since VDS catalog is independent, it can be updated anytime without affecting other data. Simply run the VDS catalog ETL procedure.
 
 ### Task: Remove Old Plant Data
 
-```sql
--- Step 1: Remove from filter
-DELETE FROM ETL_FILTER WHERE plant_id = 'OLD_PLANT_ID';
-
--- Step 2: Run ETL to clear it out
-EXEC PKG_ETL_CONTROL.run_full_etl();
-EXEC PKG_ETL_CONTROL.run_pcs_details_etl();
-```
+**Steps:**
+1. **Remove from filter** - Delete the plant/issue from ETL_FILTER
+2. **Run ETL processes** - Both reference and PCS details ETL will clear out the old data
 
 ### Task: Check What's Loaded
 
@@ -231,17 +189,11 @@ ORDER BY plant_id, issue_revision;
 
 ### Problem: ETL Failed
 
-**Solution**: Identify which process failed and rerun:
-```sql
--- For reference ETL failures:
-EXEC PKG_ETL_CONTROL.run_full_etl();
+**Solution**: Identify which process failed and rerun that specific ETL procedure:
+- **Reference ETL failures**: Run the reference ETL procedure
+- **PCS details failures**: Run the PCS details ETL procedure
+- **VDS catalog failures**: Run the VDS catalog ETL procedure
 
--- For PCS details failures:
-EXEC PKG_ETL_CONTROL.run_pcs_details_etl();
-
--- For VDS catalog failures:
-EXEC PKG_ETL_CONTROL.run_vds_catalog_etl();
-```
 The system clears everything first, so running again is always safe.
 
 ### Problem: Missing Data
@@ -271,44 +223,22 @@ ORDER BY error_timestamp DESC;
 
 **This shouldn't happen** in the new system because we clear everything first. If you see partial data:
 
-1. Run full ETL again:
-```sql
-EXEC PKG_ETL_CONTROL.run_full_etl();
-```
-
-2. If still issues, manually clear and retry:
-```sql
-EXEC PKG_ETL_CONTROL.clear_all_data_tables();
-EXEC PKG_ETL_CONTROL.run_full_etl();
-```
+1. **Run the affected ETL process again** - It will clear and reload
+2. **If still issues**: Check ETL_ERROR_LOG for specific errors
 
 ### Problem: API Timeout
 
 **Symptom**: ETL takes very long or fails with timeout errors
 
 **For VDS Catalog** (44,000+ items):
-```sql
--- This is expected to take 30+ seconds
--- If it times out, just retry:
-EXEC PKG_ETL_CONTROL.run_vds_catalog_etl();
-```
+- Expected to take 30+ seconds
+- If it times out, simply retry the VDS catalog ETL
 
 **For PCS Details** (many API calls):
-```sql
--- Process in smaller batches by limiting active filters
--- Temporarily disable some filters
-UPDATE ETL_FILTER SET filter_id = -filter_id 
-WHERE plant_id IN ('PLANT1', 'PLANT2');
-
--- Run for remaining
-EXEC PKG_ETL_CONTROL.run_full_etl();
-EXEC PKG_ETL_CONTROL.run_pcs_details_etl();
-
--- Re-enable and process the rest
-UPDATE ETL_FILTER SET filter_id = ABS(filter_id) WHERE filter_id < 0;
-EXEC PKG_ETL_CONTROL.run_full_etl();
-EXEC PKG_ETL_CONTROL.run_pcs_details_etl();
-```
+- Process in smaller batches by temporarily disabling some ETL_FILTER entries
+- Use negative filter_id as a disable flag
+- Run ETL for active filters only
+- Re-enable and process the rest
 
 ## Performance Tips
 
@@ -334,7 +264,7 @@ GROUP BY endpoint;
 
 ### Simplified Flow
 1. **ETL_FILTER** defines what to load
-2. **clear_all_data_tables()** removes old data
+2. **Clear phase** removes old data
 3. **API calls** fetch fresh data
 4. **RAW_JSON** stores API responses
 5. **STG_* tables** temporarily hold parsed data
@@ -411,31 +341,16 @@ ORDER BY bytes DESC;
 ## Emergency Procedures
 
 ### Complete Reset
-```sql
--- Nuclear option - clears everything
-BEGIN
-    -- Clear all data
-    PKG_ETL_CONTROL.clear_all_data_tables();
-    
-    -- Clear all logs (optional)
-    DELETE FROM ETL_RUN_LOG;
-    DELETE FROM ETL_ERROR_LOG;
-    DELETE FROM RAW_JSON;
-    
-    -- Keep ETL_FILTER intact
-    COMMIT;
-END;
-/
-```
+**Nuclear option - clears everything:**
+1. Clear all data tables
+2. Optionally clear all logs (ETL_RUN_LOG, ETL_ERROR_LOG, RAW_JSON)
+3. Keep ETL_FILTER intact
+4. Commit changes
 
 ### Disable All Processing
-```sql
--- Remove all filters temporarily
-DELETE FROM ETL_FILTER;
--- Or backup first
-CREATE TABLE ETL_FILTER_BACKUP AS SELECT * FROM ETL_FILTER;
-DELETE FROM ETL_FILTER;
-```
+**To stop all ETL processing:**
+- Remove all entries from ETL_FILTER
+- Or create a backup table first, then clear ETL_FILTER
 
 ### Check System Health
 ```sql

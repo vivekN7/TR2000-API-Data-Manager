@@ -146,98 +146,32 @@ VDS_LIST
 
 ### 1. PKG_ETL_CONTROL
 **Purpose**: Orchestrate ETL processes
-```sql
-PROCEDURES:
--- Reference Data ETL
-- run_full_etl()                -- Main entry for references
-- clear_all_reference_tables()  -- Clear reference data only
-- process_issue()               -- Process single issue
 
--- PCS Details ETL  
-- run_pcs_details_etl()        -- Load details for all PCS references
-- clear_all_pcs_details()      -- Clear PCS detail tables only
-- process_pcs_details()        -- Process details for one PCS
-
--- VDS Catalog ETL
-- run_vds_catalog_etl()        -- Load entire VDS catalog
-- clear_vds_list()             -- Clear VDS_LIST table
-
--- Utilities
-- log_etl_run()                -- Log ETL execution
-```
+**Key Procedures:**
+- **Reference Data ETL**: Main entry point, clear tables, process issues
+- **PCS Details ETL**: Load details for all PCS references  
+- **VDS Catalog ETL**: Load entire VDS catalog
+- **Utilities**: Logging and error handling
 
 ### 2. PKG_API_CLIENT
 **Purpose**: Handle all API communications
-```sql
-FUNCTIONS:
--- Reference endpoints
-- fetch_references(plant_id, issue_rev, ref_type) RETURN CLOB
 
--- PCS endpoints
-- fetch_pcs_list(plant_id) RETURN CLOB
-- fetch_pcs_header(plant_id, pcs_name, revision) RETURN CLOB
-- fetch_pcs_temp_pressures(plant_id, pcs_name, revision) RETURN CLOB
-- fetch_pcs_pipe_sizes(plant_id, pcs_name, revision) RETURN CLOB
-- fetch_pcs_pipe_elements(plant_id, pcs_name, revision) RETURN CLOB
-- fetch_pcs_valve_elements(plant_id, pcs_name, revision) RETURN CLOB
-- fetch_pcs_embedded_notes(plant_id, pcs_name, revision) RETURN CLOB
-
--- VDS endpoints
-- fetch_vds_list() RETURN CLOB
-
-PROCEDURES:
-- store_raw_json(endpoint, plant_id, issue_rev, pcs_name, pcs_rev, payload)
-```
+**Key Functions:**
+- **Reference endpoints**: Fetch data for 9 reference types
+- **PCS endpoints**: 6 detail endpoints (header, temp/pressure, sizes, elements, valves, notes)
+- **VDS endpoint**: Single endpoint for entire catalog
+- **RAW_JSON storage**: Store all API responses for audit
 
 ### 3. PKG_ETL_PROCESSOR
 **Purpose**: Parse JSON and load data
-```sql
-PROCEDURES:
--- Reference parsing (JSON → STG)
-- parse_pcs_references(raw_json_id)
-- parse_vds_references(raw_json_id)
-- parse_mds_references(raw_json_id)
-- parse_eds_references(raw_json_id)
-- parse_vsk_references(raw_json_id)
-- parse_esk_references(raw_json_id)
-- parse_pipe_element_references(raw_json_id)
-- parse_sc_references(raw_json_id)
-- parse_vsm_references(raw_json_id)
 
--- Reference loading (STG → Final)
-- load_pcs_references(plant_id, issue_rev)
-- load_vds_references(plant_id, issue_rev)
-- load_mds_references(plant_id, issue_rev)
-- load_eds_references(plant_id, issue_rev)
-- load_vsk_references(plant_id, issue_rev)
-- load_esk_references(plant_id, issue_rev)
-- load_pipe_element_references(plant_id, issue_rev)
-- load_sc_references(plant_id, issue_rev)
-- load_vsm_references(plant_id, issue_rev)
-
--- PCS Details parsing
-- parse_pcs_header_properties(raw_json_id)
-- parse_pcs_temp_pressures(raw_json_id)
-- parse_pcs_pipe_sizes(raw_json_id)
-- parse_pcs_pipe_elements(raw_json_id)
-- parse_pcs_valve_elements(raw_json_id)
-- parse_pcs_embedded_notes(raw_json_id)
-
--- PCS Details loading
-- load_pcs_header_properties(plant_id, pcs_name, revision)
-- load_pcs_temp_pressures(plant_id, pcs_name, revision)
-- load_pcs_pipe_sizes(plant_id, pcs_name, revision)
-- load_pcs_pipe_elements(plant_id, pcs_name, revision)
-- load_pcs_valve_elements(plant_id, pcs_name, revision)
-- load_pcs_embedded_notes(plant_id, pcs_name, revision)
-
--- VDS Catalog
-- parse_vds_list(raw_json_id)
-- load_vds_list()
-
--- Utilities
-- extract_unique_pcs_from_references() RETURN pcs_cursor
-```
+**Key Procedure Groups:**
+- **Reference parsing**: JSON to staging for 9 reference types
+- **Reference loading**: Staging to final tables
+- **PCS Details parsing**: JSON to staging for 6 detail types
+- **PCS Details loading**: Staging to final detail tables
+- **VDS Catalog**: Parse and load VDS items
+- **Utilities**: Extract unique PCS combinations
 
 ## Detailed ETL Processes
 
@@ -251,202 +185,62 @@ VALUES ('34', 'GRANE', '4.2', 'john.doe');
 ```
 
 #### Step 2: Run Reference ETL
-```sql
-PROCEDURE run_full_etl IS
-BEGIN
-    -- 1. Clear all reference tables
-    clear_all_reference_tables();
-    
-    -- 2. Process each entry in ETL_FILTER
-    FOR rec IN (SELECT * FROM ETL_FILTER) LOOP
-        process_issue(rec.plant_id, rec.issue_revision);
-    END LOOP;
-    
-    -- 3. Log completion
-    log_etl_run('REFERENCE_ETL', 'Full reference ETL completed');
-END;
-```
+The main ETL procedure performs these conceptual steps:
+1. **Clear all reference tables** - Remove existing data
+2. **Process each ETL_FILTER entry** - Loop through configured plant/issue combinations
+3. **Log completion** - Record success in ETL_RUN_LOG
 
 #### Step 3: Process Single Issue
-```sql
-PROCEDURE process_issue(p_plant_id VARCHAR2, p_issue_rev VARCHAR2) IS
-    l_json CLOB;
-    l_raw_id NUMBER;
-BEGIN
-    -- Fetch and store each reference type
-    FOR ref_type IN ('PCS', 'VDS', 'MDS', 'EDS', 'VSK', 'ESK', 
-                     'PIPE-ELEMENT', 'SC', 'VSM') LOOP
-        
-        -- Get from API
-        l_json := PKG_API_CLIENT.fetch_references(p_plant_id, p_issue_rev, ref_type);
-        
-        -- Store in RAW_JSON
-        l_raw_id := PKG_API_CLIENT.store_raw_json(
-            ref_type, p_plant_id, p_issue_rev, NULL, NULL, l_json);
-        
-        -- Parse to staging
-        CASE ref_type
-            WHEN 'PCS' THEN parse_pcs_references(l_raw_id);
-            WHEN 'VDS' THEN parse_vds_references(l_raw_id);
-            -- ... etc
-        END CASE;
-        
-        -- Load to final table
-        CASE ref_type
-            WHEN 'PCS' THEN load_pcs_references(p_plant_id, p_issue_rev);
-            WHEN 'VDS' THEN load_vds_references(p_plant_id, p_issue_rev);
-            -- ... etc
-        END CASE;
-    END LOOP;
-END;
-```
+For each plant/issue combination, the process:
+1. **Loops through 9 reference types** (PCS, VDS, MDS, EDS, VSK, ESK, PIPE-ELEMENT, SC, VSM)
+2. **For each reference type:**
+   - Fetches data from API endpoint
+   - Stores raw response in RAW_JSON for audit
+   - Parses JSON to staging tables
+   - Loads from staging to final reference tables
+3. **Commits after successful processing**
 
 ### Process 2: PCS Details ETL
 
 #### Step 1: Extract Unique PCS from References
-```sql
-PROCEDURE run_pcs_details_etl IS
-    CURSOR c_pcs IS
-        SELECT DISTINCT plant_id, pcs_name, official_revision
-        FROM PCS_REFERENCES
-        WHERE official_revision IS NOT NULL;
-BEGIN
-    -- 1. Clear all PCS detail tables
-    clear_all_pcs_details();
-    
-    -- 2. Process each unique PCS
-    FOR rec IN c_pcs LOOP
-        process_pcs_details(rec.plant_id, rec.pcs_name, rec.official_revision);
-    END LOOP;
-    
-    -- 3. Log completion
-    log_etl_run('PCS_DETAILS_ETL', 'PCS details ETL completed');
-END;
-```
+The PCS details ETL process:
+1. **Clears all PCS detail tables** - Start fresh
+2. **Extracts unique PCS combinations** - Gets distinct plant_id, pcs_name, and official_revision from PCS_REFERENCES
+3. **Processes each unique PCS** - Calls detail endpoints for each combination
+4. **Logs completion** - Records success
 
 #### Step 2: Process PCS Details
-```sql
-PROCEDURE process_pcs_details(
-    p_plant_id VARCHAR2, 
-    p_pcs_name VARCHAR2, 
-    p_revision VARCHAR2
-) IS
-    l_json CLOB;
-    l_raw_id NUMBER;
-BEGIN
-    -- 1. Fetch header and properties
-    l_json := PKG_API_CLIENT.fetch_pcs_header(p_plant_id, p_pcs_name, p_revision);
-    l_raw_id := PKG_API_CLIENT.store_raw_json(
-        'PCS_HEADER', p_plant_id, NULL, p_pcs_name, p_revision, l_json);
-    parse_pcs_header_properties(l_raw_id);
-    load_pcs_header_properties(p_plant_id, p_pcs_name, p_revision);
-    
-    -- 2. Fetch temperature/pressure
-    l_json := PKG_API_CLIENT.fetch_pcs_temp_pressures(p_plant_id, p_pcs_name, p_revision);
-    l_raw_id := PKG_API_CLIENT.store_raw_json(
-        'PCS_TEMP_PRESS', p_plant_id, NULL, p_pcs_name, p_revision, l_json);
-    parse_pcs_temp_pressures(l_raw_id);
-    load_pcs_temp_pressures(p_plant_id, p_pcs_name, p_revision);
-    
-    -- 3. Fetch pipe sizes
-    l_json := PKG_API_CLIENT.fetch_pcs_pipe_sizes(p_plant_id, p_pcs_name, p_revision);
-    l_raw_id := PKG_API_CLIENT.store_raw_json(
-        'PCS_PIPE_SIZES', p_plant_id, NULL, p_pcs_name, p_revision, l_json);
-    parse_pcs_pipe_sizes(l_raw_id);
-    load_pcs_pipe_sizes(p_plant_id, p_pcs_name, p_revision);
-    
-    -- 4. Fetch pipe elements
-    l_json := PKG_API_CLIENT.fetch_pcs_pipe_elements(p_plant_id, p_pcs_name, p_revision);
-    l_raw_id := PKG_API_CLIENT.store_raw_json(
-        'PCS_PIPE_ELEMENTS', p_plant_id, NULL, p_pcs_name, p_revision, l_json);
-    parse_pcs_pipe_elements(l_raw_id);
-    load_pcs_pipe_elements(p_plant_id, p_pcs_name, p_revision);
-    
-    -- 5. Fetch valve elements
-    l_json := PKG_API_CLIENT.fetch_pcs_valve_elements(p_plant_id, p_pcs_name, p_revision);
-    l_raw_id := PKG_API_CLIENT.store_raw_json(
-        'PCS_VALVE_ELEMENTS', p_plant_id, NULL, p_pcs_name, p_revision, l_json);
-    parse_pcs_valve_elements(l_raw_id);
-    load_pcs_valve_elements(p_plant_id, p_pcs_name, p_revision);
-    
-    -- 6. Fetch embedded notes
-    l_json := PKG_API_CLIENT.fetch_pcs_embedded_notes(p_plant_id, p_pcs_name, p_revision);
-    l_raw_id := PKG_API_CLIENT.store_raw_json(
-        'PCS_EMBEDDED_NOTES', p_plant_id, NULL, p_pcs_name, p_revision, l_json);
-    parse_pcs_embedded_notes(l_raw_id);
-    load_pcs_embedded_notes(p_plant_id, p_pcs_name, p_revision);
-    
-    COMMIT;
-EXCEPTION
-    WHEN OTHERS THEN
-        log_etl_error('PCS_DETAILS', p_pcs_name || '/' || p_revision, SQLERRM);
-        ROLLBACK;
-END;
-```
+For each unique PCS combination, the process calls 6 different API endpoints:
+1. **Header and Properties** - General PCS information
+2. **Temperature/Pressure** - Design conditions
+3. **Pipe Sizes** - Size specifications
+4. **Pipe Elements** - Material components
+5. **Valve Elements** - Valve specifications
+6. **Embedded Notes** - Additional documentation
+
+Each endpoint follows the same pattern:
+- Fetch data from API
+- Store raw JSON response
+- Parse to staging table
+- Load to final detail table
+- Handle errors with rollback
 
 ### Process 3: VDS Catalog ETL (Independent)
 
-#### Run VDS Catalog Load
-```sql
-PROCEDURE run_vds_catalog_etl IS
-    l_json CLOB;
-    l_raw_id NUMBER;
-    v_count NUMBER;
-BEGIN
-    -- 1. Clear VDS_LIST table
-    clear_vds_list();
-    
-    -- 2. Fetch entire VDS catalog (44,000+ items)
-    l_json := PKG_API_CLIENT.fetch_vds_list();
-    
-    -- 3. Store in RAW_JSON
-    l_raw_id := PKG_API_CLIENT.store_raw_json(
-        'VDS_CATALOG', NULL, NULL, NULL, NULL, l_json);
-    
-    -- 4. Parse to staging
-    parse_vds_list(l_raw_id);
-    
-    -- 5. Load to final table
-    load_vds_list();
-    
-    -- 6. Get count
-    SELECT COUNT(*) INTO v_count FROM VDS_LIST;
-    
-    -- 7. Log completion
-    log_etl_run('VDS_CATALOG_ETL', 'Loaded ' || v_count || ' VDS items');
-    
-    COMMIT;
-EXCEPTION
-    WHEN OTHERS THEN
-        log_etl_error('VDS_CATALOG', 'FULL_LOAD', SQLERRM);
-        ROLLBACK;
-        RAISE;
-END;
-```
+#### VDS Catalog Load Process
+The VDS catalog ETL is completely independent and follows these steps:
+1. **Clear VDS_LIST table** - Remove existing catalog
+2. **Fetch entire VDS catalog** - Single API call returns 44,000+ items
+3. **Store in RAW_JSON** - Audit trail of the large response
+4. **Parse to staging** - Extract VDS items to STG_VDS_LIST
+5. **Load to final table** - Simple INSERT from staging
+6. **Log completion** - Record count and success
 
-#### Simple VDS Load Pattern
-```sql
-PROCEDURE load_vds_list IS
-BEGIN
-    INSERT INTO VDS_LIST (
-        vds_guid, vds_name, revision, status, rev_date,
-        description, valve_type_id, rating_class_id,
-        material_group_id, end_connection_id, bore_id,
-        size_range, custom_name, subsegment_list,
-        created_date, last_modified_date
-    )
-    SELECT 
-        SYS_GUID(), vds, revision, status, 
-        TO_DATE(rev_date, 'YYYY-MM-DD'),
-        description, valve_type_id, rating_class_id,
-        material_group_id, end_connection_id, bore_id,
-        size_range, custom_name, subsegment_list,
-        SYSDATE, SYSDATE
-    FROM STG_VDS_LIST;
-    
-    DBMS_OUTPUT.PUT_LINE('Loaded ' || SQL%ROWCOUNT || ' VDS catalog items');
-END;
-```
+Key characteristics:
+- **No dependencies** - Can run anytime, independent of other ETL processes
+- **Single API call** - One endpoint returns entire catalog
+- **Large volume** - Typically 44,000+ items, takes 30+ seconds
+- **Simple recovery** - If fails, just run again
 
 ## Error Handling Strategy
 
@@ -479,24 +273,12 @@ END;
    - Clear and reload: `EXEC PKG_ETL_CONTROL.run_vds_catalog_etl();`
 
 ### Recovery Procedures
-```sql
--- For Reference Data issues:
-EXEC PKG_ETL_CONTROL.run_full_etl();
+Recovery is straightforward - just rerun the failed process:
+- **Reference Data issues**: Run the reference ETL again
+- **PCS Details issues**: Run the PCS details ETL again  
+- **VDS Catalog issues**: Run the VDS catalog ETL again
 
--- For PCS Details issues:
-EXEC PKG_ETL_CONTROL.run_pcs_details_etl();
-
--- For VDS Catalog issues:
-EXEC PKG_ETL_CONTROL.run_vds_catalog_etl();
-
--- Nuclear option - reload everything:
-BEGIN
-    PKG_ETL_CONTROL.run_full_etl();
-    PKG_ETL_CONTROL.run_pcs_details_etl();
-    PKG_ETL_CONTROL.run_vds_catalog_etl();
-END;
-/
-```
+Since each process clears its tables first, rerunning is always safe. For a complete system refresh, run all three processes in sequence.
 
 ## What We Eliminated
 

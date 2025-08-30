@@ -23,13 +23,15 @@ Before any ETL process starts, clear all data tables except:
 - Control tables (ETL_FILTER, CONTROL_SETTINGS)
 - Logging tables (ETL_LOG, ETL_RUN_LOG, ETL_ERROR_LOG, ETL_STATS)
 - RAW_JSON (audit trail)
+- VDS_LIST (not cleared since it's a separate ETL process)
 
 Tables to clear:
 - All reference tables (PCS_REFERENCES, VDS_REFERENCES, MDS_REFERENCES, etc.)
 - All PCS detail tables (PCS_HEADER_PROPERTIES, PCS_TEMP_PRESSURES, etc.)
 - PCS_LIST
-- VDS_LIST
 - All staging tables (STG_*)
+
+Main flow for all processes: API Call → RAW_JSON → STG_* → Core tables
 
 ### Process 1: Reference Data ETL (Issue-based)
 **Flow:** ETL_FILTER → For each plant_id and issue_revision → API Calls → Parse → Load
@@ -62,11 +64,13 @@ Tables to clear:
 - `https://equinor.pipespec-api.presight.com/plants/{plantid}/pcs/{pcsname}/rev/{official_revision}/valve-elements`
 - `https://equinor.pipespec-api.presight.com/plants/{plantid}/pcs/{pcsname}/rev/{official_revision}/embedded-notes`
 
-### Process 4: VDS Catalog ETL (Independent)
+### VDS Catalog ETL (Independent - Separate Process)
 **Flow:** Manual Trigger → Clear VDS_LIST → API Call → Parse → Load
 
 **API Endpoint:**
 - `https://equinor.pipespec-api.presight.com/vds` (No parameters, returns 50,000+ items)
+
+Note: This is a completely separate ETL process, not part of the main ETL flow.
 
 ## Core Tables
 

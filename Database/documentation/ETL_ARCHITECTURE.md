@@ -1,4 +1,4 @@
-# ETL Simplified Architecture - TR2000 Staging System
+# ETL Architecture & Operations Guide - TR2000 Staging System
 
 ## System Philosophy
 
@@ -16,34 +16,57 @@
 - Maintenance overhead exceeded benefits
 - Simple is reliable
 
-## Architecture Overview
+## ETL Processes
 
-### Three Distinct ETL Processes
+### Initial Clear Phase
+Before any ETL process starts, clear all data tables except:
+- Control tables (ETL_FILTER, CONTROL_SETTINGS)
+- Logging tables (ETL_LOG, ETL_RUN_LOG, ETL_ERROR_LOG, ETL_STATS)
+- RAW_JSON (audit trail)
 
-#### 1. Reference Data ETL (Issue-based)
-```
-ETL_FILTER → Clear References → API Calls → Parse → Load
-```
-Loads reference data (PCS, VDS, MDS, EDS, VSK, ESK, PIPE_ELEMENT, SC, VSM) for specific plant/issue combinations.
+Tables to clear:
+- All reference tables (PCS_REFERENCES, VDS_REFERENCES, MDS_REFERENCES, etc.)
+- All PCS detail tables (PCS_HEADER_PROPERTIES, PCS_TEMP_PRESSURES, etc.)
+- PCS_LIST
+- VDS_LIST
+- All staging tables (STG_*)
 
-#### 2. PCS Details ETL (Reference-dependent)
-```
-PCS_REFERENCES → Extract Unique PCS → API Calls → Parse → Load Details
-```
-Loads detailed PCS information based on PCS references already loaded.
+### Process 1: Reference Data ETL (Issue-based)
+**Flow:** ETL_FILTER → For each plant_id and issue_revision → API Calls → Parse → Load
 
-#### 3. VDS Catalog ETL (Independent)
-```
-Manual Trigger → Clear VDS_LIST → API Call → Parse → Load
-```
-Loads entire VDS catalog (44,000+ items) - completely independent of plant/issue selections.
+**API Endpoints:**
+- `https://equinor.pipespec-api.presight.com/plants/{plantid}/issues/rev/{issuerev}/pcs`
+- `https://equinor.pipespec-api.presight.com/plants/{plantid}/issues/rev/{issuerev}/vds`
+- `https://equinor.pipespec-api.presight.com/plants/{plantid}/issues/rev/{issuerev}/mds`
+- `https://equinor.pipespec-api.presight.com/plants/{plantid}/issues/rev/{issuerev}/eds`
+- `https://equinor.pipespec-api.presight.com/plants/{plantid}/issues/rev/{issuerev}/vsk`
+- `https://equinor.pipespec-api.presight.com/plants/{plantid}/issues/rev/{issuerev}/esk`
+- `https://equinor.pipespec-api.presight.com/plants/{plantid}/issues/rev/{issuerev}/pipe-elements`
+- `https://equinor.pipespec-api.presight.com/plants/{plantid}/issues/rev/{issuerev}/sc`
+- `https://equinor.pipespec-api.presight.com/plants/{plantid}/issues/rev/{issuerev}/vsm`
 
-### Key Components
-- **ETL_FILTER**: Control table for reference data loading
-- **RAW_JSON**: Audit trail of all API calls
-- **STG_* Tables**: Temporary parsing workspace
-- **Final Tables**: Clean data ready for use
-- **No PLANTS/ISSUES tables**: ETL_FILTER is the only control for references
+### Process 2: PCS_LIST Load
+**Flow:** ETL_FILTER → For each unique plant_id → API Call → Parse → Load
+
+**API Endpoint:**
+- `https://equinor.pipespec-api.presight.com/plants/{plantid}/pcs`
+
+### Process 3: PCS Details ETL (Reference-dependent)
+**Flow:** ETL_FILTER → For each plant_id and issue_revision → Get PCS_NAME and official_revision from PCS_REFERENCES → API Calls → Parse → Load
+
+**API Endpoints (6 per PCS):**
+- `https://equinor.pipespec-api.presight.com/plants/{plantid}/pcs/{pcsname}/rev/{official_revision}`
+- `https://equinor.pipespec-api.presight.com/plants/{plantid}/pcs/{pcsname}/rev/{official_revision}/temp-pressures`
+- `https://equinor.pipespec-api.presight.com/plants/{plantid}/pcs/{pcsname}/rev/{official_revision}/pipe-sizes`
+- `https://equinor.pipespec-api.presight.com/plants/{plantid}/pcs/{pcsname}/rev/{official_revision}/pipe-elements`
+- `https://equinor.pipespec-api.presight.com/plants/{plantid}/pcs/{pcsname}/rev/{official_revision}/valve-elements`
+- `https://equinor.pipespec-api.presight.com/plants/{plantid}/pcs/{pcsname}/rev/{official_revision}/embedded-notes`
+
+### Process 4: VDS Catalog ETL (Independent)
+**Flow:** Manual Trigger → Clear VDS_LIST → API Call → Parse → Load
+
+**API Endpoint:**
+- `https://equinor.pipespec-api.presight.com/vds` (No parameters, returns 50,000+ items)
 
 ## Core Tables
 
@@ -65,7 +88,7 @@ CONTROL_SETTINGS
 └── last_modified
 ```
 
-### 2. Audit Table
+### 2. RAW_JSON Table (Raw data dump for parsing)
 ```sql
 RAW_JSON
 ├── raw_json_id (PK)
@@ -90,13 +113,14 @@ RAW_JSON
 - SC_REFERENCES
 - VSM_REFERENCES
 
-### 4. PCS Detail Tables (Reference-dependent)
-- PCS_HEADER_PROPERTIES
-- PCS_TEMP_PRESSURES
-- PCS_PIPE_SIZES
-- PCS_PIPE_ELEMENTS
-- PCS_VALVE_ELEMENTS
-- PCS_EMBEDDED_NOTES
+### 4. PCS Tables
+- PCS_LIST (All PCS for a plant)
+- PCS_HEADER_PROPERTIES (Detail table)
+- PCS_TEMP_PRESSURES (Detail table)
+- PCS_PIPE_SIZES (Detail table)
+- PCS_PIPE_ELEMENTS (Detail table)
+- PCS_VALVE_ELEMENTS (Detail table)
+- PCS_EMBEDDED_NOTES (Detail table)
 
 ### 5. VDS Catalog Table (Independent)
 ```sql
@@ -120,6 +144,7 @@ VDS_LIST
 ```
 
 ### 6. Staging Tables (Temporary)
+All staging tables use VARCHAR2 for all columns (no strong typing) to allow direct JSON transfer:
 - STG_PCS_REFERENCES
 - STG_VDS_REFERENCES
 - STG_MDS_REFERENCES
@@ -129,6 +154,7 @@ VDS_LIST
 - STG_PIPE_ELEMENT_REFERENCES
 - STG_SC_REFERENCES
 - STG_VSM_REFERENCES
+- STG_PCS_LIST
 - STG_VDS_LIST
 - STG_PCS_HEADER_PROPERTIES
 - STG_PCS_TEMP_PRESSURES
@@ -137,10 +163,13 @@ VDS_LIST
 - STG_PCS_VALVE_ELEMENTS
 - STG_PCS_EMBEDDED_NOTES
 
+Note: Data is properly typed (NUMBER, DATE, etc.) when moving from STG_* to final tables.
+
 ### 7. Control/Logging Tables
-- ETL_STATS
-- ETL_RUN_LOG
-- ETL_ERROR_LOG
+- ETL_LOG - Main ETL execution log
+- ETL_RUN_LOG - Individual run details
+- ETL_ERROR_LOG - Error tracking
+- ETL_STATS - Performance statistics
 
 ## Package Structure
 
@@ -173,112 +202,67 @@ VDS_LIST
 - **VDS Catalog**: Parse and load VDS items
 - **Utilities**: Extract unique PCS combinations
 
-## Detailed ETL Processes
+## User Operations
 
-### Process 1: Reference Data ETL
+### Managing ETL_FILTER
 
-#### Step 1: User Setup
 ```sql
--- User adds what they want to load
+-- View current filters
+SELECT plant_id, plant_name, issue_revision, added_date, added_by_user_id
+FROM ETL_FILTER
+ORDER BY plant_id, issue_revision;
+
+-- Add new plant/issue
 INSERT INTO ETL_FILTER (plant_id, plant_name, issue_revision, added_by_user_id)
 VALUES ('34', 'GRANE', '4.2', 'john.doe');
+
+-- Remove plant/issue
+DELETE FROM ETL_FILTER 
+WHERE plant_id = '34' AND issue_revision = '4.2';
 ```
 
-#### Step 2: Run Reference ETL
-The main ETL procedure performs these conceptual steps:
-1. **Clear all reference tables** - Remove existing data
-2. **Process each ETL_FILTER entry** - Loop through configured plant/issue combinations
-3. **Log completion** - Record success in ETL_RUN_LOG
+### Running ETL Processes
 
-#### Step 3: Process Single Issue
-For each plant/issue combination, the process:
-1. **Loops through 9 reference types** (PCS, VDS, MDS, EDS, VSK, ESK, PIPE-ELEMENT, SC, VSM)
-2. **For each reference type:**
-   - Fetches data from API endpoint
-   - Stores raw response in RAW_JSON for audit
-   - Parses JSON to staging tables
-   - Loads from staging to final reference tables
-3. **Commits after successful processing**
+1. **Reference Data ETL** - Processes all entries in ETL_FILTER
+2. **PCS_LIST Load** - Loads all PCS for configured plants
+3. **PCS Details ETL** - Loads details for PCS references (run after references)
+4. **VDS Catalog ETL** - Independent, can run anytime
 
-### Process 2: PCS Details ETL
+### Monitoring
 
-#### Step 1: Extract Unique PCS from References
-The PCS details ETL process:
-1. **Clears all PCS detail tables** - Start fresh
-2. **Extracts unique PCS combinations** - Gets distinct plant_id, pcs_name, and official_revision from PCS_REFERENCES
-3. **Processes each unique PCS** - Calls detail endpoints for each combination
-4. **Logs completion** - Records success
+```sql
+-- Check overall status
+SELECT 
+    'ETL Filters' as component, COUNT(*) as count FROM ETL_FILTER
+UNION ALL
+SELECT 'PCS References', COUNT(*) FROM PCS_REFERENCES
+UNION ALL
+SELECT 'PCS Details', COUNT(*) FROM PCS_HEADER_PROPERTIES
+UNION ALL
+SELECT 'VDS Catalog', COUNT(*) FROM VDS_LIST;
 
-#### Step 2: Process PCS Details
-For each unique PCS combination, the process calls 6 different API endpoints:
-1. **Header and Properties** - General PCS information
-2. **Temperature/Pressure** - Design conditions
-3. **Pipe Sizes** - Size specifications
-4. **Pipe Elements** - Material components
-5. **Valve Elements** - Valve specifications
-6. **Embedded Notes** - Additional documentation
+-- Check recent ETL runs
+SELECT status, message, run_timestamp 
+FROM ETL_RUN_LOG 
+ORDER BY run_timestamp DESC
+FETCH FIRST 10 ROWS ONLY;
 
-Each endpoint follows the same pattern:
-- Fetch data from API
-- Store raw JSON response
-- Parse to staging table
-- Load to final detail table
-- Handle errors with rollback
+-- Check for errors
+SELECT * FROM ETL_ERROR_LOG
+WHERE error_timestamp > SYSDATE - 1
+ORDER BY error_timestamp DESC;
+```
 
-### Process 3: VDS Catalog ETL (Independent)
+## Error Recovery
 
-#### VDS Catalog Load Process
-The VDS catalog ETL is completely independent and follows these steps:
-1. **Clear VDS_LIST table** - Remove existing catalog
-2. **Fetch entire VDS catalog** - Single API call returns 44,000+ items
-3. **Store in RAW_JSON** - Audit trail of the large response
-4. **Parse to staging** - Extract VDS items to STG_VDS_LIST
-5. **Load to final table** - Simple INSERT from staging
-6. **Log completion** - Record count and success
+### Simple Recovery Pattern
+If any ETL process fails, just run it again. The system clears tables first, so rerunning is always safe.
 
-Key characteristics:
-- **No dependencies** - Can run anytime, independent of other ETL processes
-- **Single API call** - One endpoint returns entire catalog
-- **Large volume** - Typically 44,000+ items, takes 30+ seconds
-- **Simple recovery** - If fails, just run again
+- **Reference Data issues**: Run reference ETL again
+- **PCS Details issues**: Run PCS details ETL again  
+- **VDS Catalog issues**: Run VDS catalog ETL again
 
-## Error Handling Strategy
-
-### Failure Scenarios by Process Type
-
-#### Reference Data ETL Failures
-1. **API Call Fails**: 
-   - Old data remains (nothing was cleared yet)
-   - Fix issue and run again: `EXEC PKG_ETL_CONTROL.run_full_etl();`
-
-2. **Parse/Load Fails**:
-   - Partial data in reference tables
-   - Run full ETL again (will clear and reload)
-
-#### PCS Details ETL Failures
-1. **Missing PCS Reference**:
-   - Skip that PCS and continue with others
-   - Log error for review
-
-2. **API Call Fails for Specific PCS**:
-   - That PCS's details remain empty
-   - Can retry just PCS details: `EXEC PKG_ETL_CONTROL.run_pcs_details_etl();`
-
-#### VDS Catalog ETL Failures
-1. **API Timeout** (44,000+ items):
-   - No data loaded (transaction rolled back)
-   - Retry: `EXEC PKG_ETL_CONTROL.run_vds_catalog_etl();`
-
-2. **Partial Load**:
-   - Clear and reload: `EXEC PKG_ETL_CONTROL.run_vds_catalog_etl();`
-
-### Recovery Procedures
-Recovery is straightforward - just rerun the failed process:
-- **Reference Data issues**: Run the reference ETL again
-- **PCS Details issues**: Run the PCS details ETL again  
-- **VDS Catalog issues**: Run the VDS catalog ETL again
-
-Since each process clears its tables first, rerunning is always safe. For a complete system refresh, run all three processes in sequence.
+For VDS Catalog (50,000+ items), timeouts are expected - simply retry.
 
 ## What We Eliminated
 
@@ -319,48 +303,24 @@ Since each process clears its tables first, rerunning is always safe. For a comp
 - **Fast Loads**: Simple INSERT statements
 - **No Complex Logic**: No triggers firing, no cascades
 
-## Processing Order and Dependencies
+## API Call Volumes
 
-### Execution Sequence
-1. **VDS Catalog** (Independent - can run anytime)
-   - No dependencies
-   - Single API call
-   - ~44,000 items
-
-2. **Reference Data** (Issue-based)
-   - Depends on ETL_FILTER entries
-   - 9 API calls per issue
-   - Must complete before PCS details
-
-3. **PCS Details** (Reference-dependent)
-   - Depends on PCS_REFERENCES
-   - 6 API calls per unique PCS
-   - Can run after references loaded
-
-### API Call Volumes
 For a typical issue with 100 PCS references:
 - **Reference ETL**: 9 API calls (one per reference type)
+- **PCS_LIST**: 1 API call per plant
 - **PCS Details ETL**: ~600 API calls (6 endpoints × 100 unique PCS)
 - **VDS Catalog ETL**: 1 API call (entire catalog)
 
-Total: ~610 API calls per issue + 1 for VDS catalog
+Total: ~610 API calls per issue
 
 ## Summary
 
-The new architecture separates ETL into three distinct processes:
-
-1. **Reference Data ETL**: Issue-based loading controlled by ETL_FILTER
-2. **PCS Details ETL**: Loads detailed information for PCS references
-3. **VDS Catalog ETL**: Independent catalog load
-
 **Old System**: API → Plants → Issues → Selected → Cascades → Soft-deletes → Complex Data
-**New System**: 
-- References: ETL_FILTER → API → Clear → Load
-- PCS Details: PCS_REFERENCES → API → Clear → Load
-- VDS Catalog: Manual → API → Clear → Load
 
-This approach is ideal for a staging system where:
+**New System**: ETL_FILTER → Clear All → API → Parse → Load
+
+This simplified approach is ideal for a staging system where:
 - The API is the source of truth
-- Different data types have different update frequencies
 - Simplicity and reliability are priorities
-- Clear separation of concerns is needed
+- Recovery is straightforward (just run again)
+- No partial updates or complex merges needed

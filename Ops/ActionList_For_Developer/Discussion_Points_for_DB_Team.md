@@ -43,8 +43,8 @@ The ETL system assumes `plant_id` values from the API are immutable (never chang
 
 ### Points to Confirm
 1. Is soft delete acceptable for all tables?
-2. Any regulatory requirements for data retention/purging?
-3. Performance implications as tables grow?
+2. Do we really need this? As it complicates the system and need to take care of potential multiple failure points.
+
 
 ### Status
 **Implemented and Working**

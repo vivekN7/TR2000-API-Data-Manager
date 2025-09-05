@@ -1,0 +1,12 @@
+SET SERVEROUTPUT ON
+SET LINESIZE 200
+
+-- Check PKG_ETL_LOGGING.log_error signature
+SELECT text 
+FROM user_source 
+WHERE name = 'PKG_ETL_LOGGING' 
+AND type = 'PACKAGE'
+AND UPPER(text) LIKE '%LOG_ERROR%'
+ORDER BY line;
+
+EXIT;

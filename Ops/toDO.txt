@@ -1,0 +1,162 @@
+1) These tables have loaded
+- EDS_REFERENCES, STG_EDS_REFERENCES
+- MDS_REFERENCES, STG_MDS_REFERENCES
+- PCS_LIST, STG_PCS_LIST
+- PCS_REFERENCES, STG_PCS_REFERENCES
+- SC_REFERENCES, STG_SC_REFERENCES
+- RAW_JSON
+- VDS_REFERENCES, STG_VDS_REFERENCES
+- VSK_REFERENCES, STG_VSK_REFERENCES
+- VSM_REFERENCES, STG_VSM_REFERENCES
+
+
+These tables have not loaded but have data in json. Parser implementation is pending:
+- PCS_EMBEDDED_NOTES, STG_PCS_EMBEDDED_NOTES
+- PCS_HEADER_PROPERTIES, STG_PCS_HEADER_PROPERTIES 
+- PCS_PIPE_ELEMENTS, STG_PCS_PIPE_ELEMENTS  
+- PCS_PIPE_SIZES, STG_PCS_PIPE_SIZES
+- PCS_TEMP_PRESSURES, STG_PCS_TEMP_PRESSURES
+- PCS_VALVE_ELEMENTS, STG_PCS_VALVE_ELEMENTS
+- PIPE_ELEMENT_REFERENCES, STG_PIPE_ELEMENT_REFERENCES 
+
+- ETL_PERFORMANCE_METRICS - can we change the time metrics to seconds instead of ms? makes more sense to end user. if so.. remember to also fix the header name and all its references.
+
+- clear raw_json, etl_log, etl_errot_log, etl_run_log, ETL_PERFORMANCE_METRICS during testing so we can test with a clean slate
+
+- PCS DETAILS mentioned above - parsing to be implemented.
+
+
+For 2. RAW_JSON issue_revision is NULL for PCS endpoints > Rename the "endpoint" column a "ENDPOINT_VALUE", " add another column "ENDPOINT_URL" that gives the URL template where the category is in {}. This is the same as ENDPOINT_URL in CONTROL_ENDPOINTS. Are we actually using this or is the url hardcoded in? Remove columns "Plant_ID", "Issue_Revision", "PCS_NAME" and "PCS_Revision". The 2nd column make a new column that adds the ENDPOINT_KEY, which is the same as ENDPOINT_KEY in CONTROL_ENDPOINTS - For example in /plants/34/pcs/BD100/rev/C/embedded-notes, the ENDPOINT_TARGET = embedded-notes. Make "ENDPOINT_URL" and "ENDPOINT_VALUE" appear together in the 3rd and 4rth columns when i see in sql_developer or any select statements. Recreate the table if you need to achieve this. 
+Not sure if this is possible, but can we then create a view to automatically split the columns that appear in {} as headers in ENDPOINT_TEMPLATE and put their values that appear in ENDPOINT_VALUE as values?
+
+For 3. header-properties is coming from the endpoint_url connected to PCS_HEADER_PROPERTIES as stated in control_endpoints. Are we hardcoding urls in the procedures/packages? I hope not. and i do NOT see this being loaded in raw_json select * from raw_json where upper(endpoint) like upper('%header%'); check for yourself.
+
+For 4. ignore this and see my comments to point 2 instead.
+
+
+
+
+
+1) First understand how the proxy api call system works with tr2000_util (this was requested by my dba) from the etl_Architecture file you just read. This is also the script my dba gave me @
+this write to our raw_json and etl_log tables. The system was working fine before. But then we updated our raw_json table to be better and that ended up breaking things. It looks like the tr2000_util is writing to some columns in our table that may not be necessary or we need to rename our columns to fit it. So can you do an investigation and make suggestions on the best way forward - asking my dba to change his script is possible if it has benefits, or if its easy fix to rename our columns without losing much benefits then we may do that. so do a comparison study and let me know and suggest what we should do.
+if we are changing, I would like to change the name "etl_log" to something else more appropriate like "API_CALL_LOG" or "APEX_API_CALL_LOG".  make some suggestions.
+2) in the last session we also worked on removing any hardcoded values/url etc and to be able to get from CONTROL_ENDPOINTS and control_settings. This work may not be finished yet as we were unable to test.
+3) We also made a view V_RAW_JSON_PARAMS to try and extract the categories {} in the url in control_endpoints.endpoint_url and automatically make them headers and the values from their endpoint_value will display as the values.
+
+
+lets fix these first in this session.
+
+
+ Summary of Pending Activities for Next Session
+
+  Critical Infrastructure Changes (DBA Required)
+
+  1. TR2000_UTIL Modifications - Add support for new RAW_JSON structure with endpoint_key, endpoint_url, endpoint_value
+  2. Table Rename - ETL_LOG → API_CALL_LOG for clarity
+
+  Database Structure Improvements
+
+  1. RAW_JSON Redesigned - Now uses endpoint_key, endpoint_url, endpoint_value (scripts ready)
+  2. CONTROL_ENDPOINTS Standardized - All keys uppercase, consistent parameter names
+  3. V_RAW_JSON_PARAMS View - Dynamic parameter extraction using extract_param_value function
+  4. PKG_API_CLIENT Refactored - No more hardcoded URLs, uses CONTROL_ENDPOINTS
+
+  Remaining Implementation Tasks
+
+  1. PCS Details Parsers - 7 tables need parsers (PCS_HEADER_PROPERTIES, PCS_TEMP_PRESSURES, etc.)
+  2. ETL_PERFORMANCE_METRICS - Convert from milliseconds to seconds
+  3. VDS Catalog Parser - Handle 50,000+ items
+  4. PIPE_ELEMENT_REFERENCES - Fix unique constraint violations
+
+
+  
+
+
+
+
+
+- VDS_LIST and STG_VDS_LIST to be tested
+
+- we need to test data for - ESK_REFERENCES, STG_ESK_REFERENCES
+- the above tables where data is not loaded, check for nulls
+- is there test pressure in ANY pcs_list plant or issue? seems all null, so difficult to test
+- ETL_RUN_LOG: the run_type IS CURRENTLY "FULL ETL", maybe should be something else.
+
+testing:
+1) data conversion errors: what if supposed to be numeric but is string in json/stg
+2) For cases where where data is in json but is null in stg_ and core tables, error is currently not logged as it is a silent error, how can we capture these?
+3) etl_metrics: also in this table... why is "plant_id" = 124 showing up in several rows? We only selected plant 34 didnt we?
+4) we should prob have a pattern whereby rawjson and stg_ has same column headers. then transform to core tables with proper names.
+
+
+go through and see if anything is hardcoded in the packages, procedures, triggers etc - it is!! refactor
+
+
+
+
+
+  Priority 1: Fix Constraint Issues 🔴
+
+  - PIPE_ELEMENT_REFERENCES has UK_PIPE_ELEM_REF unique constraint violation
+  - Need to handle duplicates in the API data
+
+  Priority 2: Implement PCS Details Parsers 🔴
+
+  Six tables with 0 records - parsers not implemented:
+  1. PCS_HEADER_PROPERTIES
+  2. PCS_TEMP_PRESSURES
+  3. PCS_PIPE_SIZES
+  4. PCS_PIPE_ELEMENTS
+  5. PCS_VALVE_ELEMENTS
+  6. PCS_EMBEDDED_NOTES
+
+  Priority 3: Performance Metrics 🟡
+
+  - Convert time units from milliseconds to seconds
+  - Rename columns from _MS to _SEC
+  - Update calculations in PKG_MAIN_ETL_CONTROL
+
+  Priority 4: VDS Catalog Parser 🟡
+
+  - Implement parse_and_load_vds_catalog procedure
+  - Handle 50,000+ items without timeout
+  - Consider batching strategy
+
+  Priority 5: Testing & Validation 🟢
+
+  - Full ETL cycle test
+  - Performance benchmarking
+  - Error recovery testing
+
+  What's Working Now ✅
+
+  - Proxy architecture correctly implemented (3-schema pattern)
+  - ETL fetching real data from Equinor API
+  - 9 reference types loading successfully
+  - Clean RAW_JSON structure with proper columns
+  - No hardcoded URLs - everything uses CONTROL_ENDPOINTS
+  - batch_id linking between API_PROXY and TR2000_STAGING
+
+
+
+
+
+
+
+
+
+  1) but etl_, vds_catalog_ etc are fixed anyway and shouldnt change i think? if it does we need to do whole lot more changes anyway, so i think lets take revert these back to keep control_Settings also not so complex in case we need to add more tables in the future (and we will!).
+   the batch_id_date_format as well... does it really need a string passed to it? isnt it a direct timesteamp or date passed to tr2000_util? please check this.
+  2) same reasons as point 1) equinor will not change their api naming convention just like that without breaking a lot more things, so please revert back to the way it was
+  3) same.. i think revert back as this is just fixed to each table anyway and not something that is expected to change
+4) remove the fallback column and remove its use in any procedure/package. there is unfortunately only one url.
+
+
+
+
+  1. 165 "No Data Found" errors for PCS_HEADER - The API doesn't have header data for many PCS (expected)
+  2. 132 API 500 errors - The API returns server errors for some PCS pipe sizes/elements (API issue)
+  3. 3 Duplicate violations - Some embedded notes have duplicates (data quality issue)
+  4. 1 Table not exist - Fixed by creating staging tables
+
+  fix these errors. need to do a proper error logger
